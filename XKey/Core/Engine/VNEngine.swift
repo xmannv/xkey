@@ -672,8 +672,9 @@ class VNEngine {
             return
         }
         
-        // Check VNI special case
-        var VEI = 0
+        // Check VNI special case - find the vowel to apply circumflex/horn
+        // VEI = -1 means no valid vowel (a, e, o) was found
+        var VEI = -1
         if vInputType == 1 { // VNI
             for i in stride(from: Int(index) - 1, through: 0, by: -1) {
                 let key = chr(i)
@@ -683,7 +684,7 @@ class VNEngine {
                 }
             }
         }
-        
+
         let keyForAEO: UInt16
         if vInputType != 1 {
             keyForAEO = keyCode
@@ -691,7 +692,9 @@ class VNEngine {
             if keyCode == VietnameseData.KEY_7 || keyCode == VietnameseData.KEY_8 {
                 keyForAEO = VietnameseData.KEY_W
             } else if keyCode == VietnameseData.KEY_6 {
-                keyForAEO = chr(VEI)
+                // For VNI key 6: apply circumflex to found vowel (a->â, e->ê, o->ô)
+                // If no vowel found (VEI == -1), keyForAEO will be 0 and won't match any pattern
+                keyForAEO = VEI >= 0 ? chr(VEI) : 0
             } else {
                 keyForAEO = keyCode
             }
@@ -736,18 +739,25 @@ class VNEngine {
                 isChanged = true
                 
                 // Check if it's double letter (A, O, E) or W
-                let isKeyDouble = (vInputType != 1 && (keyForAEO == VietnameseData.KEY_A || 
-                                                       keyForAEO == VietnameseData.KEY_O || 
+                // For VNI: key 6 adds circumflex (^) to a, e, o -> â, ê, ô
+                // We check keyCode (original key pressed) for VNI, not keyForAEO (which is already converted to vowel)
+                let isKeyDouble = (vInputType != 1 && (keyForAEO == VietnameseData.KEY_A ||
+                                                       keyForAEO == VietnameseData.KEY_O ||
                                                        keyForAEO == VietnameseData.KEY_E)) ||
-                                 (vInputType == 1 && keyForAEO == VietnameseData.KEY_6)
+                                 (vInputType == 1 && keyCode == VietnameseData.KEY_6)
                 
                 let isKeyW = isKeyW(keyCode: keyCode, inputType: vInputType)
                 
                 if isKeyDouble {
                     insertAOE(keyCode: keyForAEO, isCaps: isCaps)
                 } else if isKeyW {
-                    // VNI special check
+                    // VNI special validation for key 7 and key 8:
+                    // Key 7: horn (móc) for 'o' → 'ơ' and 'u' → 'ư'
+                    // Key 8: breve (trăng) only for 'a' → 'ă'
+                    var shouldProcess = true
                     if vInputType == 1 {
+                        // Re-search for vowels including U for horn (key 7)
+                        VEI = -1
                         for i in stride(from: Int(index) - 1, through: 0, by: -1) {
                             let key = chr(i)
                             if key == VietnameseData.KEY_O || key == VietnameseData.KEY_U ||
@@ -756,14 +766,29 @@ class VNEngine {
                                 break
                             }
                         }
-                        if (keyCode == VietnameseData.KEY_7 && chr(VEI) == VietnameseData.KEY_A && 
-                            (VEI - 1 >= 0 ? chr(VEI - 1) != VietnameseData.KEY_U : true)) ||
-                           (keyCode == VietnameseData.KEY_8 && (chr(VEI) == VietnameseData.KEY_O || 
-                                                                chr(VEI) == VietnameseData.KEY_U)) {
-                            break
+
+                        if VEI < 0 {
+                            // No vowel found - don't process, insert key as-is
+                            shouldProcess = false
+                        } else {
+                            let vowelKey = chr(VEI)
+                            if keyCode == VietnameseData.KEY_7 {
+                                // Key 7: horn (móc) for 'o' → 'ơ' and 'u' → 'ư'
+                                // Only valid if previous vowel is 'o' or 'u'
+                                shouldProcess = (vowelKey == VietnameseData.KEY_O || vowelKey == VietnameseData.KEY_U)
+                            } else if keyCode == VietnameseData.KEY_8 {
+                                // Key 8: breve (trăng) only for 'a' → 'ă'
+                                // Only valid if previous vowel is 'a'
+                                shouldProcess = (vowelKey == VietnameseData.KEY_A)
+                            }
                         }
                     }
-                    insertW(keyCode: keyForAEO, isCaps: isCaps)
+                    if shouldProcess {
+                        insertW(keyCode: keyForAEO, isCaps: isCaps)
+                    } else {
+                        // Not a valid VNI combination - will be handled in the outer "if !isChanged" block
+                        isChanged = false
+                    }
                 }
                 break
             }
