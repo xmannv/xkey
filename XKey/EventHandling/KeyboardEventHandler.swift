@@ -123,6 +123,24 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         
         // Load macro data from UserDefaults
         loadMacrosFromUserDefaults()
+        
+        // Load smart switch data from file
+        loadSmartSwitchData()
+    }
+    
+    // MARK: - Smart Switch Data Loading
+    
+    private func loadSmartSwitchData() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let xkeyDir = appSupport.appendingPathComponent("XKey")
+        let path = xkeyDir.appendingPathComponent("smart_switch.json").path
+        
+        if smartSwitchManager.loadFromFile(path: path) {
+            let apps = smartSwitchManager.getAllApps()
+            #if DEBUG
+            debugLogCallback?("📦 Loaded \(apps.count) app language settings from file")
+            #endif
+        }
     }
     
     // MARK: - Macro Data Loading
@@ -274,9 +292,17 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         ]
         
         if cursorMovementKeys.contains(keyCode) {
-            debugLogCallback?("  → CURSOR MOVEMENT - reset engine")
+            debugLogCallback?("  → CURSOR MOVEMENT - reset engine, mark mid-sentence")
             engine.reset()
-            injector.markNewSession()
+            injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
+            return event
+        }
+        
+        // Handle Tab key - reset engine and mid-sentence flag (new field)
+        if keyCode == 0x30 { // Tab
+            debugLogCallback?("  → TAB - reset engine, new field")
+            engine.reset()
+            injector.markNewSession(cursorMoved: false)  // New field, not mid-sentence
             return event
         }
 
@@ -321,6 +347,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             
             injector.resetFirstWord()  // Mark that we're no longer on first word
             injector.resetKeystrokeCount()  // Reset keystroke count for next word
+            
+            // Reset mid-sentence flag on Enter/Return - user is starting a new line
+            if character == "\n" || character == "\r" {
+                injector.resetMidSentenceFlag()
+                debugLogCallback?("  → New line - reset mid-sentence flag")
+            }
+            
             return event
         }
 
@@ -505,6 +538,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     func reset() {
         engine.reset()
         injector.markNewSession()  // Mark as new input session
+    }
+    
+    /// Reset engine and mark that cursor was moved (by mouse click or arrow keys)
+    /// This disables autocomplete fix to avoid deleting text on the right of cursor
+    func resetWithCursorMoved() {
+        engine.reset()
+        injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
     }
 }
 

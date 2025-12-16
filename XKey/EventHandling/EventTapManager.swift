@@ -23,6 +23,15 @@ class EventTapManager {
     var toggleHotkey: Hotkey?
     var onToggleHotkey: (() -> Void)?
     
+    // Modifier-only hotkey tracking
+    private var modifierOnlyState: ModifierOnlyState = ModifierOnlyState()
+    
+    private struct ModifierOnlyState {
+        var currentModifiers: ModifierFlags = []
+        var targetModifiersReached: Bool = false  // True when all required modifiers were pressed
+        var hasTriggered: Bool = false
+    }
+    
     // MARK: - Delegate Protocol
 
     protocol EventTapDelegate: AnyObject {
@@ -173,16 +182,64 @@ class EventTapManager {
 
         // Check for toggle hotkey FIRST (before delegate processing)
         // This ensures the hotkey is consumed and doesn't reach other apps
-        if type == .keyDown, let hotkey = toggleHotkey {
-            let eventModifiers = ModifierFlags(from: event.flags)
-            if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TOGGLE HOTKEY DETECTED - consuming event")
-                // Call toggle callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onToggleHotkey?()
+        if let hotkey = toggleHotkey {
+            // Handle modifier-only hotkey (e.g., Ctrl+Shift)
+            if hotkey.isModifierOnly {
+                if type == .flagsChanged {
+                    let eventModifiers = ModifierFlags(from: event.flags)
+                    
+                    debugLogCallback?("  → flagsChanged: eventModifiers=\(eventModifiers.rawValue), hotkey.modifiers=\(hotkey.modifiers.rawValue)")
+                    
+                    // Check if all required modifiers are currently pressed
+                    // Use "contains" to allow for additional modifiers like CapsLock
+                    let hasAllRequiredModifiers = hotkey.modifiers.isSubset(of: eventModifiers) &&
+                                                   eventModifiers.intersection([.control, .shift, .option, .command]) == hotkey.modifiers
+                    
+                    if hasAllRequiredModifiers {
+                        // All required modifiers are pressed
+                        if !modifierOnlyState.targetModifiersReached {
+                            modifierOnlyState.targetModifiersReached = true
+                            modifierOnlyState.hasTriggered = false
+                            debugLogCallback?("  → Target modifiers REACHED: \(hotkey.displayString)")
+                        }
+                        modifierOnlyState.currentModifiers = eventModifiers
+                    } else {
+                        // Modifiers changed
+                        if modifierOnlyState.targetModifiersReached && !modifierOnlyState.hasTriggered {
+                            // Was holding target modifiers, now released - TRIGGER!
+                            modifierOnlyState.hasTriggered = true
+                            debugLogCallback?("  → MODIFIER-ONLY HOTKEY TRIGGERED on release: \(hotkey.displayString)")
+                            DispatchQueue.main.async { [weak self] in
+                                self?.onToggleHotkey?()
+                            }
+                        }
+                        // Reset state
+                        modifierOnlyState.targetModifiersReached = false
+                        modifierOnlyState.currentModifiers = eventModifiers
+                    }
+                } else if type == .keyDown {
+                    // If user presses any key while holding modifiers, cancel the modifier-only hotkey
+                    if modifierOnlyState.targetModifiersReached {
+                        debugLogCallback?("  → Key pressed while holding modifiers - canceling modifier-only hotkey")
+                        modifierOnlyState.targetModifiersReached = false
+                        modifierOnlyState.hasTriggered = true  // Prevent trigger on release
+                    }
                 }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                // Don't consume flagsChanged events - let them pass through
+            } else {
+                // Handle regular hotkey (e.g., Cmd+Shift+V)
+                if type == .keyDown {
+                    let eventModifiers = ModifierFlags(from: event.flags)
+                    if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
+                        debugLogCallback?("  → TOGGLE HOTKEY DETECTED - consuming event")
+                        // Call toggle callback on main thread
+                        DispatchQueue.main.async { [weak self] in
+                            self?.onToggleHotkey?()
+                        }
+                        // Consume the event completely - don't pass to other apps
+                        return nil
+                    }
+                }
             }
         }
 
@@ -241,6 +298,11 @@ extension ModifierFlags {
         if cgFlags.contains(.maskControl) { flags.insert(.control) }
         if cgFlags.contains(.maskAlternate) { flags.insert(.option) }
         self = flags
+    }
+    
+    /// Check if this set is a subset of another set
+    func isSubset(of other: ModifierFlags) -> Bool {
+        return self.intersection(other) == self
     }
 }
 

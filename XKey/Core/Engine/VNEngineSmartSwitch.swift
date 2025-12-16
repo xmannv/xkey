@@ -95,6 +95,8 @@ extension VNEngine {
     }
     
     /// Check if should switch language for current app
+    /// - Note: This method uses vLanguage which may not be in sync with UI. 
+    ///         Prefer checkSmartSwitchForApp(bundleId:currentLanguage:) instead.
     func checkSmartSwitch() -> SmartSwitchResult {
         guard vUseSmartSwitchKey == 1 else {
             return SmartSwitchResult(shouldSwitch: false, newLanguage: vLanguage, bundleId: "")
@@ -111,5 +113,28 @@ extension VNEngine {
         }
         
         return SmartSwitchResult(shouldSwitch: false, newLanguage: vLanguage, bundleId: bundleId)
+    }
+    
+    /// Check if should switch language for a specific app with explicit current language
+    /// - Parameters:
+    ///   - bundleId: Bundle identifier of the app
+    ///   - currentLanguage: Current language from UI (0: English, 1: Vietnamese)
+    /// - Returns: SmartSwitchResult indicating if switch is needed
+    func checkSmartSwitchForApp(bundleId: String, currentLanguage: Int) -> SmartSwitchResult {
+        guard vUseSmartSwitchKey == 1 else {
+            return SmartSwitchResult(shouldSwitch: false, newLanguage: currentLanguage, bundleId: bundleId)
+        }
+        
+        // Get saved language for this app
+        let savedLanguage = smartSwitchManager.getAppLanguage(bundleId: bundleId, currentLanguage: currentLanguage)
+        
+        // If app is new (savedLanguage == -1), don't switch - just use current language
+        // If app has saved language and it's different from current, switch
+        if savedLanguage >= 0 && savedLanguage != currentLanguage {
+            logCallback?("Smart Switch: App '\(bundleId)' has saved language \(savedLanguage == 1 ? "Vietnamese" : "English"), current is \(currentLanguage == 1 ? "Vietnamese" : "English")")
+            return SmartSwitchResult(shouldSwitch: true, newLanguage: savedLanguage, bundleId: bundleId)
+        }
+        
+        return SmartSwitchResult(shouldSwitch: false, newLanguage: currentLanguage, bundleId: bundleId)
     }
 }

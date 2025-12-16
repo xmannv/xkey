@@ -105,13 +105,28 @@ class StatusBarManager: ObservableObject {
         menu.autoenablesItems = false
         
         // Toggle Vietnamese
+        // For modifier-only hotkeys, show the hotkey in the title instead of using keyEquivalent
+        let prefs = PreferencesManager.shared.loadPreferences()
+        let isModifierOnly = prefs.toggleHotkey.isModifierOnly
+        
+        let toggleTitle: String
+        if isModifierOnly {
+            // Show hotkey in title for modifier-only hotkeys (e.g., "Bật Tiếng Việt (⌃⇧)")
+            let baseTitle = viewModel.isVietnameseEnabled ? "Tắt Tiếng Việt" : "Bật Tiếng Việt"
+            toggleTitle = "\(baseTitle) (\(viewModel.hotkeyDisplay))"
+        } else {
+            toggleTitle = viewModel.isVietnameseEnabled ? "Tắt Tiếng Việt" : "Bật Tiếng Việt"
+        }
+        
         let toggleItem = menu.addItem(
-            withTitle: viewModel.isVietnameseEnabled ? "Tắt Tiếng Việt" : "Bật Tiếng Việt",
+            withTitle: toggleTitle,
             action: #selector(toggleVietnamese),
-            keyEquivalent: String(viewModel.hotkeyKeyEquivalent.character)
+            keyEquivalent: isModifierOnly ? "" : String(viewModel.hotkeyKeyEquivalent.character)
         )
         toggleItem.target = self
-        toggleItem.keyEquivalentModifierMask = convertToNSEventModifiers(viewModel.hotkeyModifiers)
+        if !isModifierOnly {
+            toggleItem.keyEquivalentModifierMask = convertToNSEventModifiers(viewModel.hotkeyModifiers)
+        }
         toggleItem.state = viewModel.isVietnameseEnabled ? .on : .off
         toggleItem.tag = 1
         
@@ -219,7 +234,15 @@ class StatusBarManager: ObservableObject {
         
         // Update toggle item
         if let toggleItem = menu.item(withTag: 1) {
-            toggleItem.title = viewModel.isVietnameseEnabled ? "Tắt Tiếng Việt" : "Bật Tiếng Việt"
+            let prefs = PreferencesManager.shared.loadPreferences()
+            let isModifierOnly = prefs.toggleHotkey.isModifierOnly
+            
+            let baseTitle = viewModel.isVietnameseEnabled ? "Tắt Tiếng Việt" : "Bật Tiếng Việt"
+            if isModifierOnly {
+                toggleItem.title = "\(baseTitle) (\(viewModel.hotkeyDisplay))"
+            } else {
+                toggleItem.title = baseTitle
+            }
             toggleItem.state = viewModel.isVietnameseEnabled ? .on : .off
         }
         

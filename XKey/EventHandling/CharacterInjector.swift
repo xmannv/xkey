@@ -15,6 +15,7 @@ class CharacterInjector {
     private var eventSource: CGEventSource?
     private var isFirstWord: Bool = true  // Track if we're typing the first word
     private var keystrokeCount: Int = 0   // Track number of keystrokes in current word
+    private var isTypingMidSentence: Bool = false  // Track if user moved cursor (typing in middle of text)
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
@@ -34,10 +35,23 @@ class CharacterInjector {
     }
     
     /// Mark as new input session (call when cursor moves or new field focused)
-    func markNewSession() {
+    /// - Parameter cursorMoved: true if cursor was moved by user (mouse click or arrow keys)
+    func markNewSession(cursorMoved: Bool = false) {
         isFirstWord = true
         keystrokeCount = 0
-        debugCallback?("New session: isFirstWord=true, keystrokeCount=0")
+        isTypingMidSentence = cursorMoved  // If cursor moved, we're likely typing in middle of text
+        debugCallback?("New session: isFirstWord=true, keystrokeCount=0, isTypingMidSentence=\(cursorMoved)")
+    }
+    
+    /// Check if currently typing in middle of sentence (cursor was moved)
+    func getIsTypingMidSentence() -> Bool {
+        return isTypingMidSentence
+    }
+    
+    /// Reset mid-sentence flag (call when starting fresh input, e.g., new text field)
+    func resetMidSentenceFlag() {
+        isTypingMidSentence = false
+        debugCallback?("Reset mid-sentence flag: isTypingMidSentence=false")
     }
     
     /// Reset keystroke count for new word (call when space/enter is pressed)
@@ -58,9 +72,13 @@ class CharacterInjector {
     func sendBackspaces(count: Int, codeTable: CodeTable, proxy: CGEventTapProxy, fixAutocomplete: Bool = false) {
         guard count > 0 else { return }
         
-        debugCallback?("sendBackspaces: count=\(count), fixAutocomplete=\(fixAutocomplete)")
+        debugCallback?("sendBackspaces: count=\(count), fixAutocomplete=\(fixAutocomplete), isTypingMidSentence=\(isTypingMidSentence)")
         
-        if fixAutocomplete {
+        // IMPORTANT: Disable autocomplete fix when typing in middle of sentence
+        // Forward Delete would delete text to the right of cursor, which is wrong!
+        let shouldFixAutocomplete = fixAutocomplete && !isTypingMidSentence
+        
+        if shouldFixAutocomplete {
             // Universal autocomplete fix approach:
             // Problem: Apps like Spotlight, Chrome address bar auto-select suggestion text after cursor
             // When we send backspace, it deletes the selection (suggestion) first, not our typed text
@@ -81,6 +99,14 @@ class CharacterInjector {
             
             // Add delay after backspaces before character injection
             usleep(3000) // 3ms delay
+        } else if isTypingMidSentence {
+            // Typing in middle of sentence - skip Forward Delete to avoid deleting text on the right
+            debugCallback?("    → Mid-sentence mode: skipping Forward Delete to preserve text on right")
+            for i in 0..<count {
+                sendBackspace(codeTable: codeTable, proxy: proxy)
+                debugCallback?("    → Backspace \(i + 1)/\(count)")
+            }
+            usleep(2000) // 2ms delay after backspaces
         } else {
             // Normal backspace without autocomplete fix
             debugCallback?("    → Normal backspaces (no fix)")

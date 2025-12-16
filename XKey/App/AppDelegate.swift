@@ -558,14 +558,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle Smart Switch when app changes
     private func handleSmartSwitch(notification: Notification) {
         guard let handler = keyboardHandler else { return }
+        
+        debugWindowController?.logEvent("🔍 Smart Switch check: enabled=\(handler.smartSwitchEnabled), vUseSmartSwitchKey=\(handler.engine.vUseSmartSwitchKey)")
+        
         guard handler.smartSwitchEnabled else { return }
         
         // Get the new active app
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let bundleId = app.bundleIdentifier else { return }
         
-        // Check if should switch language
-        let result = handler.engine.checkSmartSwitch()
+        // Get current language from UI (StatusBar) - this is the source of truth
+        let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
+        
+        debugWindowController?.logEvent("🔍 Smart Switch: bundleId=\(bundleId), currentLanguage=\(currentLanguage)")
+        
+        // Check if should switch language, passing the actual current language
+        let result = handler.engine.checkSmartSwitchForApp(bundleId: bundleId, currentLanguage: currentLanguage)
+        
+        debugWindowController?.logEvent("🔍 Smart Switch result: shouldSwitch=\(result.shouldSwitch), newLanguage=\(result.newLanguage)")
         
         if result.shouldSwitch {
             // Switch language
@@ -575,19 +585,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             debugWindowController?.logEvent("🔄 Smart Switch: '\(bundleId)' → \(newEnabled ? "Vietnamese" : "English")")
         } else {
-            // Save current language for this app
-            let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
+            // App is new or language hasn't changed - save current language
             handler.engine.saveAppLanguage(bundleId: bundleId, language: currentLanguage)
+            debugWindowController?.logEvent("📝 Smart Switch: Saved '\(bundleId)' → \(currentLanguage == 1 ? "Vietnamese" : "English")")
         }
     }
     
     private func setupMouseClickMonitor() {
         // Monitor mouse clicks to detect focus changes
-        // When user clicks, they might be switching between input fields
+        // When user clicks, they might be switching between input fields or moving cursor
         mouseClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            // Reset engine when mouse is clicked (likely focus change)
-            self?.keyboardHandler?.reset()
-            self?.debugWindowController?.logEvent("🖱️ Mouse click - engine reset")
+            // Reset engine when mouse is clicked (likely focus change or cursor move)
+            // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
+            self?.keyboardHandler?.resetWithCursorMoved()
+            self?.debugWindowController?.logEvent("🖱️ Mouse click - engine reset, mid-sentence mode")
         }
         
         debugWindowController?.logEvent("  ✅ Mouse click monitor registered")

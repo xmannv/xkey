@@ -62,6 +62,13 @@ struct Preferences: Codable {
 struct Hotkey: Codable, Equatable {
     var keyCode: UInt16
     var modifiers: ModifierFlags
+    var isModifierOnly: Bool  // True if hotkey is just modifiers (e.g., Ctrl+Shift)
+    
+    init(keyCode: UInt16, modifiers: ModifierFlags, isModifierOnly: Bool = false) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.isModifierOnly = isModifierOnly
+    }
     
     var displayString: String {
         var parts: [String] = []
@@ -71,10 +78,15 @@ struct Hotkey: Codable, Equatable {
         if modifiers.contains(.shift) { parts.append("⇧") }
         if modifiers.contains(.command) { parts.append("⌘") }
         
+        // For modifier-only hotkeys, don't add key character
+        if isModifierOnly {
+            return parts.joined()
+        }
+        
         // Convert keyCode to character
         if let char = keyCodeToCharacter(keyCode) {
             parts.append(char.uppercased())
-        } else {
+        } else if keyCode != 0 {
             parts.append("?")
         }
         

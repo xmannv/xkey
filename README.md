@@ -5,7 +5,7 @@
   
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
-  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://github.com/xmannv/xkey/releases)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -156,6 +156,38 @@ Bật Debug Window trong **Cài đặt** → **Nâng cao** → **Bật chế đ�
    - Mở **System Settings** → **Privacy & Security** → **Accessibility**
    - Bật quyền cho XKey
 
+### Cài đặt cho nhiều người dùng (Multi-User)
+
+Nếu máy Mac có nhiều user accounts và bạn gặp lỗi **"You can't open the application because someone else is using it"**, hãy cài đặt theo cách sau:
+
+#### Cách 1: Mỗi user cài riêng (Khuyến nghị)
+
+Mỗi user cài XKey vào thư mục Applications riêng của mình:
+
+```bash
+# Tạo thư mục Applications cho user (nếu chưa có)
+mkdir -p ~/Applications
+
+# Di chuyển XKey.app vào thư mục user
+mv /Applications/XKey.app ~/Applications/
+```
+
+Hoặc kéo thả `XKey.app` vào `~/Applications/` (thư mục Applications trong Home folder).
+
+#### Cách 2: Mỗi user có bản copy riêng
+
+Nếu muốn giữ XKey trong `/Applications` chung:
+
+1. User A: Sử dụng `/Applications/XKey.app`
+2. User B: Copy `XKey.app` vào `~/Applications/XKey.app`
+
+#### Lưu ý quan trọng
+
+- ✅ Mỗi user cần **cấp quyền Accessibility riêng** trong System Settings
+- ✅ Preferences (cài đặt) của mỗi user được lưu **độc lập**
+- ✅ Macro và Smart Switch data của mỗi user cũng **riêng biệt**
+- ✅ Nếu muốn XKey tự khởi động, mỗi user cần thêm vào **Login Items** riêng
+
 ### Build từ mã nguồn
 
 ```bash
@@ -242,15 +274,9 @@ Chúng tôi hoan nghênh mọi đóng góp! Vui lòng:
 
 ## 📝 Changelog
 
-### Version 1.0.0 (Current)
-- ✨ Phát hành phiên bản đầu tiên
-- 🎯 Hỗ trợ Telex, VNI, VIQR
-- ⚡ Quick Typing với nhiều tùy chọn
-- 🔧 Macro (Text Shortcuts)
-- 🧠 Smart Switch
-- 🛠️ Công cụ chuyển đổi văn bản
-- 🎨 Giao diện hiện đại theo phong cách macOS
-- 🎨 Tùy chọn biểu tượng menubar (chữ X hoặc chữ V)
+### Version 1.0.3 (Current)
+- 📖 Thêm hướng dẫn cài đặt multi-user
+- 🐛 Sửa các lỗi nhỏ
 
 ---
 

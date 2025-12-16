@@ -21,18 +21,18 @@ class SmartSwitchManager {
     
     // MARK: - App Language Management
     
-    /// Get language for app, or set default if not found
+    /// Get language for app
     /// - Parameters:
     ///   - bundleId: App bundle identifier
-    ///   - currentLanguage: Current language to set if not found
+    ///   - currentLanguage: Current language (used for reference, not auto-saved)
     /// - Returns: Language for this app (-1 if not found, 0: English, 1: Vietnamese)
     func getAppLanguage(bundleId: String, currentLanguage: Int) -> Int {
         if let language = appLanguageMap[bundleId] {
             return language
         }
         
-        // Not found - set current language as default
-        setAppLanguage(bundleId: bundleId, language: currentLanguage)
+        // Not found - return -1 to indicate app is new
+        // The caller should decide whether to save the current language
         return -1
     }
     

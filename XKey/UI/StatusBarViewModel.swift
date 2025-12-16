@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import Cocoa
 
 class StatusBarViewModel: ObservableObject {
     @Published var isVietnameseEnabled = true
@@ -49,6 +50,21 @@ class StatusBarViewModel: ObservableObject {
         isVietnameseEnabled.toggle()
         keyboardHandler?.setVietnamese(isVietnameseEnabled)
         log("🔄 Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
+        
+        // Save language for current app (Smart Switch)
+        saveLanguageForCurrentApp()
+    }
+    
+    /// Save current language for the active app (for Smart Switch feature)
+    private func saveLanguageForCurrentApp() {
+        guard let handler = keyboardHandler else { return }
+        guard handler.smartSwitchEnabled else { return }
+        
+        guard let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return }
+        
+        let language = isVietnameseEnabled ? 1 : 0
+        handler.engine.saveAppLanguage(bundleId: bundleId, language: language)
+        log("📝 Smart Switch: Saved '\(bundleId)' → \(isVietnameseEnabled ? "Vietnamese" : "English")")
     }
     
     func selectInputMethod(_ method: InputMethod) {
@@ -111,8 +127,12 @@ class StatusBarViewModel: ObservableObject {
         // Update display string
         hotkeyDisplay = hotkeyToUse.displayString
         
-        // Convert to SwiftUI KeyEquivalent and EventModifiers
-        hotkeyKeyEquivalent = keyCodeToKeyEquivalent(hotkeyToUse.keyCode)
+        // For modifier-only hotkeys, don't set keyEquivalent (menu won't show shortcut)
+        if hotkeyToUse.isModifierOnly {
+            hotkeyKeyEquivalent = KeyEquivalent("\0")  // Null character - no key equivalent
+        } else {
+            hotkeyKeyEquivalent = keyCodeToKeyEquivalent(hotkeyToUse.keyCode)
+        }
         hotkeyModifiers = modifierFlagsToEventModifiers(hotkeyToUse.modifiers)
     }
     
