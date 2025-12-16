@@ -199,7 +199,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             // Temporarily disable engine when Option is pressed
             debugLogCallback?("  → Option pressed - temp off engine")
             engine.reset()
-            injector.markNewSession()
             return false
         }
 
@@ -207,23 +206,20 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if event.isCommandPressed {
             debugLogCallback?("  → Has Cmd modifier")
             engine.reset()
-            injector.markNewSession()  // Mark as new input session
             return false
         }
-        
+
         // Don't process if Option is pressed and tempOffEngine is NOT enabled
         if event.isOptionPressed && !tempOffEngineEnabled {
             debugLogCallback?("  → Option pressed but tempOffEngine disabled")
             engine.reset()
-            injector.markNewSession()
             return false
         }
-        
+
         // If only Ctrl is pressed and tempOffSpelling is NOT enabled, skip processing
         if event.isControlPressed && !tempOffSpellingEnabled {
             debugLogCallback?("  → Ctrl pressed but tempOffSpelling disabled")
             engine.reset()
-            injector.markNewSession()
             return false
         }
 
@@ -269,7 +265,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if cursorMovementKeys.contains(keyCode) {
             debugLogCallback?("  → CURSOR MOVEMENT - reset engine")
             engine.reset()
-            injector.markNewSession()
             return event
         }
 
@@ -309,8 +304,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 // Don't consume - let it pass through
             }
             
-            injector.resetFirstWord()  // Mark that we're no longer on first word
-            injector.resetKeystrokeCount()  // Reset keystroke count for next word
             return event
         }
 
@@ -322,21 +315,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             isUppercase: isUppercase
         )
         debugLogCallback?("  → Engine returned: shouldConsume=\(result.shouldConsume), bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
-        
-        // Increment keystroke count for Chrome duplicate detection
-        if result.shouldConsume {
-            injector.incrementKeystroke()
-        }
 
         // Handle result
         if result.shouldConsume {
             debugLogCallback?("  → CONSUME: bs=\(result.backspaceCount) chars=\(result.newCharacters.count)")
-
-            // Chrome address bar fix: Check for duplicates BEFORE sending backspaces
-            // Only applies to Chrome address bar, not content area
-            debugLogCallback?("  → Calling Chrome address bar fix...")
-            injector.checkAndFixChromeAddressBarDuplicate(proxy: proxy)
-            debugLogCallback?("  → Chrome fix done")
 
             // Send backspaces with autocomplete fix
             if result.backspaceCount > 0 {
@@ -473,10 +455,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     // MARK: - Reset
-    
+
     func reset() {
         engine.reset()
-        injector.markNewSession()  // Mark as new input session
     }
 }
 

@@ -11,47 +11,18 @@ import Carbon
 class CharacterInjector {
     
     // MARK: - Properties
-    
+
     private var eventSource: CGEventSource?
-    private var isFirstWord: Bool = true  // Track if we're typing the first word
-    private var keystrokeCount: Int = 0   // Track number of keystrokes in current word
-    
+
     // Debug callback
     var debugCallback: ((String) -> Void)?
-    
+
     // MARK: - Initialization
-    
+
     init() {
         eventSource = CGEventSource(stateID: .hidSystemState)
     }
-    
-    // MARK: - Word Tracking
-    
-    /// Reset first word flag (call when space/enter is pressed)
-    func resetFirstWord() {
-        isFirstWord = false
-        debugCallback?("Reset first word: isFirstWord=false")
-    }
-    
-    /// Mark as new input session (call when cursor moves or new field focused)
-    func markNewSession() {
-        isFirstWord = true
-        keystrokeCount = 0
-        debugCallback?("New session: isFirstWord=true, keystrokeCount=0")
-    }
-    
-    /// Reset keystroke count for new word (call when space/enter is pressed)
-    func resetKeystrokeCount() {
-        keystrokeCount = 0
-        debugCallback?("Reset keystroke count: keystrokeCount=0")
-    }
-    
-    /// Increment keystroke count (call after each keystroke)
-    func incrementKeystroke() {
-        keystrokeCount += 1
-        debugCallback?("Keystroke count: \(keystrokeCount)")
-    }
-    
+
     // MARK: - Public Methods
 
     /// Send backspace key presses with optional autocomplete fix
@@ -487,50 +458,5 @@ class CharacterInjector {
         return false
     }
     
-    /// Check if we're in Chrome address bar (for special handling)
-    func isInChromeAddressBar() -> Bool {
-        return isChromeAddressBar()
-    }
-    
-    /// Get current keystroke count (for Chrome address bar detection)
-    func getKeystrokeCount() -> Int {
-        return keystrokeCount
-    }
-    
-    /// Check and fix duplicate BEFORE backspace (Chrome address bar fix ONLY)
-    func checkAndFixChromeAddressBarDuplicate(proxy: CGEventTapProxy) {
-        let isAddressBar = isChromeAddressBar()
-        
-        debugCallback?("    → Chrome fix check: isAddressBar=\(isAddressBar), isFirstWord=\(isFirstWord), keystrokeCount=\(keystrokeCount)")
-        
-        // Only apply fix for Chrome ADDRESS BAR, not content area
-        guard isAddressBar else {
-            debugCallback?("    → Chrome fix: Not address bar, skipping")
-            return
-        }
-        
-        // Only apply fix for FIRST WORD ONLY, starting from keystroke 2
-        // Chrome address bar duplicates characters in the first word only
-        // Subsequent words work normally
-        guard isFirstWord && keystrokeCount >= 2 else {
-            debugCallback?("    → Chrome fix: Wrong timing (need isFirstWord=true, keystrokeCount>=2)")
-            return
-        }
-        
-        debugCallback?("    → ✓ Chrome address bar fix: Applying fix at keystroke \(keystrokeCount) (FIRST WORD)")
-        
-        // Chrome duplicates injected characters in the first word
-        // For each keystroke after the first, we need to remove the duplicate
-        // Example:
-        // - Keystroke 1: "m" → Chrome has "mm" (original + injected)
-        // - Keystroke 2: "o" → Need to remove 1 duplicate "m" first
-        // - Keystroke 3: "a" → Need to remove 1 duplicate from previous injection
-        
-        debugCallback?("    → ✓ Chrome fix: Sending backspace to remove duplicate")
-        sendKeyPress(0x33, proxy: proxy) // Backspace to remove duplicate
-        usleep(2000) // 2ms delay after cleanup
-        
-        debugCallback?("    → ✓ Chrome fix: Duplicate removed")
-    }
 }
 
