@@ -5,7 +5,7 @@
   
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
-  [![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/xmannv/xkey/releases)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -269,14 +269,6 @@ Chúng tôi hoan nghênh mọi đóng góp! Vui lòng:
 3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to branch (`git push origin feature/AmazingFeature`)
 5. Mở Pull Request
-
----
-
-## 📝 Changelog
-
-### Version 1.0.3 (Current)
-- 📖 Thêm hướng dẫn cài đặt multi-user
-- 🐛 Sửa các lỗi nhỏ
 
 ---
 
