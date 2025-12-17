@@ -23,6 +23,9 @@ class EventTapManager {
     var toggleHotkey: Hotkey?
     var onToggleHotkey: (() -> Void)?
     
+    // Note: Undo typing key is handled by KeyboardEventHandler directly
+    // because it needs to check engine state before deciding to consume the key
+    
     // Modifier-only hotkey tracking
     private var modifierOnlyState: ModifierOnlyState = ModifierOnlyState()
     
@@ -242,6 +245,11 @@ class EventTapManager {
                 }
             }
         }
+        
+        // Check for undo typing key (single key, no modifiers required)
+        // This is handled by the delegate (KeyboardEventHandler) because it needs
+        // to check if there's something to undo in the engine buffer first.
+        // If there's nothing to undo, the key should be passed through normally.
 
         // Check if delegate wants to process this event
         guard let delegate = delegate else {

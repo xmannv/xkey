@@ -8,6 +8,20 @@
 import Cocoa
 import Carbon
 
+// MARK: - Injection Method
+
+/// Injection method for different app types
+/// Adaptive delays for Terminal/JetBrains/Electron compatibility
+enum InjectionMethod {
+    case fast           // Default: backspace + text with minimal delays
+    case slow           // Terminals/IDEs: backspace + text with higher delays
+    case selection      // Browser address bars: Shift+Left select + type replacement
+    case autocomplete   // Spotlight: Forward Delete + backspace + text
+}
+
+/// Injection delays in microseconds (backspace, wait, text)
+typealias InjectionDelays = (backspace: UInt32, wait: UInt32, text: UInt32)
+
 class CharacterInjector {
     
     // MARK: - Properties
@@ -18,6 +32,11 @@ class CharacterInjector {
     private var isTypingMidSentence: Bool = false  // Track if user moved cursor (typing in middle of text)
     private var lastInjectionTime: UInt64 = 0  // Track when last character was injected (mach_absolute_time)
     private static let injectionCooldownNs: UInt64 = 15_000_000  // 15ms cooldown between injections
+    
+    // Cached injection method to avoid repeated detection
+    private var cachedMethod: InjectionMethod?
+    private var cachedDelays: InjectionDelays?
+    private var cachedBundleId: String?
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
@@ -91,74 +110,131 @@ class CharacterInjector {
     // MARK: - Public Methods
 
     /// Send backspace key presses with optional autocomplete fix
+    /// Uses adaptive delays based on detected app type (Terminal/JetBrains/etc.)
     func sendBackspaces(count: Int, codeTable: CodeTable, proxy: CGEventTapProxy, fixAutocomplete: Bool = false) {
         guard count > 0 else { return }
         
-        debugCallback?("sendBackspaces: count=\(count), fixAutocomplete=\(fixAutocomplete), isTypingMidSentence=\(isTypingMidSentence)")
+        // Detect injection method for current app
+        let (method, delays) = detectInjectionMethod()
+        
+        debugCallback?("sendBackspaces: count=\(count), method=\(method), fixAutocomplete=\(fixAutocomplete), isTypingMidSentence=\(isTypingMidSentence)")
         
         // IMPORTANT: Disable autocomplete fix when typing in middle of sentence
         // Forward Delete would delete text to the right of cursor, which is wrong!
         let shouldFixAutocomplete = fixAutocomplete && !isTypingMidSentence
         
-        if shouldFixAutocomplete {
-            // Universal autocomplete fix approach:
-            // Problem: Apps like Spotlight, Chrome address bar auto-select suggestion text after cursor
-            // When we send backspace, it deletes the selection (suggestion) first, not our typed text
-            // 
-            // Solution: Send Delete (forward delete) to clear the suggestion first,
-            // then send backspaces to delete our typed characters
-            //
-            // This works for: Spotlight, Chrome/Edge/Brave address bar, Safari address bar, etc.
-            debugCallback?("    → Autocomplete fix: sending Forward Delete to clear suggestion")
+        switch method {
+        case .selection:
+            // Selection method: Shift+Left to select, then type replacement
+            debugCallback?("    → Selection method: Shift+Left × \(count)")
+            injectViaSelection(count: count, delays: delays, proxy: proxy)
+            
+        case .autocomplete:
+            // Autocomplete method: Forward Delete to clear suggestion, then backspaces
+            debugCallback?("    → Autocomplete method: Forward Delete + backspaces")
+            injectViaAutocomplete(count: count, delays: delays, proxy: proxy)
+            
+        case .slow:
+            // Slow method for Terminal/JetBrains: higher delays between keystrokes
+            debugCallback?("    → Slow method (Terminal/IDE): delays=\(delays)")
+            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: shouldFixAutocomplete)
+            
+        case .fast:
+            // Fast method: minimal delays
+            if shouldFixAutocomplete {
+                debugCallback?("    → Fast method with autocomplete fix")
+                sendForwardDelete(proxy: proxy)
+                usleep(3000)
+                injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: false)
+            } else if isTypingMidSentence {
+                debugCallback?("    → Fast method (mid-sentence)")
+                injectViaBackspace(count: count, codeTable: codeTable, delays: (delays.backspace, delays.wait, delays.text), proxy: proxy, fixAutocomplete: false)
+            } else {
+                debugCallback?("    → Fast method (normal)")
+                injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: false)
+            }
+        }
+    }
+    
+    // MARK: - Injection Methods (Terminal/JetBrains compatible)
+    
+    /// Standard backspace injection with configurable delays
+    private func injectViaBackspace(count: Int, codeTable: CodeTable, delays: InjectionDelays, proxy: CGEventTapProxy, fixAutocomplete: Bool) {
+        if fixAutocomplete {
             sendForwardDelete(proxy: proxy)
-            usleep(3000) // 3ms delay after Forward Delete
-            
-            // Send backspaces
-            for i in 0..<count {
-                sendBackspace(codeTable: codeTable, proxy: proxy)
-                debugCallback?("    → Backspace \(i + 1)/\(count)")
-            }
-            
-            // Add delay after backspaces before character injection
-            usleep(3000) // 3ms delay
-        } else if isTypingMidSentence {
-            // Typing in middle of sentence - skip Forward Delete to avoid deleting text on the right
-            debugCallback?("    → Mid-sentence mode: skipping Forward Delete to preserve text on right")
-            for i in 0..<count {
-                sendBackspace(codeTable: codeTable, proxy: proxy)
-                debugCallback?("    → Backspace \(i + 1)/\(count)")
-            }
-            usleep(5000) // 5ms delay after backspaces (increased for Chrome compatibility)
-        } else {
-            // Normal backspace without autocomplete fix
-            debugCallback?("    → Normal backspaces (no fix)")
-            for _ in 0..<count {
-                sendBackspace(codeTable: codeTable, proxy: proxy)
-            }
-            
-            // Add delay after all backspaces
-            if count > 0 {
-                usleep(2000) // 2ms delay after backspaces
-            }
+            usleep(3000)
+        }
+        
+        for i in 0..<count {
+            sendBackspace(codeTable: codeTable, proxy: proxy)
+            usleep(delays.backspace)
+            debugCallback?("    → Backspace \(i + 1)/\(count)")
+        }
+        
+        if count > 0 {
+            usleep(delays.wait)
+        }
+    }
+    
+    /// Selection injection: Shift+Left to select characters
+    private func injectViaSelection(count: Int, delays: InjectionDelays, proxy: CGEventTapProxy) {
+        for i in 0..<count {
+            sendShiftLeftArrow(proxy: proxy)
+            usleep(delays.backspace > 0 ? delays.backspace : 1000)
+            debugCallback?("    → Shift+Left \(i + 1)/\(count)")
+        }
+        
+        if count > 0 {
+            usleep(delays.wait > 0 ? delays.wait : 3000)
+        }
+    }
+    
+    /// Autocomplete injection: Forward Delete to clear suggestion, then backspaces
+    private func injectViaAutocomplete(count: Int, delays: InjectionDelays, proxy: CGEventTapProxy) {
+        // Forward Delete clears auto-selected suggestion
+        sendForwardDelete(proxy: proxy)
+        usleep(3000)
+        
+        // Backspaces remove typed characters
+        for i in 0..<count {
+            sendKeyPress(0x33, proxy: proxy)  // Backspace
+            usleep(delays.backspace > 0 ? delays.backspace : 1000)
+            debugCallback?("    → Backspace \(i + 1)/\(count)")
+        }
+        
+        if count > 0 {
+            usleep(delays.wait > 0 ? delays.wait : 5000)
         }
     }
 
 
     
-    /// Send Vietnamese characters
+    /// Send Vietnamese characters with adaptive delays for Terminal/JetBrains
     func sendCharacters(_ characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
-        debugCallback?("sendCharacters: count=\(characters.count)")
+        guard !characters.isEmpty else { return }
+        
+        // Get injection method and delays
+        let (method, delays) = detectInjectionMethod()
+        
+        debugCallback?("sendCharacters: count=\(characters.count), method=\(method)")
         
         for (index, character) in characters.enumerated() {
             let unicodeString = character.unicode(codeTable: codeTable)
             debugCallback?("  [\(index)]: Sending '\(unicodeString)' (Unicode: \(unicodeString.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: ", ")))")
             sendString(unicodeString, proxy: proxy)
+            
+            // Add delay between characters for slow apps (Terminal/JetBrains)
+            if method == .slow && index < characters.count - 1 {
+                usleep(delays.text)
+            }
         }
         
+        // Settle time: longer for slow apps to ensure text is rendered
+        let settleTime: UInt32 = (method == .slow) ? 40000 : 5000  // 40ms for slow (Terminal), 5ms for fast
+        usleep(settleTime)
+        
         // Record injection time for cooldown tracking
-        if characters.count > 0 {
-            lastInjectionTime = mach_absolute_time()
-        }
+        lastInjectionTime = mach_absolute_time()
     }
 
     
@@ -584,6 +660,140 @@ class CharacterInjector {
         usleep(2000) // 2ms delay after cleanup
         
         debugCallback?("    → ✓ Chrome fix: Duplicate removed")
+    }
+    
+    // MARK: - Injection Method Detection
+    
+    /// Detect injection method based on frontmost app and focused element
+    /// Uses adaptive delays for Terminal/JetBrains/Electron compatibility
+    func detectInjectionMethod() -> (InjectionMethod, InjectionDelays) {
+        // Get focused element and its owning app
+        let systemWide = AXUIElementCreateSystemWide()
+        var focused: CFTypeRef?
+        var role: String?
+        var bundleId: String?
+        
+        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+           let el = focused {
+            let axEl = el as! AXUIElement
+            
+            // Get role
+            var roleVal: CFTypeRef?
+            AXUIElementCopyAttributeValue(axEl, kAXRoleAttribute as CFString, &roleVal)
+            role = roleVal as? String
+            
+            // Get owning app's bundle ID
+            var pid: pid_t = 0
+            if AXUIElementGetPid(axEl, &pid) == .success {
+                if let app = NSRunningApplication(processIdentifier: pid) {
+                    bundleId = app.bundleIdentifier
+                }
+            }
+        }
+        
+        // Fallback to frontmost app
+        if bundleId == nil {
+            bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        }
+        
+        guard let bundleId = bundleId else {
+            return (.fast, (200, 800, 500))
+        }
+        
+        // Cache check - avoid repeated detection for same app
+        if bundleId == cachedBundleId, let method = cachedMethod, let delays = cachedDelays {
+            debugCallback?("    → detectMethod (cached): \(bundleId) → \(method)")
+            return (method, delays)
+        }
+        
+        cachedBundleId = bundleId
+        
+        debugCallback?("    → detectMethod: \(bundleId) role=\(role ?? "nil")")
+        
+        // Selection method for autocomplete UI elements (ComboBox, SearchField)
+        if role == "AXComboBox" {
+            debugCallback?("    → Method: selection (ComboBox)")
+            cachedMethod = .selection
+            cachedDelays = (1000, 3000, 2000)
+            return (.selection, (1000, 3000, 2000))
+        }
+        if role == "AXSearchField" {
+            debugCallback?("    → Method: selection (SearchField)")
+            cachedMethod = .selection
+            cachedDelays = (1000, 3000, 2000)
+            return (.selection, (1000, 3000, 2000))
+        }
+        
+        // Spotlight - use autocomplete method
+        if bundleId == "com.apple.Spotlight" {
+            debugCallback?("    → Method: autocomplete (Spotlight)")
+            cachedMethod = .autocomplete
+            cachedDelays = (1000, 3000, 1000)
+            return (.autocomplete, (1000, 3000, 1000))
+        }
+        
+        // Browser address bars (AXTextField with autocomplete)
+        let browsers = ["com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser",
+                        "com.brave.Browser", "com.microsoft.edgemac", "org.mozilla.firefox", 
+                        "com.operasoftware.Opera", "com.vivaldi.Vivaldi"]
+        if browsers.contains(bundleId) && role == "AXTextField" {
+            debugCallback?("    → Method: selection (browser address bar)")
+            cachedMethod = .selection
+            cachedDelays = (1000, 3000, 2000)
+            return (.selection, (1000, 3000, 2000))
+        }
+        
+        // JetBrains IDEs - TextField uses selection, others use slow with higher delays
+        if bundleId.hasPrefix("com.jetbrains") {
+            if role == "AXTextField" {
+                debugCallback?("    → Method: selection (JetBrains TextField)")
+                cachedMethod = .selection
+                cachedDelays = (1000, 3000, 2000)
+                return (.selection, (1000, 3000, 2000))
+            }
+            debugCallback?("    → Method: slow (JetBrains IDE)")
+            cachedMethod = .slow
+            // Higher delays for JetBrains: 6ms backspace, 15ms wait, 6ms text
+            cachedDelays = (6000, 15000, 6000)
+            return (.slow, (6000, 15000, 6000))
+        }
+        
+        // Microsoft Office apps
+        if bundleId == "com.microsoft.Excel" || bundleId == "com.microsoft.Word" {
+            debugCallback?("    → Method: selection (Microsoft Office)")
+            cachedMethod = .selection
+            cachedDelays = (1000, 3000, 2000)
+            return (.selection, (1000, 3000, 2000))
+        }
+        
+        // Terminal apps - high delays for reliability (Warp, iTerm2, etc.)
+        let terminals = [
+            // Terminals
+            "com.apple.Terminal", "com.googlecode.iterm2", "io.alacritty",
+            "com.github.wez.wezterm", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
+            "net.kovidgoyal.kitty", "co.zeit.hyper", "org.tabby", "com.raphaelamorim.rio",
+            "com.termius-dmg.mac"
+        ]
+        if terminals.contains(bundleId) {
+            debugCallback?("    → Method: slow (Terminal)")
+            cachedMethod = .slow
+            // High delays for terminal reliability: 12ms backspace, 30ms wait, 12ms text
+            cachedDelays = (12000, 30000, 12000)
+            return (.slow, (12000, 30000, 12000))
+        }
+        
+        // Default: fast with safe delays
+        debugCallback?("    → Method: fast (default)")
+        cachedMethod = .fast
+        cachedDelays = (1000, 3000, 1500)
+        return (.fast, (1000, 3000, 1500))
+    }
+    
+    /// Clear cached injection method (call when app changes)
+    func clearMethodCache() {
+        cachedMethod = nil
+        cachedDelays = nil
+        cachedBundleId = nil
     }
 }
 

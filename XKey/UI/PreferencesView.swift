@@ -61,12 +61,19 @@ struct PreferencesView: View {
                     }
                     .tag(3)
                 
-                // Tab 4: Giao diện
+                // Tab 4: Chuyển đổi
+                ConvertToolTab()
+                    .tabItem {
+                        Label("Chuyển đổi", systemImage: "arrow.left.arrow.right")
+                    }
+                    .tag(4)
+                
+                // Tab 5: Giao diện
                 UISettingsTab(viewModel: viewModel)
                     .tabItem {
                         Label("Giao diện", systemImage: "paintbrush")
                     }
-                    .tag(4)
+                    .tag(5)
             }
             .padding(.horizontal, 8)
             
@@ -244,11 +251,25 @@ struct BasicSettingsTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Hotkey
                 GroupBox("Phím tắt") {
-                    HStack {
-                        Text("Bật/tắt tiếng Việt:")
-                        Spacer()
-                        HotkeyRecorderView(hotkey: $viewModel.preferences.toggleHotkey)
-                            .frame(width: 150)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Bật/tắt tiếng Việt:")
+                            Spacer()
+                            HotkeyRecorderView(hotkey: $viewModel.preferences.toggleHotkey)
+                                .frame(width: 150)
+                        }
+                        
+                        Toggle("Phát âm thanh khi bật/tắt", isOn: $viewModel.preferences.beepOnToggle)
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Hoàn tác gõ tiếng Việt bằng phím Esc", isOn: $viewModel.preferences.undoTypingEnabled)
+                            
+                            Text("Nhấn Esc ngay sau khi gõ để hoàn tác việc bỏ dấu")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -404,6 +425,17 @@ struct AdvancedTab: View {
                     }
                     .padding(.vertical, 4)
                 }
+                
+                GroupBox("Debug") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Bật chế độ Debug", isOn: $viewModel.preferences.debugModeEnabled)
+                        
+                        Text("Hiển thị cửa sổ debug để theo dõi hoạt động của bộ gõ")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -459,6 +491,145 @@ struct UISettingsTab: View {
                 }
                 
                 Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+}
+
+// MARK: - Tab 4: Convert Tool
+
+struct ConvertToolTab: View {
+    @StateObject private var viewModel = ConvertToolViewModel()
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Input text
+                GroupBox("Văn bản gốc") {
+                    TextEditor(text: $viewModel.inputText)
+                        .font(.body)
+                        .frame(height: 80)
+                        .border(Color.gray.opacity(0.2), width: 1)
+                        .cornerRadius(4)
+                }
+                
+                // Conversion options
+                GroupBox("Chuyển đổi chữ hoa/thường") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 16) {
+                            Toggle("Viết hoa tất cả", isOn: $viewModel.toAllCaps)
+                                .onChange(of: viewModel.toAllCaps) { newValue in
+                                    if newValue {
+                                        viewModel.toAllNonCaps = false
+                                        viewModel.toCapsFirstLetter = false
+                                        viewModel.toCapsEachWord = false
+                                    }
+                                }
+                            
+                            Toggle("Viết thường tất cả", isOn: $viewModel.toAllNonCaps)
+                                .onChange(of: viewModel.toAllNonCaps) { newValue in
+                                    if newValue {
+                                        viewModel.toAllCaps = false
+                                        viewModel.toCapsFirstLetter = false
+                                        viewModel.toCapsEachWord = false
+                                    }
+                                }
+                        }
+                        
+                        HStack(spacing: 16) {
+                            Toggle("Viết hoa chữ đầu", isOn: $viewModel.toCapsFirstLetter)
+                                .onChange(of: viewModel.toCapsFirstLetter) { newValue in
+                                    if newValue {
+                                        viewModel.toAllCaps = false
+                                        viewModel.toAllNonCaps = false
+                                        viewModel.toCapsEachWord = false
+                                    }
+                                }
+                            
+                            Toggle("Viết hoa mỗi từ", isOn: $viewModel.toCapsEachWord)
+                                .onChange(of: viewModel.toCapsEachWord) { newValue in
+                                    if newValue {
+                                        viewModel.toAllCaps = false
+                                        viewModel.toAllNonCaps = false
+                                        viewModel.toCapsFirstLetter = false
+                                    }
+                                }
+                        }
+                        
+                        Toggle("Xóa dấu tiếng Việt", isOn: $viewModel.removeMark)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                // Code table conversion
+                GroupBox("Chuyển đổi bảng mã") {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Từ:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Picker("", selection: $viewModel.fromCode) {
+                                Text("Unicode").tag(0)
+                                Text("TCVN3").tag(1)
+                                Text("VNI").tag(2)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 180)
+                        }
+                        
+                        Image(systemName: "arrow.right")
+                            .foregroundColor(.secondary)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Sang:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Picker("", selection: $viewModel.toCode) {
+                                Text("Unicode").tag(0)
+                                Text("TCVN3").tag(1)
+                                Text("VNI").tag(2)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 180)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                // Convert button
+                HStack {
+                    Button("Xóa") {
+                        viewModel.clear()
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Chuyển đổi") {
+                        viewModel.convert()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.inputText.isEmpty)
+                }
+                
+                // Output text
+                GroupBox("Kết quả") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextEditor(text: $viewModel.outputText)
+                            .font(.body)
+                            .frame(height: 80)
+                            .border(Color.gray.opacity(0.2), width: 1)
+                            .cornerRadius(4)
+                        
+                        if !viewModel.outputText.isEmpty {
+                            Button("Copy kết quả") {
+                                viewModel.copyToClipboard()
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()

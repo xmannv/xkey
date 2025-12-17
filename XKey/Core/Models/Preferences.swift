@@ -20,9 +20,13 @@ enum MenuBarIconStyle: String, Codable, CaseIterable {
     }
 }
 
+
+
 struct Preferences: Codable {
     // Hotkey settings
     var toggleHotkey: Hotkey = Hotkey(keyCode: 9, modifiers: [.command, .shift]) // Default: Cmd+Shift+V
+    var undoTypingEnabled: Bool = false          // Enable undo typing with Esc key
+    var beepOnToggle: Bool = false               // Play beep sound when toggle Vietnamese
     
     // Input settings
     var inputMethod: InputMethod = .telex

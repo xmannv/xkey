@@ -95,6 +95,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
+    // Undo typing key (single key, no modifiers)
+    var undoTypingKeyCode: UInt16?
+    
     // Managers
     private let macroManager = MacroManager()
     private let smartSwitchManager = SmartSwitchManager()
@@ -137,6 +140,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             name: .macrosDidChange,
             object: nil
         )
+        
+
     }
     
     deinit {
@@ -325,6 +330,39 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             engine.reset()
             injector.markNewSession(cursorMoved: false)  // New field, not mid-sentence
             return event
+        }
+        
+        // Handle undo typing key (single key, no modifiers)
+        // Only trigger if there's something to undo in the engine buffer
+        if let undoKeyCode = undoTypingKeyCode, keyCode == undoKeyCode {
+            // Check if NO modifiers are pressed (pure single key)
+            let hasNoModifiers = !event.isCommandPressed && !event.isControlPressed && !event.isOptionPressed
+            
+            if hasNoModifiers && engine.canUndoTyping() {
+                debugLogCallback?("  → UNDO TYPING KEY - performing undo")
+                let result = engine.undoTyping()
+                
+                if result.shouldConsume {
+                    // Send backspaces
+                    if result.backspaceCount > 0 {
+                        injector.sendBackspaces(
+                            count: result.backspaceCount,
+                            codeTable: codeTable,
+                            proxy: proxy,
+                            fixAutocomplete: false
+                        )
+                    }
+                    
+                    // Send original characters
+                    if !result.newCharacters.isEmpty {
+                        injector.sendCharacters(result.newCharacters, codeTable: codeTable, proxy: proxy)
+                    }
+                    
+                    injector.markNewSession()
+                    return nil  // Consume the event
+                }
+            }
+            // If nothing to undo, fall through to normal processing
         }
 
         // Handle special keys
@@ -547,6 +585,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     func reset() {
         engine.reset()
         injector.markNewSession()  // Mark as new input session
+        injector.clearMethodCache()  // Clear injection method cache
     }
     
     /// Reset engine and mark that cursor was moved (by mouse click or arrow keys)
@@ -554,6 +593,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     func resetWithCursorMoved() {
         engine.reset()
         injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
+        injector.clearMethodCache()  // Clear injection method cache
     }
 }
 

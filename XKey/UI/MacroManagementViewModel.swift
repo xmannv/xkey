@@ -8,7 +8,7 @@
 import Foundation
 import AppKit
 
-// Notification name for macro changes
+// Notification names
 extension Notification.Name {
     static let macrosDidChange = Notification.Name("XKey.macrosDidChange")
 }

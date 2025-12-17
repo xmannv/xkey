@@ -49,6 +49,12 @@ class StatusBarViewModel: ObservableObject {
         keyboardHandler?.setVietnamese(isVietnameseEnabled)
         log("🔄 Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
         
+        // Play beep sound if enabled
+        let prefs = PreferencesManager.shared.loadPreferences()
+        if prefs.beepOnToggle {
+            NSSound.beep()
+        }
+        
         // Save language for current app (Smart Switch)
         saveLanguageForCurrentApp()
     }

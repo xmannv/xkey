@@ -2427,6 +2427,65 @@ extension VNEngine {
         return convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: nil, isUppercase: false)
     }
     
+    /// Check if there's something to undo
+    /// Returns true if engine has Vietnamese-processed text that can be reverted
+    func canUndoTyping() -> Bool {
+        // Can undo if we have both:
+        // 1. Current word in buffer (index > 0)
+        // 2. Original keystrokes saved (stateIndex > 0)
+        // 3. The word has been processed (not just raw characters)
+        return index > 0 && stateIndex > 0
+    }
+    
+    /// Undo Vietnamese typing - restore original keystrokes
+    /// This restores the raw keystrokes before Vietnamese processing
+    /// Example: "tiếng" → "tieesng"
+    func undoTyping() -> ProcessResult {
+        logCallback?("undoTyping: index=\(index), stateIndex=\(stateIndex)")
+        
+        // Check if there's anything to undo
+        guard index > 0 && stateIndex > 0 else {
+            logCallback?("  → Nothing to undo (index=\(index), stateIndex=\(stateIndex))")
+            return ProcessResult.doNothing
+        }
+        
+        // Get original typed keys from keyStates
+        var originalKeys = [UInt32]()
+        for i in 0..<Int(stateIndex) {
+            originalKeys.append(keyStates[i])
+        }
+        
+        guard !originalKeys.isEmpty else {
+            logCallback?("  → No original keys found")
+            return ProcessResult.doNothing
+        }
+        
+        logCallback?("  → Restoring \(originalKeys.count) original keys")
+        
+        // Build result
+        var result = ProcessResult()
+        result.shouldConsume = true
+        result.backspaceCount = Int(index)  // Delete current Vietnamese word
+        
+        // Convert original key codes to VNCharacters
+        for keyData in originalKeys {
+            let keyCode = UInt16(keyData & VNEngine.CHAR_MASK)
+            let isCaps = (keyData & VNEngine.CAPS_MASK) != 0
+            
+            // Convert key code to character
+            if let char = keyCodeToCharacter(keyCode) {
+                let finalChar = isCaps ? Character(String(char).uppercased()) : char
+                result.newCharacters.append(VNCharacter(character: finalChar))
+                logCallback?("    → Key \(keyCode) → '\(finalChar)'")
+            }
+        }
+        
+        // Reset engine state after undo
+        startNewSession()
+        
+        return result
+    }
+    
     /// Process word break (space, punctuation, etc.)
     /// Returns ProcessResult with macro replacement if found
     func processWordBreak(character: Character) -> ProcessResult {

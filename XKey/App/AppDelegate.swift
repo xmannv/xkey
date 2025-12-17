@@ -340,6 +340,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update hotkey
         setupGlobalHotkey(with: preferences.toggleHotkey)
         
+        // Update undo typing (Esc key)
+        setupUndoTyping(enabled: preferences.undoTypingEnabled)
+        
         debugWindowController?.logEvent("✅ Preferences applied (including advanced features)")
     }
     
@@ -458,6 +461,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         debugWindowController?.logEvent("  ✅ Toggle hotkey configured in EventTap: \(hotkey.displayString)")
+    }
+    
+    private func setupUndoTyping(enabled: Bool) {
+        if enabled {
+            // Enable undo typing with Esc key (keyCode 0x35)
+            keyboardHandler?.undoTypingKeyCode = 0x35
+            debugWindowController?.logEvent("  ✅ Undo typing enabled (Esc key)")
+        } else {
+            keyboardHandler?.undoTypingKeyCode = nil
+            debugWindowController?.logEvent("  ⏹️ Undo typing disabled")
+        }
     }
     
     private func setupReadWordHotkey() {

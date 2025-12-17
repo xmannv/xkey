@@ -103,11 +103,25 @@ struct GeneralSettingsSection: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Hotkey
                 SettingsGroup(title: "Phím tắt") {
-                    HStack {
-                        Text("Bật/tắt tiếng Việt:")
-                        Spacer()
-                        HotkeyRecorderView(hotkey: $viewModel.preferences.toggleHotkey)
-                            .frame(width: 150)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Bật/tắt tiếng Việt:")
+                            Spacer()
+                            HotkeyRecorderView(hotkey: $viewModel.preferences.toggleHotkey)
+                                .frame(width: 150)
+                        }
+                        
+                        Toggle("Phát âm thanh khi bật/tắt", isOn: $viewModel.preferences.beepOnToggle)
+                        
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Hoàn tác gõ tiếng Việt bằng phím Esc", isOn: $viewModel.preferences.undoTypingEnabled)
+                            
+                            Text("Nhấn Esc ngay sau khi gõ để hoàn tác việc bỏ dấu (ví dụ: \"tiếng\" → \"tieesng\")")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 
