@@ -301,27 +301,35 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return event
         }
 
-        // Get character and key code
-        // Use charactersIgnoringModifiers for the base character (for input processing)
-        // But check the ACTUAL character (with modifiers) to determine if it's uppercase
-        guard let charactersIgnoringModifiers = event.charactersIgnoringModifiers,
-              let character = charactersIgnoringModifiers.first else {
+        // Get physical key code
+        let keyCode = event.keyCode
+        
+        // IMPORTANT: Convert physical keyCode to QWERTY character
+        // This ensures Vietnamese typing works on non-QWERTY layouts (QWERTZ, AZERTY, etc.)
+        // We cannot use event.charactersIgnoringModifiers because it returns the character
+        // based on the current keyboard layout, not the physical key position
+        // For example, on QWERTZ: physical key at position 0x06 (Z on QWERTY) returns 'y'
+        
+        // Determine if Shift is pressed (for uppercase and special characters)
+        let hasShiftModifier = event.flags.contains(.maskShift)
+        let hasCapsLock = event.flags.contains(.maskAlphaShift)
+        
+        // Get QWERTY character from physical key position
+        guard let qwertyCharacter = KeyCodeToCharacter.qwertyCharacter(keyCode: keyCode, withShift: hasShiftModifier) else {
+            // Not a printable character or not mapped
             return event
         }
+        
+        // Determine if uppercase:
+        // - For letters: Shift XOR Caps Lock (standard behavior)
+        // - For special characters: use Shift flag
+        let isLetter = qwertyCharacter.isLetter
+        let isUppercase = isLetter ? (hasShiftModifier != hasCapsLock) : hasShiftModifier
+        
+        // Use the QWERTY character for processing
+        let character = qwertyCharacter
 
-        let keyCode = event.keyCode
-
-        // Determine uppercase by checking the ACTUAL character (with Shift/Caps Lock applied)
-        // For letters, use character.isUppercase
-        // For special characters (like @, #, !), check if Shift modifier is present
-        let actualCharacters = event.characters ?? ""
-        let actualCharacter = actualCharacters.first ?? character
-        let hasShiftModifier = event.flags.contains(.maskShift)
-
-        // If character is a letter, use isUppercase; otherwise use Shift flag
-        let isUppercase = actualCharacter.isLetter ? actualCharacter.isUppercase : hasShiftModifier
-
-        debugLogCallback?("KEY: '\(character)' code=\(keyCode)")
+        debugLogCallback?("KEY: '\(character)' code=\(keyCode) (QWERTY)")
 
         // Handle cursor movement keys - reset engine as focus might have changed
         let cursorMovementKeys: [CGKeyCode] = [

@@ -152,6 +152,18 @@ if [ "$ENABLE_XKEYIM" = true ]; then
               build
         fi
         
+        # Kill running XKeyIM process if it exists
+        echo "🔍 Checking for running XKeyIM process..."
+        if pgrep -x "XKeyIM" > /dev/null; then
+            echo "⚠️  XKeyIM is currently running, killing process..."
+            killall XKeyIM 2>/dev/null || true
+            echo "✅ XKeyIM process killed"
+            # Wait a bit to ensure process is fully terminated
+            sleep 1
+        else
+            echo "✅ No running XKeyIM process found"
+        fi
+        
         # Copy XKeyIM to Release directory
         echo "📦 Copying XKeyIM.app to Release..."
         rm -rf Release/XKeyIM.app
@@ -200,6 +212,24 @@ if [ "$ENABLE_XKEYIM" = true ]; then
         echo "🔍 Verifying XKey.app signature after embedding..."
         codesign -vvv --deep --strict Release/XKey.app
         echo "✅ XKey.app signature verified"
+        
+        # Auto-install XKeyIM to user's Input Methods
+        echo ""
+        echo "📲 Installing XKeyIM to ~/Library/Input Methods/..."
+        mkdir -p ~/Library/Input\ Methods/
+        
+        # Kill XKeyIM process again before installing (in case it was restarted)
+        if pgrep -x "XKeyIM" > /dev/null; then
+            echo "🔄 Killing XKeyIM process before installation..."
+            killall XKeyIM 2>/dev/null || true
+            sleep 1
+        fi
+        
+        # Copy to Input Methods
+        rm -rf ~/Library/Input\ Methods/XKeyIM.app
+        cp -R "Release/XKeyIM.app" ~/Library/Input\ Methods/
+        echo "✅ XKeyIM installed to ~/Library/Input Methods/"
+        echo "   New version will load automatically on next use"
 
     else
         echo "⚠️  XKeyIM target not found in Xcode project, skipping..."

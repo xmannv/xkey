@@ -31,7 +31,7 @@ struct Preferences: Codable {
     // Input settings
     var inputMethod: InputMethod = .telex
     var codeTable: CodeTable = .unicode
-    var modernStyle: Bool = true
+    var modernStyle: Bool = false
     var spellCheckEnabled: Bool = false
     var fixAutocomplete: Bool = true
     
