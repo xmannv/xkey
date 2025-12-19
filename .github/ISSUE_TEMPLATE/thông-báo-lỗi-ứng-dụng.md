@@ -27,6 +27,8 @@ Nếu có thể hãy đính kèm hình ảnh để mô tả chi tiết hơn
  - OS: phiên bản macOS (ví dụ Tahoe 26.2)
  - App: tên app [ví dụ chrome, safari]
  - Xkey: phiên bản đang sử dụng [ví dụ 1.0.5]
+ - Kiểu gõ: ví dụ Telex/VNI
+ - Bảng mã: Unicode,...
 
 **Additional context**
 Các thông tin thêm nếu có
