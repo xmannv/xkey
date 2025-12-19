@@ -292,7 +292,7 @@ struct AdvancedSettingsSection: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Toggle("Bật IMKit Mode", isOn: $viewModel.preferences.imkitEnabled)
 
-                            Text("Sử dụng Input Method Kit thay vì CGEvent injection. Giúp gõ mượt hơn trong Terminal và IDE.")
+                            Text("Sử dụng Input Method Kit thay vì CGEvent injection. Giúp gõ mượt hơn trong Terminal app và IDE Terminal.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -306,7 +306,7 @@ struct AdvancedSettingsSection: View {
 
                                 Text(viewModel.preferences.imkitUseMarkedText ?
                                     "✓ Chuẩn IMKit - Hiển thị gạch chân khi đang gõ. Ổn định và tương thích tốt với mọi ứng dụng." :
-                                    "⚠️ Direct Mode - Không có gạch chân nhưng có thể gặp lỗi thêm dấu/double ký tự trong một số trường hợp.")
+                                    "⚠️ Direct Mode - Không có gạch chân nhưng có thể gặp lỗi thêm dấu/double ký tự trong một số trường hợp trên các app khác nhau. Nếu gặp lỗi như vậy hãy bật tính năng này lên và thử lại.")
                                     .font(.caption)
                                     .foregroundColor(viewModel.preferences.imkitUseMarkedText ? .secondary : .orange)
                                     .padding(.leading, 20)
@@ -329,6 +329,38 @@ struct AdvancedSettingsSection: View {
                             Text("Sau khi cài đặt, vào System Settings → Keyboard → Input Sources để thêm XKey Vietnamese")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
+                            
+                            Divider()
+                            
+                            // Quick switch hotkey
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Phím tắt chuyển nhanh sang XKey:")
+                                        .font(.caption)
+                                    Spacer()
+                                    // Use custom binding for optional hotkey
+                                    HotkeyRecorderView(hotkey: Binding(
+                                        get: { viewModel.preferences.switchToXKeyHotkey ?? Hotkey(keyCode: 0, modifiers: []) },
+                                        set: { viewModel.preferences.switchToXKeyHotkey = $0 }
+                                    ))
+                                        .frame(width: 150)
+                                }
+                                
+                                Text("Nhấn phím tắt này để chuyển nhanh sang XKey Input Method từ bất kỳ nguồn nhập nào")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                // Quick switch button
+                                HStack {
+                                    Button("Chuyển sang XKey ngay") {
+                                        InputSourceSwitcher.shared.switchToXKey()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                    
+                                    Spacer()
+                                }
+                            }
                         }
                     }
                 }

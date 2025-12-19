@@ -151,6 +151,16 @@ XKeyIM là Input Method sử dụng IMKit của Apple, cung cấp trải nghiệ
 6. Mở **System Settings** → **Keyboard** → **Input Sources**
 7. Click **"+"** và thêm **"XKey Vietnamese"**
 
+### Quyền truy cập cho XKeyIM
+
+XKeyIM cần quyền **Accessibility** để xử lý một số tổ hợp phím đặc biệt (như Ctrl+C trong Terminal):
+
+1. Mở **System Settings** → **Privacy & Security** → **Accessibility**
+2. Click **"+"** và thêm `XKeyIM.app` từ `~/Library/Input Methods/`
+3. Bật quyền cho XKeyIM
+
+> **Lưu ý:** Nếu không cấp quyền Accessibility, XKeyIM vẫn hoạt động bình thường cho việc gõ tiếng Việt. Quyền này chỉ cần thiết để đảm bảo các phím tắt như Ctrl+C hoạt động đúng khi đang có văn bản đang soạn (marked text).
+
 ### Build XKeyIM từ mã nguồn
 
 Xem hướng dẫn chi tiết tại [XKeyIM/README.md](XKeyIM/README.md)

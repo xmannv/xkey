@@ -38,6 +38,9 @@
 		10F26F102ED6CAF900B9FA1F /* SmartSwitchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */; };
 		10F26F112ED6CAF900B9FA1F /* VietnameseData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */; };
 		10F26F132ED6CAF900B9FA1F /* MacroManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0B2ED6CAF900B9FA1F /* MacroManager.swift */; };
+		10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
+		10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
+		10FDCC1C2EF5942400B2D9AC /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */; };
 		48B758BE0BDCAB95CFBADD3D /* VNEngineSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7801294053CCB45DE7232D2 /* VNEngineSettings.swift */; };
 		564995EF131811377C4F3FF6 /* VNEngineAdvanced.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6BDFF6F99DC1B577BA425 /* VNEngineAdvanced.swift */; };
 		5A61FAA58A29AD3225DD649C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803B94EF161FE79A022FF806 /* SettingsView.swift */; };
@@ -86,6 +89,8 @@
 		10F26F0B2ED6CAF900B9FA1F /* MacroManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManager.swift; sourceTree = "<group>"; };
 		10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSwitchManager.swift; sourceTree = "<group>"; };
 		10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VietnameseData.swift; sourceTree = "<group>"; };
+		10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBehaviorDetector.swift; sourceTree = "<group>"; };
+		10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
 		4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyCodeToCharacter.swift; sourceTree = "<group>"; };
 		5AAC14FFBBB2B10B6A983B1A /* VNEngineSmartSwitch.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VNEngineSmartSwitch.swift; sourceTree = "<group>"; };
 		803B94EF161FE79A022FF806 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -143,6 +148,7 @@
 		101A444A2ED419E9003F9D05 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */,
 				100D2BE52EF2C72600C26B87 /* SharedSettings.swift */,
 				100D2BE32EF2C71E00C26B87 /* IMKitHelper.swift */,
 				LAUNCHATLOGIN002 /* LaunchAtLogin.swift */,
@@ -152,9 +158,18 @@
 			path = Utilities;
 			sourceTree = "<group>";
 		};
+		10FDCC182EF5885200B2D9AC /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		A5000001 = {
 			isa = PBXGroup;
 			children = (
+				10FDCC182EF5885200B2D9AC /* Shared */,
 				A5000002 /* XKey */,
 				100D2BAE2EF2B89600C26B87 /* XKeyIM */,
 				A5000003 /* Products */,
@@ -380,6 +395,7 @@
 				100D2BD82EF2C1D800C26B87 /* VNEngineMacro.swift in Sources */,
 				100D2BD92EF2C1D800C26B87 /* VNEngine.swift in Sources */,
 				100D2BDA2EF2C1D800C26B87 /* VNWordBuffer.swift in Sources */,
+				10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				100D2BDB2EF2C1D800C26B87 /* MacroManager.swift in Sources */,
 				100D2BDC2EF2C1D800C26B87 /* InputProcessor.swift in Sources */,
 				100D2BDD2EF2C1D800C26B87 /* VNEngineSettings.swift in Sources */,
@@ -397,6 +413,7 @@
 				10F26F132ED6CAF900B9FA1F /* MacroManager.swift in Sources */,
 				A1000001 /* XKeyApp.swift in Sources */,
 				A1000002 /* AppDelegate.swift in Sources */,
+				10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				A1000003 /* VNCharacter.swift in Sources */,
 				A1000004 /* VNCharacterMap.swift in Sources */,
 				10A214992ED42DFA005B52BD /* HotkeyRecorderView.swift in Sources */,
@@ -407,6 +424,7 @@
 				A1000006 /* VNWordBuffer.swift in Sources */,
 				A1000007 /* InputProcessor.swift in Sources */,
 				A1000008 /* VNEngine.swift in Sources */,
+				10FDCC1C2EF5942400B2D9AC /* InputSourceSwitcher.swift in Sources */,
 				100D2BE42EF2C71E00C26B87 /* IMKitHelper.swift in Sources */,
 				106779A62ED41FD400FE0B24 /* StatusBarManager.swift in Sources */,
 				106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */,

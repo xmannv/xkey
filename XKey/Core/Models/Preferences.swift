@@ -60,6 +60,7 @@ struct Preferences: Codable {
     // IMKit settings (experimental)
     var imkitEnabled: Bool = false               // Use IMKit instead of CGEvent injection
     var imkitUseMarkedText: Bool = false         // Show underline when composing (IMKit mode)
+    var switchToXKeyHotkey: Hotkey?              // Hotkey to quickly switch to XKeyIM input source
     
     // UI settings
     var showDockIcon: Bool = false               // Show icon in Dock (menu bar always visible)

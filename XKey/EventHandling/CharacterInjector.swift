@@ -9,21 +9,8 @@ import Cocoa
 import Carbon
 
 // MARK: - Injection Method
-
-/// Injection method for different app types
-/// Adaptive delays for Terminal/JetBrains/Electron compatibility
-enum InjectionMethod {
-    case fast           // Default: backspace + text with minimal delays
-    case slow           // Terminals/IDEs: backspace + text with higher delays
-    case selection      // Browser address bars: Shift+Left select + type replacement
-    case autocomplete   // Spotlight: Forward Delete + backspace + text
-}
-
-/// Injection delays in microseconds (backspace, wait, text)
-/// - backspace: Delay between each backspace keystroke (deleting old characters)
-/// - wait: Delay after all backspaces, before sending new text
-/// - text: Delay between each character when injecting Vietnamese text
-typealias InjectionDelays = (backspace: UInt32, wait: UInt32, text: UInt32)
+// NOTE: InjectionMethod, InjectionDelays, and InjectionMethodInfo are defined in
+// Shared/AppBehaviorDetector.swift (Single Source of Truth)
 
 class CharacterInjector {
     
@@ -698,206 +685,18 @@ class CharacterInjector {
     // MARK: - Injection Method Detection
     
     /// Detect injection method based on frontmost app and focused element
-    /// Uses adaptive delays for Terminal/JetBrains/Electron compatibility
+    /// Uses AppBehaviorDetector for centralized app detection
     func detectInjectionMethod() -> (InjectionMethod, InjectionDelays) {
-        // Get focused element and its owning app
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        var role: String?
-        var bundleId: String?
+        // Use AppBehaviorDetector (Single Source of Truth)
+        let methodInfo = AppBehaviorDetector.shared.detectInjectionMethod()
         
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            
-            // Get role
-            var roleVal: CFTypeRef?
-            AXUIElementCopyAttributeValue(axEl, kAXRoleAttribute as CFString, &roleVal)
-            role = roleVal as? String
-            
-            // Get owning app's bundle ID
-            var pid: pid_t = 0
-            if AXUIElementGetPid(axEl, &pid) == .success {
-                if let app = NSRunningApplication(processIdentifier: pid) {
-                    bundleId = app.bundleIdentifier
-                }
-            }
-        }
+        debugCallback?("    → detectMethod: \(methodInfo.description) → \(methodInfo.method)")
         
-        // Fallback to frontmost app
-        if bundleId == nil {
-            bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        }
+        // Update local cache for compatibility
+        cachedMethod = methodInfo.method
+        cachedDelays = methodInfo.delays
         
-        guard let bundleId = bundleId else {
-            return (.fast, (200, 800, 500))
-        }
-        
-        // Cache check - avoid repeated detection for same app
-        if bundleId == cachedBundleId, let method = cachedMethod, let delays = cachedDelays {
-            debugCallback?("    → detectMethod (cached): \(bundleId) → \(method)")
-            return (method, delays)
-        }
-        
-        cachedBundleId = bundleId
-        
-        debugCallback?("    → detectMethod: \(bundleId) role=\(role ?? "nil")")
-        
-        // Selection method for autocomplete UI elements (ComboBox, SearchField)
-        if role == "AXComboBox" {
-            debugCallback?("    → Method: selection (ComboBox)")
-            cachedMethod = .selection
-            cachedDelays = (1000, 3000, 2000)
-            return (.selection, (1000, 3000, 2000))
-        }
-        if role == "AXSearchField" {
-            debugCallback?("    → Method: selection (SearchField)")
-            cachedMethod = .selection
-            cachedDelays = (1000, 3000, 2000)
-            return (.selection, (1000, 3000, 2000))
-        }
-        
-        // Spotlight - use autocomplete method
-        if bundleId == "com.apple.Spotlight" {
-            debugCallback?("    → Method: autocomplete (Spotlight)")
-            cachedMethod = .autocomplete
-            cachedDelays = (1000, 3000, 1000)
-            return (.autocomplete, (1000, 3000, 1000))
-        }
-        
-        // Browser address bars (AXTextField with autocomplete)
-        let browsers = [
-            // Chromium-based
-            "com.google.Chrome",
-            "com.google.Chrome.canary",
-            "com.google.Chrome.beta",
-            "org.chromium.Chromium",
-            "com.brave.Browser",
-            "com.brave.Browser.beta",
-            "com.brave.Browser.nightly",
-            "com.microsoft.edgemac",
-            "com.microsoft.edgemac.Beta",
-            "com.microsoft.edgemac.Dev",
-            "com.microsoft.edgemac.Canary",
-            "com.vivaldi.Vivaldi",
-            "com.vivaldi.Vivaldi.snapshot",
-            "ru.yandex.desktop.yandex-browser",
-            // Opera
-            "com.opera.Opera",
-            "com.operasoftware.Opera",
-            "com.operasoftware.OperaGX",
-            "com.operasoftware.OperaAir",
-            "com.opera.OperaNext",
-            // Firefox-based
-            "org.mozilla.firefox",
-            "org.mozilla.firefoxdeveloperedition",
-            "org.mozilla.nightly",
-            "org.waterfoxproject.waterfox",
-            "io.gitlab.librewolf-community.librewolf",
-            "one.ablaze.floorp",
-            "org.torproject.torbrowser",
-            "net.mullvad.mullvadbrowser",
-            // Safari
-            "com.apple.Safari",
-            "com.apple.SafariTechnologyPreview",
-            // WebKit-based
-            "com.kagi.kagimacOS",
-            // Arc & Others
-            "company.thebrowser.Browser",
-            "company.thebrowser.Arc",
-            "company.thebrowser.dia",
-            "app.zen-browser.zen",
-            "com.sigmaos.sigmaos.macos",
-            "com.pushplaylabs.sidekick",
-            "com.firstversionist.polypane",
-            "ai.perplexity.comet",
-            "com.duckduckgo.macos.browser"
-        ]
-        
-        if browsers.contains(bundleId) && role == "AXTextField" {
-            debugCallback?("    → Method: selection (browser address bar)")
-            cachedMethod = .selection
-            cachedDelays = (1000, 3000, 2000)
-            return (.selection, (1000, 3000, 2000))
-        }
-        
-        // JetBrains IDEs - TextField uses selection, others use slow with higher delays
-        if bundleId.hasPrefix("com.jetbrains") {
-            if role == "AXTextField" {
-                debugCallback?("    → Method: selection (JetBrains TextField)")
-                cachedMethod = .selection
-                cachedDelays = (1000, 3000, 2000)
-                return (.selection, (1000, 3000, 2000))
-            }
-            debugCallback?("    → Method: slow (JetBrains IDE)")
-            cachedMethod = .slow
-            // Higher delays for JetBrains: 6ms backspace, 15ms wait, 6ms text
-            cachedDelays = (12000, 30000, 12000)
-            return (.slow, (12000, 30000, 12000))
-        }
-        
-        // Microsoft Office apps
-        // Excel uses AXTextArea, Word may use AXTextField
-        if bundleId == "com.microsoft.Excel" || bundleId == "com.microsoft.Word" {
-            // Use backspace method for Excel cells (AXTextArea has issues with selection)
-            if role == "AXTextArea" {
-                debugCallback?("    → Method: fast (Microsoft Excel cell)")
-                cachedMethod = .fast
-                cachedDelays = (2000, 5000, 2000)
-                return (.fast, (2000, 5000, 2000))
-            }
-            debugCallback?("    → Method: selection (Microsoft Office)")
-            cachedMethod = .selection
-            cachedDelays = (1000, 3000, 2000)
-            return (.selection, (1000, 3000, 2000))
-        }
-        
-        // Terminal apps - optimized delays with semaphore synchronization
-        // Different terminals have different rendering speeds
-        let fastTerminals = [
-            // Fast terminals (GPU-accelerated, modern)
-            "io.alacritty", "com.mitchellh.ghostty", "net.kovidgoyal.kitty",
-            "com.github.wez.wezterm", "com.raphaelamorim.rio"
-        ]
-        let mediumTerminals = [
-            // Medium speed terminals
-            "com.googlecode.iterm2", "dev.warp.Warp-Stable", "co.zeit.hyper",
-            "org.tabby", "com.termius-dmg.mac"
-        ]
-        let slowTerminals = [
-            // Slower terminals (Apple Terminal)
-            "com.apple.Terminal"
-        ]
-        
-        if fastTerminals.contains(bundleId) {
-            debugCallback?("    → Method: slow (Fast Terminal - GPU)")
-            cachedMethod = .slow
-            // Fast GPU terminals: 2ms backspace, 4ms wait, 2ms text
-            cachedDelays = (2000, 4000, 2000)
-            return (.slow, (2000, 4000, 2000))
-        }
-        
-        if mediumTerminals.contains(bundleId) {
-            debugCallback?("    → Method: slow (Medium Terminal)")
-            cachedMethod = .slow
-            // Medium terminals: 3ms backspace, 6ms wait, 3ms text
-            cachedDelays = (3000, 6000, 3000)
-            return (.slow, (3000, 6000, 3000))
-        }
-        
-        if slowTerminals.contains(bundleId) {
-            debugCallback?("    → Method: slow (Slow Terminal)")
-            cachedMethod = .slow
-            // Apple Terminal: 4ms backspace, 8ms wait, 4ms text
-            cachedDelays = (4000, 8000, 4000)
-            return (.slow, (4000, 8000, 4000))
-        }
-        
-        // Default: fast with safe delays
-        debugCallback?("    → Method: fast (default)")
-        cachedMethod = .fast
-        cachedDelays = (1000, 3000, 1500)
-        return (.fast, (1000, 3000, 1500))
+        return (methodInfo.method, methodInfo.delays)
     }
     
     /// Clear cached injection method (call when app changes)
@@ -905,6 +704,8 @@ class CharacterInjector {
         cachedMethod = nil
         cachedDelays = nil
         cachedBundleId = nil
+        // Also clear AppBehaviorDetector cache
+        AppBehaviorDetector.shared.clearCache()
     }
 }
 

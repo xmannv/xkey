@@ -30,6 +30,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionAlertShown = false
     private var permissionCheckTimer: Timer?
     private var inputSourceManager: InputSourceManager?
+    private var switchXKeyHotkeyMonitor: Any?
+    private var switchXKeyGlobalHotkeyMonitor: Any?
 
     // MARK: - Initialization
 
@@ -104,6 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let monitor = readWordGlobalHotKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
+        
+        // Remove switch XKey hotkey monitors
+        if let monitor = switchXKeyHotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = switchXKeyGlobalHotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
 
         // Remove app switch observer
         if let observer = appSwitchObserver {
@@ -117,6 +127,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
+    }
+    
+    // MARK: - URL Scheme Handler
+    
+    /// Handle URL scheme: xkey://settings opens preferences
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme == "xkey" else { continue }
+            
+            switch url.host {
+            case "settings", "preferences":
+                // Open settings window
+                debugWindowController?.logEvent("📲 Received URL: \(url.absoluteString) - opening settings")
+                openPreferences()
+            default:
+                // Just activate the app
+                debugWindowController?.logEvent("📲 Received URL: \(url.absoluteString)")
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
     }
     
     // MARK: - Setup
@@ -356,6 +386,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update hotkey
         setupGlobalHotkey(with: preferences.toggleHotkey)
         
+        // Update switch XKey hotkey
+        setupSwitchXKeyHotkey(with: preferences.switchToXKeyHotkey)
+        
         // Update undo typing (Esc key)
         keyboardHandler?.undoTypingEnabled = preferences.undoTypingEnabled
         debugWindowController?.logEvent(preferences.undoTypingEnabled ? "  ✅ Undo typing enabled (Esc key)" : "  ⏹️ Undo typing disabled")
@@ -525,6 +558,66 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugWindowController?.logEvent("  ✅ Read Word hotkey: Cmd+Shift+R")
+    }
+    
+    private func setupSwitchXKeyHotkey(with hotkey: Hotkey?) {
+        // Remove existing monitors
+        if let monitor = switchXKeyHotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            switchXKeyHotkeyMonitor = nil
+        }
+        if let monitor = switchXKeyGlobalHotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            switchXKeyGlobalHotkeyMonitor = nil
+        }
+        
+        guard let hotkey = hotkey else {
+            debugWindowController?.logEvent("  ⏹️ Switch XKey hotkey disabled")
+            return
+        }
+        
+        let keyCode = hotkey.keyCode
+        
+        // Helper to check modifiers match exactly
+        let checkModifiers: (NSEvent) -> Bool = { event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            var requiredFlags: NSEvent.ModifierFlags = []
+            
+            if hotkey.modifiers.contains(.command) { requiredFlags.insert(.command) }
+            if hotkey.modifiers.contains(.control) { requiredFlags.insert(.control) }
+            if hotkey.modifiers.contains(.option) { requiredFlags.insert(.option) }
+            if hotkey.modifiers.contains(.shift) { requiredFlags.insert(.shift) }
+            
+            // Check if flags match exactly (only required modifiers, no extras)
+            let significantFlags = NSEvent.ModifierFlags([.command, .control, .option, .shift])
+            let actualFlags = flags.intersection(significantFlags)
+            return actualFlags == requiredFlags
+        }
+        
+        // Global monitor - catches hotkey in ALL apps
+        switchXKeyGlobalHotkeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == keyCode && checkModifiers(event) {
+                DispatchQueue.main.async {
+                    let success = InputSourceSwitcher.shared.switchToXKey()
+                    self?.debugWindowController?.logEvent("🔄 Switch to XKey via hotkey (\(hotkey.displayString)): \(success ? "success" : "failed")")
+                }
+            }
+        }
+        
+        // Local monitor - catches hotkey when XKey app is focused
+        switchXKeyHotkeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == keyCode && checkModifiers(event) {
+                DispatchQueue.main.async {
+                    let success = InputSourceSwitcher.shared.switchToXKey()
+                    self?.debugWindowController?.logEvent("🔄 Switch to XKey via hotkey (\(hotkey.displayString)): \(success ? "success" : "failed")")
+                }
+                // Return nil to consume the event
+                return nil
+            }
+            return event
+        }
+        
+        debugWindowController?.logEvent("  ✅ Switch XKey hotkey: \(hotkey.displayString)")
     }
 
     private func setupAppSwitchObserver() {

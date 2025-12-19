@@ -68,7 +68,7 @@ class XKeyIMController: IMKInputController {
 
     /// Handle settings changed notification from XKey app
     @objc private func handleSettingsChanged(_ notification: Notification) {
-        NSLog("XKeyIMController: Settings changed, reloading...")
+        IMKitDebugger.shared.log("Received XKey.settingsDidChange notification - reloading...", category: "NOTIFY")
         reloadSettings()
     }
     
@@ -141,9 +141,44 @@ class XKeyIMController: IMKInputController {
         
         // Handle modifier keys
         if event.modifierFlags.contains(.command) {
-            // Cmd+key: pass through
+            // Cmd+key: commit composition, reset buffer, and pass through
+            // This is important for Cmd+A (select all), Cmd+C, Cmd+V, etc.
+            // After Cmd+A, user expects to start fresh typing, not continue previous word
             commitComposition(client)
+            engine.reset()
+            currentWordLength = 0
             return false
+        }
+        
+        if event.modifierFlags.contains(.control) {
+            // Ctrl+key: commit composition and reset buffer (important for Ctrl+C in terminal)
+            IMKitDebugger.shared.log("CTRL+key detected - committing and re-posting event", category: "CTRL")
+            
+            // Only need special handling if there was composing text
+            let hadComposingText = !composingText.isEmpty
+            
+            commitComposition(client)
+            engine.reset()
+            currentWordLength = 0
+            markedTextStartLocation = NSNotFound
+            
+            // If there was composing text, IMKit may not pass through the Ctrl+key properly
+            // So we manually create and post a new event to ensure terminal receives it
+            if hadComposingText {
+                if let cgEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(event.keyCode), keyDown: true) {
+                    cgEvent.flags = .maskControl
+                    cgEvent.post(tap: .cgSessionEventTap)
+                    
+                    // Also post key up event
+                    if let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(event.keyCode), keyDown: false) {
+                        keyUpEvent.flags = .maskControl
+                        keyUpEvent.post(tap: .cgSessionEventTap)
+                    }
+                }
+                return true  // We handled it by re-posting
+            }
+            
+            return false  // No composing text, let it pass through normally
         }
         
         // Handle special keys
@@ -313,6 +348,17 @@ class XKeyIMController: IMKInputController {
             if result.shouldConsume {
                 handleResult(result, client: client)
                 return true
+            } else if character.isLetter {
+                // Engine didn't consume, but we need to track word length
+                // so that future replacements work correctly
+                let currentWord = engine.getCurrentWord()
+                if !currentWord.isEmpty {
+                    // Engine has buffered the character - track its length
+                    currentWordLength = currentWord.utf16.count
+                    IMKitDebugger.shared.log("Direct mode: pass-through, tracking length = \(currentWordLength)", category: "DIRECT")
+                }
+                // Let the character pass through to be inserted by the system
+                return false
             }
         }
 
@@ -321,21 +367,42 @@ class XKeyIMController: IMKInputController {
     
     /// Handle engine result
     private func handleResult(_ result: VNEngine.ProcessResult, client: IMKTextInput) {
-        if settings.useMarkedText {
+        // Detect app-specific behavior
+        let appBehavior = AppBehaviorDetector.shared.detectIMKitBehavior()
+        
+        // Determine whether to use marked text:
+        // 1. User preference (settings.useMarkedText)
+        // 2. Override if app has known issues and user wants direct mode
+        var useMarkedText = settings.useMarkedText
+        
+        // If app has marked text issues and user hasn't explicitly enabled marked text,
+        // prefer direct insertion for better compatibility
+        if appBehavior.hasMarkedTextIssues && !settings.useMarkedText {
+            useMarkedText = false
+            IMKitDebugger.shared.log("handleResult: App '\(appBehavior.description)' has marked text issues, using direct mode", category: "APP")
+        }
+        
+        if useMarkedText {
             // Option 1: Marked text mode - RECOMMENDED
             // IMPORTANT: Use getCurrentWord() to get FULL word, not just delta
             // result.newCharacters only contains changed characters (e.g., "ư")
             // but we need the entire word (e.g., "thư")
             let fullWord = engine.getCurrentWord()
-            IMKitDebugger.shared.log("handleResult: fullWord='\(fullWord)' (from getCurrentWord)", category: "RESULT")
+            IMKitDebugger.shared.log("handleResult: fullWord='\(fullWord)' (marked text mode)", category: "RESULT")
             setMarkedText(fullWord, client: client)
+            
+            // Apply commit delay if needed for this app type
+            if appBehavior.commitDelay > 0 {
+                usleep(appBehavior.commitDelay)
+            }
         } else {
             // Option 2: Direct replacement mode
-            // Use delta (newCharacters) with backspace count
-            let newText = result.newCharacters.map {
-                $0.unicode(codeTable: settings.codeTable)
-            }.joined()
-            replaceTextDirect(newText: newText, client: client)
+            // IMPORTANT: Also use getCurrentWord() to get FULL word!
+            // result.newCharacters only contains delta (changed chars), not full word
+            // Using delta would replace "thu" with just "ư" → lose "th"!
+            let fullWord = engine.getCurrentWord()
+            IMKitDebugger.shared.log("handleResult: fullWord='\(fullWord)' (direct mode, app=\(appBehavior.description))", category: "RESULT")
+            replaceTextDirect(newText: fullWord, client: client)
         }
     }
     
@@ -647,13 +714,24 @@ class XKeyIMController: IMKInputController {
     }
     
     @objc private func openXKeySettings() {
-        // Open main XKey app
-        NSWorkspace.shared.launchApplication(
-            withBundleIdentifier: "com.codetay.XKey",
-            options: [],
-            additionalEventParamDescriptor: nil,
-            launchIdentifier: nil
-        )
+        // Use URL scheme to open XKey settings directly
+        // This will open the settings window, not just the app
+        if let url = URL(string: "xkey://settings") {
+            NSWorkspace.shared.open(url)
+            NSLog("XKeyIMController: Opened xkey://settings")
+        } else {
+            // Fallback: Just launch the app
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-b", "com.codetay.XKey"]
+            
+            do {
+                try process.run()
+                NSLog("XKeyIMController: Launched XKey app (fallback)")
+            } catch {
+                NSLog("XKeyIMController: Failed to launch XKey: \(error)")
+            }
+        }
     }
 }
 
@@ -680,7 +758,13 @@ class XKeyIMSettings {
     }
     
     func reload() {
-        guard let defaults = defaults else { return }
+        guard let defaults = defaults else {
+            IMKitDebugger.shared.log("reload() - defaults is nil! App Group may not be configured", category: "SETTINGS")
+            return
+        }
+        
+        // Force synchronize to get latest values from disk
+        defaults.synchronize()
 
         if let method = InputMethod(rawValue: defaults.integer(forKey: "XKey.inputMethod")) {
             inputMethod = method
@@ -696,12 +780,34 @@ class XKeyIMSettings {
         freeMarkEnabled = defaults.bool(forKey: "XKey.freeMarkEnabled")
         restoreIfWrongSpelling = defaults.bool(forKey: "XKey.restoreIfWrongSpelling")
 
-        // Use marked text by default (standard IMKit behavior)
-        // Only if explicitly set to false in settings, use direct insertion mode
-        if defaults.object(forKey: "XKey.imkitUseMarkedText") != nil {
-            useMarkedText = defaults.bool(forKey: "XKey.imkitUseMarkedText")
-        } else {
-            useMarkedText = true  // Default
+        // CRITICAL: Read imkitUseMarkedText directly from plist file to bypass cfprefsd cache
+        // cfprefsd caches aggressively and may not reflect the latest value from XKey app
+        useMarkedText = readMarkedTextFromPlist() ?? true
+        IMKitDebugger.shared.log("reload() - useMarkedText = \(useMarkedText) (from plist file)", category: "SETTINGS")
+    }
+    
+    /// Read imkitUseMarkedText directly from plist file to bypass cfprefsd cache
+    private func readMarkedTextFromPlist() -> Bool? {
+        let appGroup = "group.com.codetay.inputmethod.XKey"
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            IMKitDebugger.shared.log("readMarkedTextFromPlist() - Cannot get App Group container URL", category: "SETTINGS")
+            return nil
         }
+        
+        let prefsURL = containerURL.appendingPathComponent("Library/Preferences/\(appGroup).plist")
+        
+        guard let data = try? Data(contentsOf: prefsURL),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            IMKitDebugger.shared.log("readMarkedTextFromPlist() - Cannot read plist file", category: "SETTINGS")
+            return nil
+        }
+        
+        if let value = dict["XKey.imkitUseMarkedText"] as? Bool {
+            return value
+        } else if let value = dict["XKey.imkitUseMarkedText"] as? Int {
+            return value != 0
+        }
+        
+        return nil
     }
 }

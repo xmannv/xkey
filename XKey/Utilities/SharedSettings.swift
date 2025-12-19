@@ -366,6 +366,11 @@ class SharedSettings {
         get { defaults.bool(forKey: SharedSettingsKey.imkitUseMarkedText.rawValue) }
         set {
             defaults.set(newValue, forKey: SharedSettingsKey.imkitUseMarkedText.rawValue)
+            
+            // CRITICAL: Also write directly to plist file to bypass cfprefsd caching
+            // This ensures XKeyIM will read the latest value
+            writeDirectlyToPlist(key: SharedSettingsKey.imkitUseMarkedText.rawValue, value: newValue)
+            
             notifySettingsChanged()
         }
     }
@@ -413,6 +418,10 @@ class SharedSettings {
     func synchronize() {
         // Save to primary storage (App Group or local)
         defaults.synchronize()
+        
+        // Force flush using CFPreferences for cross-process sync
+        // This is more aggressive than UserDefaults.synchronize() alone
+        CFPreferencesAppSynchronize(kXKeyAppGroup as CFString)
 
         // CRITICAL: Also backup to UserDefaults.standard as failsafe
         // This ensures settings persist even if App Group container changes
@@ -433,9 +442,44 @@ class SharedSettings {
 
         localDefaults.synchronize()
     }
+    
+    /// Write directly to plist file to bypass cfprefsd caching
+    /// This is needed because cfprefsd doesn't always flush to disk in time for XKeyIM to read
+    private func writeDirectlyToPlist(key: String, value: Any) {
+        // Get the plist file path in App Group container
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kXKeyAppGroup) else {
+            print("⚠️ SharedSettings: Cannot get App Group container URL")
+            return
+        }
+        
+        let prefsURL = containerURL.appendingPathComponent("Library/Preferences/\(kXKeyAppGroup).plist")
+        
+        // Read existing plist or create new one
+        var plistDict: [String: Any] = [:]
+        if let data = try? Data(contentsOf: prefsURL),
+           let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+            plistDict = dict
+        }
+        
+        // Update the value
+        plistDict[key] = value
+        
+        // Write back to file
+        do {
+            let data = try PropertyListSerialization.data(fromPropertyList: plistDict, format: .binary, options: 0)
+            try data.write(to: prefsURL)
+            print("✅ SharedSettings: Wrote \(key)=\(value) directly to plist")
+        } catch {
+            print("❌ SharedSettings: Failed to write plist: \(error)")
+        }
+    }
 
     /// Notify that settings have changed (for observers)
     private func notifySettingsChanged() {
+        // IMPORTANT: Synchronize BEFORE notifying!
+        // This ensures XKeyIM receives the latest values when it reloads
+        defaults.synchronize()
+        
         // Post notification for local observers
         NotificationCenter.default.post(
             name: .sharedSettingsDidChange,

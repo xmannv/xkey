@@ -236,6 +236,17 @@ if [ "$ENABLE_XKEYIM" = true ]; then
     fi
 fi
 
+# ============================================
+# Cleanup build folder
+# ============================================
+# IMPORTANT: Remove built apps from build folder to prevent LaunchServices
+# from finding duplicate versions when opening XKey from XKeyIM menu
+echo ""
+echo "🧹 Cleaning up build folder..."
+rm -rf "./build/Build/Products/Release/XKey.app"
+rm -rf "./build/Build/Products/Release/XKeyIM.app"
+echo "✅ Build folder cleaned (prevents duplicate app versions)"
+
 
 # ============================================
 # Create DMG with Applications folder symlink
