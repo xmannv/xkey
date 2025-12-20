@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>XKey Updates</title>
+    <link>https://xmannv.github.io/xkey/appcast.xml</link>
+    <description>XKey - Vietnamese Input Method for macOS</description>
+    <language>vi</language>
+    <item>
+      <title>Version 1.2.3</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/1.2.3</link>
+      <sparkle:version>1.2.3</sparkle:version>
+      <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+      <description><![CDATA[
+        <p>feat: Implement automatic appcast generation from GitHub Releases</p>
+<ul>
+<li>Add GitHub Actions workflow to auto-generate appcast.json on new releases</li>
+<li>Create Python script to fetch releases from GitHub API and convert markdown to HTML</li>
+<li>Deploy appcast.json to GitHub Pages (gh-pages branch) for CDN delivery</li>
+<li>Update SUFeedURL to use GitHub Pages instead of raw.githubusercontent.com</li>
+<li>Only include latest release in appcast to reduce file size</li>
+<li>Preserve EdDSA signatures from existing appcast</li>
+<li>Add comprehensive documentation (APPCAST<em>AUTO</em>UPDATE.md, QUICK_SETUP.md)</li>
+<li>Ignore appcast.json in git since it's auto-generated</li>
+</ul>
+<p>Benefits:</p>
+<ul>
+<li>No manual appcast maintenance required</li>
+<li>No need to pull changes (deployed to separate gh-pages branch)</li>
+<li>Automatic release notes from GitHub Release descriptions</li>
+<li>Faster delivery via GitHub Pages CDN</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/1.2.3">Xem chi tiết trên GitHub</a></p>
+      ]]></description>
+      <pubDate>Sat, 20 Dec 2025 12:59:05 +0000</pubDate>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure 
+        url="https://github.com/xmannv/xkey/releases/download/1.2.3/XKey.dmg" 
+        sparkle:version="1.2.3" 
+        sparkle:shortVersionString="1.2.3" 
+        length="8232080" 
+        type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
