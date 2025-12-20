@@ -20,13 +20,11 @@ ENABLE_XKEYIM_BUNDLE=${ENABLE_XKEYIM_BUNDLE:-true}  # Set to false to skip bundl
 
 # Smart defaults: If notarizing, assume it's a full release
 if [ "$ENABLE_NOTARIZE" = true ]; then
-    # Auto-enable Sparkle signing and appcast generation for notarized releases
+    # Auto-enable Sparkle signing for notarized releases
     ENABLE_SPARKLE_SIGN=${ENABLE_SPARKLE_SIGN:-true}
-    ENABLE_APPCAST=${ENABLE_APPCAST:-true}
 else
     # For development builds, keep conservative defaults
     ENABLE_SPARKLE_SIGN=${ENABLE_SPARKLE_SIGN:-true}
-    ENABLE_APPCAST=${ENABLE_APPCAST:-false}
 fi
 
 BUNDLE_ID="com.codetay.XKey"
@@ -35,7 +33,6 @@ APP_NAME="XKey"
 DMG_NAME="XKey.dmg"
 DMG_VOLUME_NAME="XKey"
 REPO_URL="https://github.com/xmannv/xkey"
-APPCAST_FILE="appcast.json"
 SPARKLE_BIN="/tmp/Sparkle-2.8.1/bin"
 
 
@@ -48,13 +45,11 @@ if [ "$ENABLE_NOTARIZE" = true ]; then
     echo "   ✅ Code signing"
     echo "   ✅ Notarization"
     echo "   ✅ Sparkle signing"
-    echo "   ✅ Appcast generation"
     echo "   ✅ XKeyIM bundled in XKey.app"
 else
     echo "🔨 Development Build Mode"
     [ "$ENABLE_CODESIGN" = true ] && echo "   ✅ Code signing" || echo "   ⚠️  Code signing disabled"
     [ "$ENABLE_SPARKLE_SIGN" = true ] && echo "   ✅ Sparkle signing" || echo "   ⚠️  Sparkle signing disabled"
-    [ "$ENABLE_APPCAST" = true ] && echo "   ✅ Appcast generation" || echo "   ⏭️  Appcast generation skipped"
     [ "$ENABLE_XKEYIM_BUNDLE" = true ] && echo "   ✅ XKeyIM bundled in XKey.app" || echo "   ⏭️  XKeyIM separate build"
 fi
 echo ""
@@ -571,174 +566,11 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
     echo "✅ DMG signed with Sparkle EdDSA signature"
     echo "   Signature: ${SPARKLE_SIGNATURE:0:50}..."
     
-    # Store signature for appcast generation
+    # Export signature for reference
     export SPARKLE_SIGNATURE
 fi
 
-# ============================================
-# Appcast Generation (JSON format)
-# ============================================
-if [ "$ENABLE_APPCAST" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Release/$DMG_NAME" ]; then
-    echo ""
-    echo "📝 Generating appcast.json..."
 
-    # Get version from Info.plist
-    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-
-    # Get DMG file size
-    DMG_SIZE=$(stat -f%z "Release/$DMG_NAME")
-
-    # Get current date in ISO 8601 format for JSON
-    PUBDATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-    # Get minimum system version
-    MIN_SYSTEM_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" LSMinimumSystemVersion 2>/dev/null || echo "12.0")
-
-    # Download URL
-    DOWNLOAD_URL="$REPO_URL/releases/download/v$CURRENT_VERSION/XKey.dmg"
-
-    # Generate release notes from git commits
-    echo "   Generating release notes from git commits..."
-
-    # Check if manual RELEASE_NOTES is provided
-    if [ -n "$RELEASE_NOTES" ]; then
-        echo "   ✅ Using manual release notes from RELEASE_NOTES variable"
-        RELEASE_NOTES_TEXT="$RELEASE_NOTES"
-    else
-        # Find the previous version tag
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-        if [ -n "$PREV_TAG" ]; then
-            echo "   📝 Collecting commits since $PREV_TAG..."
-
-            # Get commit messages since previous tag
-            # Format: subject line only, exclude merge commits
-            GIT_LOG=$(git log "$PREV_TAG"..HEAD --no-merges --pretty=format:"- %s" 2>/dev/null || echo "")
-
-            if [ -n "$GIT_LOG" ]; then
-                RELEASE_NOTES_TEXT="$GIT_LOG"
-                echo "   ✅ Found $(echo "$GIT_LOG" | wc -l | tr -d ' ') commits"
-            else
-                echo "   ⚠️  No commits found, using latest commit"
-                RELEASE_NOTES_TEXT="- $(git log -1 --pretty=format:'%s')"
-            fi
-        else
-            echo "   ⚠️  No previous tag found, using latest commit"
-            RELEASE_NOTES_TEXT="- $(git log -1 --pretty=format:'%s')"
-        fi
-    fi
-
-    # Convert to HTML (pure bash/sed - no python dependency)
-    RELEASE_NOTES_HTML=""
-    IN_LIST=false
-
-    while IFS= read -r line; do
-        # Skip empty lines
-        if [ -z "$line" ]; then
-            if [ "$IN_LIST" = true ]; then
-                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
-                IN_LIST=false
-            fi
-            continue
-        fi
-
-        # Check if line starts with "- " or "* "
-        if echo "$line" | grep -qE '^[*-] '; then
-            # Start list if not already in one
-            if [ "$IN_LIST" = false ]; then
-                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<ul>"
-                IN_LIST=true
-            fi
-
-            # Extract item text (remove "- " or "* ")
-            ITEM=$(echo "$line" | sed -E 's/^[*-] //')
-
-            # Convert markdown bold: **text** -> <strong>text</strong>
-            ITEM=$(echo "$ITEM" | sed -E 's/\*\*([^*]+)\*\*/<strong>\1<\/strong>/g')
-
-            # Convert markdown italic: *text* -> <em>text</em> (but not ** which is bold)
-            ITEM=$(echo "$ITEM" | sed -E 's/([^*])\*([^*]+)\*([^*])/\1<em>\2<\/em>\3/g')
-
-            RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<li>${ITEM}</li>"
-        else
-            # Regular paragraph
-            if [ "$IN_LIST" = true ]; then
-                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
-                IN_LIST=false
-            fi
-            RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<p>${line}</p>"
-        fi
-    done <<< "$RELEASE_NOTES_TEXT"
-
-    # Close list if still open
-    if [ "$IN_LIST" = true ]; then
-        RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
-    fi
-
-    # Fallback if conversion failed
-    if [ -z "$RELEASE_NOTES_HTML" ]; then
-        RELEASE_NOTES_HTML="<p>$RELEASE_NOTES_TEXT</p>"
-    fi
-
-    # Build complete HTML with installation instructions
-    RELEASE_NOTES_HTML="<h2>Phiên bản $CURRENT_VERSION</h2>$RELEASE_NOTES_HTML<h3>Cài đặt</h3><ol><li>Tải về và mở file XKey.dmg</li><li>Kéo XKey vào thư mục Applications</li><li>Khởi động XKey từ Applications</li></ol><p><a href='$REPO_URL/releases/tag/v$CURRENT_VERSION'>Xem chi tiết trên GitHub</a></p>"
-
-    echo "   Version: $CURRENT_VERSION"
-    echo "   DMG Size: $DMG_SIZE bytes"
-    echo "   Date: $PUBDATE"
-    echo "   Min macOS: $MIN_SYSTEM_VERSION"
-    echo "   Download URL: $DOWNLOAD_URL"
-
-    # Build enclosure JSON with or without signature
-    if [ -n "$SPARKLE_SIGNATURE" ]; then
-        ENCLOSURE_JSON=$(cat <<EOF
-      "url": "$DOWNLOAD_URL",
-      "version": "$CURRENT_VERSION",
-      "edSignature": "$SPARKLE_SIGNATURE",
-      "length": $DMG_SIZE,
-      "type": "application/octet-stream"
-EOF
-)
-    else
-        ENCLOSURE_JSON=$(cat <<EOF
-      "url": "$DOWNLOAD_URL",
-      "version": "$CURRENT_VERSION",
-      "length": $DMG_SIZE,
-      "type": "application/octet-stream"
-EOF
-)
-    fi
-
-    # Create appcast.json
-    cat > "$APPCAST_FILE" << EOF
-{
-  "title": "XKey Updates",
-  "description": "XKey - Vietnamese Input Method for macOS",
-  "language": "vi",
-  "items": [
-    {
-      "title": "Version $CURRENT_VERSION",
-      "version": "$CURRENT_VERSION",
-      "url": "$REPO_URL/releases/tag/v$CURRENT_VERSION",
-      "releaseNotesHTML": "$RELEASE_NOTES_HTML",
-      "pubDate": "$PUBDATE",
-      "minimumSystemVersion": "$MIN_SYSTEM_VERSION",
-      "enclosure": {
-$ENCLOSURE_JSON
-      }
-    }
-  ]
-}
-EOF
-
-    echo "✅ appcast.json generated successfully!"
-
-    if [ -n "$SPARKLE_SIGNATURE" ]; then
-        echo "   ✅ Includes EdDSA signature for secure updates"
-    else
-        echo "   ⚠️  No signature included (ENABLE_SPARKLE_SIGN=false)"
-    fi
-fi
 
 
 # Clear macOS launch services cache
@@ -796,11 +628,6 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ -n "$SPARKLE_SIGNATURE" ]; then
     echo "   EdDSA signature generated"
 fi
 
-if [ "$ENABLE_APPCAST" = true ] && [ -f "$APPCAST_FILE" ]; then
-    echo "📝 Appcast: GENERATED"
-    echo "   File: $APPCAST_FILE"
-fi
-
 echo ""
 echo "💡 Usage:"
 echo "   Default (with code signing + DMG):  ./build_release.sh"
@@ -810,9 +637,6 @@ echo "   Without XKeyIM:                     ENABLE_XKEYIM=false ./build_release
 echo "   Separate XKeyIM build:              ENABLE_XKEYIM_BUNDLE=false ./build_release.sh"
 echo "   With notarization:                  ENABLE_NOTARIZE=true ./build_release.sh"
 echo "   Without Sparkle signing:            ENABLE_SPARKLE_SIGN=false ./build_release.sh"
-echo "   With appcast generation:            ENABLE_APPCAST=true ./build_release.sh"
-echo ""
-echo "   Full release workflow:              ENABLE_APPCAST=true RELEASE_NOTES=\"Your notes\" ./build_release.sh"
 echo ""
 echo "📝 For notarization, create .env file with:"
 echo "   APPLE_ID=your-apple-id@example.com"
@@ -824,15 +648,16 @@ echo "   SPARKLE_PRIVATE_KEY=your-private-key-here"
 echo "   (Or it will be retrieved from Keychain automatically)"
 echo ""
 echo "📋 Next steps for release:"
-if [ "$ENABLE_APPCAST" = true ] && [ -f "$APPCAST_FILE" ]; then
-    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    echo "   1. Review appcast.json: cat $APPCAST_FILE"
-    echo "   2. Commit changes: git add $APPCAST_FILE && git commit -m \"Update appcast for v$CURRENT_VERSION\""
-    echo "   3. Push to GitHub: git push origin main"
-    echo "   4. Create release: gh release create v$CURRENT_VERSION Release/XKey.dmg --title \"XKey v$CURRENT_VERSION\" --notes \"\$RELEASE_NOTES\""
-else
-    echo "   1. Update appcast: ENABLE_APPCAST=true ./build_release.sh"
-    echo "   2. Or manually: ./update_appcast.sh <version> \"Release notes\""
-    echo "   3. Create GitHub release with Release/XKey.dmg"
-fi
+CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
+echo "   1. Create GitHub Release:"
+echo "      gh release create v$CURRENT_VERSION Release/XKey.dmg \\"
+echo "         --title \"XKey v$CURRENT_VERSION\" \\"
+echo "         --notes \"Your release notes here\""
+echo ""
+echo "   2. GitHub Actions will automatically:"
+echo "      - Update feed for Sparkle auto-updates"
+echo "      - Users will receive update notification"
+echo ""
+echo "   📖 See .github/QUICK_SETUP.md for GitHub Pages setup"
+
 

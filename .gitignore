@@ -53,3 +53,6 @@ Release/
 
 # Keep .env.example for reference
 !.env.example
+
+# Appcast is auto-generated and deployed to GitHub Pages
+appcast.json

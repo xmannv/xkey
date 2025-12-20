@@ -65,7 +65,7 @@
 		</dict>
 	</array>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/xmannv/xkey/main/appcast.json</string>
+	<string>https://xmannv.github.io/xkey/appcast.json</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUScheduledCheckInterval</key>

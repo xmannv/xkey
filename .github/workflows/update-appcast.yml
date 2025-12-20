@@ -1,0 +1,68 @@
+name: Update Appcast
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update-appcast:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Generate appcast.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python .github/scripts/generate_appcast.py
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          keep_files: false
+          enable_jekyll: false
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Update appcast.json from release ${{ github.event.release.tag_name }}'
+          # Only publish appcast.json, not the entire repo
+          destination_dir: .
+          exclude_assets: |
+            .github
+            XKey
+            XKeyIM
+            XKeyTests
+            Shared
+            build
+            Release
+            *.xcodeproj
+            *.sh
+            *.md
+            *.png
+            .env*
+            .git*
+            LICENSE
+      
+      - name: Summary
+        run: |
+          echo "✅ Appcast updated and deployed to GitHub Pages" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Release: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 Appcast URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/appcast.json" >> $GITHUB_STEP_SUMMARY
