@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>XKey Updates</title>
+        <link>https://raw.githubusercontent.com/xmannv/xkey/main/appcast.xml</link>
+        <description>XKey - Vietnamese Input Method for macOS</description>
+        <language>vi</language>
+
+        <!-- Latest Release -->
+        <item>
+            <title>Version 1.1.1</title>
+            <link>https://github.com/xmannv/xkey/releases/tag/v1.1.1</link>
+            <sparkle:version>1.1.1</sparkle:version>
+            <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>Phiên bản 1.1.1</h2>
+                <p>New version available with bug fixes and improvements</p>
+
+                <h3>Cài đặt</h3>
+                <ol>
+                    <li>Tải về và mở file XKey.dmg</li>
+                    <li>Kéo XKey vào thư mục Applications</li>
+                    <li>Khởi động XKey từ Applications</li>
+                </ol>
+
+                <p><a href="https://github.com/xmannv/xkey/releases/tag/v1.1.1">Xem chi tiết trên GitHub</a></p>
+            ]]></description>
+            <pubDate>Sat, 20 Dec 2025 07:59:02 +0000</pubDate>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/xmannv/xkey/releases/download/v1.1.1/XKey.dmg"
+                sparkle:version="1.1.1"
+                sparkle:shortVersionString="1.1.1"
+                sparkle:edSignature="sparkle:edSignature="F4/hkXlQTzEndzaLoHBEQBZgJtETY57v6fdd9BluEAWCR9VKuolV/IlkNWwftwLq73/xIw/MOYQECMdWfXwYCA==" length="5483219""
+                length="5483219"
+                type="application/octet-stream" />
+        </item>
+
+        <!-- Previous releases -->
+        <!-- Add older versions below this line -->
+
+    </channel>
+</rss>
