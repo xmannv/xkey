@@ -6,37 +6,53 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.4</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.4</link>
-      <sparkle:version>1.2.4</sparkle:version>
-      <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
+      <title>Version 1.2.5</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.5</link>
+      <sparkle:version>1.2.5</sparkle:version>
+      <sparkle:shortVersionString>1.2.5</sparkle:shortVersionString>
       <description><![CDATA[
-        <p><h2>What's New</h2></p>
-<p>feat: Add automatic GitHub Release creation to build script</p>
-<p>Added ENABLE<em>GITHUB</em>RELEASE option to build_release.sh for automated</p>
-<p>release workflow. This feature streamlines the release process by</p>
-<p>automatically creating GitHub releases with assets when building.</p>
-<p>Key changes:</p>
+        <p><h2>What's New</h2></p>
+<p>fix: Support non-QWERTY keyboard layouts (Swiss French, AZERTY, etc.)</p>
+<p>Previously, XKey only worked correctly with QWERTY keyboard layouts.</p>
+<p>When users had Input Sources like Swiss French (QWERTZ) or French (AZERTY),</p>
+<p>Vietnamese typing didn't work because the app was using physical keyCodes</p>
+<p>instead of the actual characters from the Input Source.</p>
+<p>Root cause:</p>
 <ul>
-<li>New ENABLE<em>GITHUB</em>RELEASE environment variable (default: false)</li>
-<li>Auto-enables when ENABLE_NOTARIZE=true (full release mode)</li>
-<li>Validates gh CLI installation and authentication</li>
-<li>Creates GitHub release with version tag (v{version})</li>
-<li>Uploads XKey.dmg and signature.txt automatically</li>
-<li>Supports custom release notes via .release_notes.md</li>
-<li>Auto-generates notes from latest commit if no custom file</li>
-<li>Triggers GitHub Actions for appcast generation</li>
+<li>KeyboardEventHandler was converting keyCode → character using QWERTY mapping</li>
+<li>This ignored the user's actual Input Source settings</li>
+<li>Example: Swiss French 'z' key (physical Y position) was treated as 'y'</li>
 </ul>
-<p>Version bump: 1.2.3 → 1.2.4</p>
-<p>Usage:</p>
-<p>  ENABLE<em>GITHUB</em>RELEASE=true ./build_release.sh</p>
-<p>  # Or auto-enabled with notarization:</p>
-<p>  ENABLE<em>NOTARIZE=true ./build</em>release.sh</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.4">Xem chi tiết trên GitHub</a></p>
+<p>Solution:</p>
+<ol>
+<li>Get character directly from event.characters (respects Input Source)</li>
+<li>Convert character → QWERTY keyCode for engine processing</li>
+<li>Added KeyCodeToCharacter.keyCode(forCharacter:) helper function</li>
+</ol>
+<p>Changes:</p>
+<ul>
+<li>XKey/EventHandling/KeyboardEventHandler.swift:</li>
+</ul>
+<p>  * Use event.characters instead of KeyCodeToCharacter.qwertyCharacter()</p>
+<p>  * Convert character → engineKeyCode before passing to VNEngine</p>
+<p>  * Special keys (arrows, tab, esc, etc.) still use physical keyCode</p>
+<ul>
+<li>XKey/EventHandling/KeyCodeToCharacter.swift:</li>
+</ul>
+<p>  * Added keyCode(forCharacter:) function for reverse mapping</p>
+<p>  * Supports letters, numbers, and special characters</p>
+<p>Testing:</p>
+<ul>
+<li>Swiss French (QWERTZ): typing 'thuzj' → 'thụy' ✅</li>
+<li>French (AZERTY): typing works correctly ✅</li>
+<li>US (QWERTY): no change in behavior ✅</li>
+<li>Special keys: arrows, tab, backspace all work ✅</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.5">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 20 Dec 2025 15:07:00 +0000</pubDate>
+      <pubDate>Sat, 20 Dec 2025 16:28:15 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.4/XKey.dmg" sparkle:version="1.2.4" sparkle:shortVersionString="1.2.4" length="8233282" type="application/octet-stream" sparkle:edSignature="4M0cN2OVciQ+04ne2akzQ7oA42zkBjME+O8W6+REUXPqPqj4z9QJMKl8BSAfNt0VR2m64UV+oF5BUV15jQAWDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.5/XKey.dmg" sparkle:version="1.2.5" sparkle:shortVersionString="1.2.5" length="8232612" type="application/octet-stream" sparkle:edSignature="TKvivufxojbwZBLF0Xf+LnKg16c/U0fp7NUq2IhPCFZd08fkkNeYWsH4fLgiPaRJIOYkVOcP+NqOk6tU4O6dDg==" />
     </item>
   </channel>
 </rss>
