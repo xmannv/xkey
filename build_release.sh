@@ -22,9 +22,12 @@ ENABLE_XKEYIM_BUNDLE=${ENABLE_XKEYIM_BUNDLE:-true}  # Set to false to skip bundl
 if [ "$ENABLE_NOTARIZE" = true ]; then
     # Auto-enable Sparkle signing for notarized releases
     ENABLE_SPARKLE_SIGN=${ENABLE_SPARKLE_SIGN:-true}
+    # Auto-enable GitHub release for notarized builds (unless explicitly disabled)
+    ENABLE_GITHUB_RELEASE=${ENABLE_GITHUB_RELEASE:-true}
 else
     # For development builds, keep conservative defaults
     ENABLE_SPARKLE_SIGN=${ENABLE_SPARKLE_SIGN:-true}
+    ENABLE_GITHUB_RELEASE=${ENABLE_GITHUB_RELEASE:-false}
 fi
 
 BUNDLE_ID="com.codetay.XKey"
@@ -46,11 +49,13 @@ if [ "$ENABLE_NOTARIZE" = true ]; then
     echo "   ✅ Notarization"
     echo "   ✅ Sparkle signing"
     echo "   ✅ XKeyIM bundled in XKey.app"
+    [ "$ENABLE_GITHUB_RELEASE" = true ] && echo "   ✅ GitHub Release (auto-create)"
 else
     echo "🔨 Development Build Mode"
     [ "$ENABLE_CODESIGN" = true ] && echo "   ✅ Code signing" || echo "   ⚠️  Code signing disabled"
     [ "$ENABLE_SPARKLE_SIGN" = true ] && echo "   ✅ Sparkle signing" || echo "   ⚠️  Sparkle signing disabled"
     [ "$ENABLE_XKEYIM_BUNDLE" = true ] && echo "   ✅ XKeyIM bundled in XKey.app" || echo "   ⏭️  XKeyIM separate build"
+    [ "$ENABLE_GITHUB_RELEASE" = true ] && echo "   ✅ GitHub Release (auto-create)" || echo "   ⏭️  Manual release"
 fi
 echo ""
 
@@ -576,6 +581,126 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
 fi
 
 
+# ============================================
+# GitHub Release (Automatic)
+# ============================================
+if [ "$ENABLE_GITHUB_RELEASE" = true ]; then
+    echo ""
+    echo "🚀 Creating GitHub Release..."
+
+    # Check if gh CLI is installed
+    if ! command -v gh &> /dev/null; then
+        echo "❌ Error: GitHub CLI (gh) not found"
+        echo "   Install with: brew install gh"
+        echo "   Or skip with: ENABLE_GITHUB_RELEASE=false"
+        exit 1
+    fi
+
+    # Check if authenticated
+    if ! gh auth status &> /dev/null; then
+        echo "❌ Error: Not authenticated with GitHub"
+        echo "   Run: gh auth login"
+        echo "   Or skip with: ENABLE_GITHUB_RELEASE=false"
+        exit 1
+    fi
+
+    # Get current version from Info.plist
+    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
+    RELEASE_TAG="v$CURRENT_VERSION"
+
+    echo "📋 Release details:"
+    echo "   Version: $CURRENT_VERSION"
+    echo "   Tag: $RELEASE_TAG"
+
+    # Check if release already exists
+    if gh release view "$RELEASE_TAG" &> /dev/null; then
+        echo "⚠️  Release $RELEASE_TAG already exists"
+        echo "   Options:"
+        echo "   1. Delete existing release: gh release delete $RELEASE_TAG"
+        echo "   2. Skip auto-release: ENABLE_GITHUB_RELEASE=false"
+        echo "   3. Update version in XKey/Info.plist"
+        exit 1
+    fi
+
+    # Check if DMG exists
+    if [ ! -f "Release/$DMG_NAME" ]; then
+        echo "❌ Error: DMG not found at Release/$DMG_NAME"
+        echo "   Enable DMG creation with: ENABLE_DMG=true"
+        exit 1
+    fi
+
+    # Prepare release notes
+    RELEASE_NOTES_FILE="Release/release_notes.md"
+
+    # Check if user provided custom release notes
+    if [ -f ".release_notes.md" ]; then
+        echo "📝 Using custom release notes from .release_notes.md"
+        cp ".release_notes.md" "$RELEASE_NOTES_FILE"
+    else
+        # Generate release notes from latest commit message
+        echo "📝 Generating release notes from latest commit..."
+
+        # Get latest commit message (subject + body)
+        COMMIT_SUBJECT=$(git log -1 --pretty=format:"%s")
+        COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+
+        # Create release notes header
+        echo "## What's New" > "$RELEASE_NOTES_FILE"
+        echo "" >> "$RELEASE_NOTES_FILE"
+
+        # Add commit subject as main change
+        echo "$COMMIT_SUBJECT" >> "$RELEASE_NOTES_FILE"
+
+        # Add commit body if available (detailed description)
+        if [ -n "$COMMIT_BODY" ]; then
+            echo "" >> "$RELEASE_NOTES_FILE"
+            echo "$COMMIT_BODY" >> "$RELEASE_NOTES_FILE"
+        fi
+    fi
+
+    # Display release notes
+    echo ""
+    echo "📄 Release Notes:"
+    cat "$RELEASE_NOTES_FILE"
+    echo ""
+
+    # Create release with assets
+    echo "📤 Creating GitHub release..."
+
+    UPLOAD_FILES="Release/$DMG_NAME"
+
+    # Add signature file if available
+    if [ -f "Release/signature.txt" ]; then
+        UPLOAD_FILES="$UPLOAD_FILES Release/signature.txt"
+        echo "   Uploading: $DMG_NAME + signature.txt"
+    else
+        echo "   Uploading: $DMG_NAME only"
+    fi
+
+    # Create release
+    gh release create "$RELEASE_TAG" $UPLOAD_FILES \
+        --title "XKey v$CURRENT_VERSION" \
+        --notes-file "$RELEASE_NOTES_FILE" \
+        --repo "$REPO_URL"
+
+    if [ $? -eq 0 ]; then
+        echo "✅ GitHub Release created successfully!"
+        echo "   URL: $REPO_URL/releases/tag/$RELEASE_TAG"
+        echo ""
+        echo "🔄 GitHub Actions will now:"
+        echo "   1. Generate appcast.json from releases"
+        echo "   2. Deploy to GitHub Pages"
+        echo "   3. Enable auto-update for users"
+        echo ""
+        echo "   Monitor at: $REPO_URL/actions"
+    else
+        echo "❌ Failed to create GitHub release"
+        exit 1
+    fi
+
+    # Clean up
+    rm -f "$RELEASE_NOTES_FILE"
+fi
 
 
 # Clear macOS launch services cache
@@ -633,15 +758,23 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ -n "$SPARKLE_SIGNATURE" ]; then
     echo "   EdDSA signature generated"
 fi
 
+if [ "$ENABLE_GITHUB_RELEASE" = true ]; then
+    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
+    echo "🚀 GitHub Release: CREATED"
+    echo "   Tag: v$CURRENT_VERSION"
+    echo "   URL: $REPO_URL/releases/tag/v$CURRENT_VERSION"
+fi
+
 echo ""
 echo "💡 Usage:"
-echo "   Default (with code signing + DMG):  ./build_release.sh"
-echo "   Without code signing:               ENABLE_CODESIGN=false ./build_release.sh"
-echo "   Without DMG:                        ENABLE_DMG=false ./build_release.sh"
-echo "   Without XKeyIM:                     ENABLE_XKEYIM=false ./build_release.sh"
-echo "   Separate XKeyIM build:              ENABLE_XKEYIM_BUNDLE=false ./build_release.sh"
-echo "   With notarization:                  ENABLE_NOTARIZE=true ./build_release.sh"
-echo "   Without Sparkle signing:            ENABLE_SPARKLE_SIGN=false ./build_release.sh"
+echo "   Default (with code signing + DMG):    ./build_release.sh"
+echo "   Without code signing:                 ENABLE_CODESIGN=false ./build_release.sh"
+echo "   Without DMG:                          ENABLE_DMG=false ./build_release.sh"
+echo "   Without XKeyIM:                       ENABLE_XKEYIM=false ./build_release.sh"
+echo "   Separate XKeyIM build:                ENABLE_XKEYIM_BUNDLE=false ./build_release.sh"
+echo "   With notarization (full release):     ENABLE_NOTARIZE=true ./build_release.sh"
+echo "   Without Sparkle signing:              ENABLE_SPARKLE_SIGN=false ./build_release.sh"
+echo "   With GitHub release:                  ENABLE_GITHUB_RELEASE=true ./build_release.sh"
 echo ""
 echo "📝 For notarization, create .env file with:"
 echo "   APPLE_ID=your-apple-id@example.com"
@@ -651,21 +784,31 @@ echo ""
 echo "🔐 For Sparkle auto-update, add to .env:"
 echo "   SPARKLE_PRIVATE_KEY=your-private-key-here"
 echo "   (Or it will be retrieved from Keychain automatically)"
-echo ""
-echo "📋 Next steps for release:"
-CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-echo "   1. Create GitHub Release (include signature.txt for auto-update):"
-echo "      gh release create v$CURRENT_VERSION Release/XKey.dmg Release/signature.txt \\"
-echo "         --title \"XKey v$CURRENT_VERSION\" \\"
-echo "         --notes \"Your release notes here\""
-echo ""
-echo "   2. GitHub Actions will automatically:"
-echo "      - Generate appcast.xml with EdDSA signature"
-echo "      - Deploy to GitHub Pages for Sparkle auto-updates"
-echo "      - Users will receive update notification"
-echo ""
-echo "   ⚠️  IMPORTANT: signature.txt MUST be uploaded for updates to work!"
-echo ""
-echo "   📖 See .github/QUICK_SETUP.md for GitHub Pages setup"
+if [ "$ENABLE_GITHUB_RELEASE" != true ]; then
+    echo ""
+    echo "📋 Next steps for manual release:"
+    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
+    echo "   1. Create GitHub Release (include signature.txt for auto-update):"
+    echo "      gh release create v$CURRENT_VERSION Release/XKey.dmg Release/signature.txt \\"
+    echo "         --title \"XKey v$CURRENT_VERSION\" \\"
+    echo "         --notes \"Your release notes here\""
+    echo ""
+    echo "   2. Or enable automatic release:"
+    echo "      ENABLE_GITHUB_RELEASE=true ./build_release.sh"
+    echo ""
+    echo "   3. GitHub Actions will automatically:"
+    echo "      - Generate appcast.json with EdDSA signature"
+    echo "      - Deploy to GitHub Pages for Sparkle auto-updates"
+    echo "      - Users will receive update notification"
+    echo ""
+    echo "   ⚠️  IMPORTANT: signature.txt MUST be uploaded for updates to work!"
+    echo ""
+    echo "   📖 See .github/QUICK_SETUP.md for GitHub Pages setup"
+else
+    echo ""
+    echo "✅ Release automation complete!"
+    echo "   Monitor GitHub Actions for appcast generation"
+    echo "   📖 See .github/QUICK_SETUP.md for GitHub Pages setup"
+fi
 
 

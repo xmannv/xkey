@@ -5,7 +5,7 @@
   
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
-  [![Version](https://img.shields.io/badge/version-1.2.3-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/version-1.2.4-blue.svg)](https://github.com/xmannv/xkey/releases)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -192,6 +192,8 @@ XKey/
 
 ### Build Script
 
+Script `build_release.sh` hỗ trợ nhiều options để customize build process:
+
 ```bash
 # Build với code signing + DMG (mặc định)
 ./build_release.sh
@@ -202,8 +204,39 @@ ENABLE_CODESIGN=false ./build_release.sh
 # Build không XKeyIM
 ENABLE_XKEYIM=false ./build_release.sh
 
-# Build với notarization
+# Full release: Notarization + Auto GitHub Release
 ENABLE_NOTARIZE=true ./build_release.sh
+
+# Tạo GitHub Release tự động
+ENABLE_GITHUB_RELEASE=true ./build_release.sh
+```
+
+#### Tự động tạo GitHub Release
+
+Script hỗ trợ tự động tạo GitHub Release khi build hoàn thành:
+
+**Yêu cầu:**
+- GitHub CLI (`gh`) đã cài đặt: `brew install gh`
+- Đã đăng nhập: `gh auth login`
+
+**Tính năng:**
+- ✅ Tự động đọc version từ `Info.plist`
+- ✅ Tạo tag `v{version}` và release trên GitHub
+- ✅ Upload `XKey.dmg` và `signature.txt` (cho Sparkle auto-update)
+- ✅ Tự động generate release notes từ git commits
+- ✅ Trigger GitHub Actions để generate appcast
+
+**Custom Release Notes:**
+Tạo file `.release_notes.md` trong thư mục gốc để sử dụng release notes tùy chỉnh thay vì auto-generate.
+
+**Sử dụng:**
+```bash
+# Cách 1: Enable thủ công
+ENABLE_GITHUB_RELEASE=true ./build_release.sh
+
+# Cách 2: Tự động khi notarize (full release)
+ENABLE_NOTARIZE=true ./build_release.sh
+# → Tự động enable GitHub Release
 ```
 
 ### Công nghệ sử dụng
