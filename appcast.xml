@@ -8,7 +8,7 @@
     <item>
       <title>Version 1.2.4</title>
       <link>https://github.com/xmannv/xkey/releases/tag/v1.2.4</link>
-      <sparkle:version>1.2.4</sparkle:version>
+      <sparkle:version>1</sparkle:version>
       <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -36,7 +36,7 @@
       ]]></description>
       <pubDate>Sat, 20 Dec 2025 15:07:00 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.4/XKey.dmg" sparkle:version="1.2.4" sparkle:shortVersionString="1.2.4" length="8233341" type="application/octet-stream" sparkle:edSignature="9G4Qsre+badHkEMCsFDAzM7udc7XR9zK2KmHOKZnBVy4sE24i7C/B4gyzdQno3KKRyGkBuHPr6Ek9Jth/Z1ZCw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.4/XKey.dmg" sparkle:version="1" sparkle:shortVersionString="1.2.4" length="8233341" type="application/octet-stream" sparkle:edSignature="9G4Qsre+badHkEMCsFDAzM7udc7XR9zK2KmHOKZnBVy4sE24i7C/B4gyzdQno3KKRyGkBuHPr6Ek9Jth/Z1ZCw==" />
     </item>
   </channel>
 </rss>
