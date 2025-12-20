@@ -11,12 +11,12 @@
       <sparkle:version>1.2.4</sparkle:version>
       <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
       <description><![CDATA[
-        <p><h2>What's New</h2></p>
-<p>feat: Add automatic GitHub Release creation to build script</p>
-<p>Added ENABLE<em>GITHUB</em>RELEASE option to build_release.sh for automated</p>
-<p>release workflow. This feature streamlines the release process by</p>
-<p>automatically creating GitHub releases with assets when building.</p>
-<p>Key changes:</p>
+        <p><h2>What's New</h2></p>
+<p>feat: Add automatic GitHub Release creation to build script</p>
+<p>Added ENABLE<em>GITHUB</em>RELEASE option to build_release.sh for automated</p>
+<p>release workflow. This feature streamlines the release process by</p>
+<p>automatically creating GitHub releases with assets when building.</p>
+<p>Key changes:</p>
 <ul>
 <li>New ENABLE<em>GITHUB</em>RELEASE environment variable (default: false)</li>
 <li>Auto-enables when ENABLE_NOTARIZE=true (full release mode)</li>
@@ -27,16 +27,16 @@
 <li>Auto-generates notes from latest commit if no custom file</li>
 <li>Triggers GitHub Actions for appcast generation</li>
 </ul>
-<p>Version bump: 1.2.3 → 1.2.4</p>
-<p>Usage:</p>
-<p>  ENABLE<em>GITHUB</em>RELEASE=true ./build_release.sh</p>
-<p>  # Or auto-enabled with notarization:</p>
-<p>  ENABLE<em>NOTARIZE=true ./build</em>release.sh</p>
+<p>Version bump: 1.2.3 → 1.2.4</p>
+<p>Usage:</p>
+<p>  ENABLE<em>GITHUB</em>RELEASE=true ./build_release.sh</p>
+<p>  # Or auto-enabled with notarization:</p>
+<p>  ENABLE<em>NOTARIZE=true ./build</em>release.sh</p>
 <p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
       <pubDate>Sat, 20 Dec 2025 15:07:00 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.4/XKey.dmg" sparkle:version="1.2.4" sparkle:shortVersionString="1.2.4" length="8233341" type="application/octet-stream" sparkle:edSignature="9G4Qsre+badHkEMCsFDAzM7udc7XR9zK2KmHOKZnBVy4sE24i7C/B4gyzdQno3KKRyGkBuHPr6Ek9Jth/Z1ZCw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.4/XKey.dmg" sparkle:version="1.2.4" sparkle:shortVersionString="1.2.4" length="8233282" type="application/octet-stream" sparkle:edSignature="4M0cN2OVciQ+04ne2akzQ7oA42zkBjME+O8W6+REUXPqPqj4z9QJMKl8BSAfNt0VR2m64UV+oF5BUV15jQAWDg==" />
     </item>
   </channel>
 </rss>
