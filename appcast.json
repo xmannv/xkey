@@ -4,18 +4,17 @@
   "language": "vi",
   "items": [
     {
-      "title": "Version 1.2.1",
-      "version": "1.2.1",
-      "url": "https://github.com/xmannv/xkey/releases/tag/v1.2.1",
-      "releaseNotesHTML": "<h2>Phiên bản 1.2.1</h2><ul><li>Release version 1.2.2 with Sparkle auto-update, macro improvements, and VNI fix</li><li>feat: Integrate Sparkle auto-update and fix notarization</li><li>refactor: Cleanup code and add debug logging infrastructure</li></ul><h3>Cài đặt</h3><ol><li>Tải về và mở file XKey.dmg</li><li>Kéo XKey vào thư mục Applications</li><li>Khởi động XKey từ Applications</li></ol><p><a href='https://github.com/xmannv/xkey/releases/tag/v1.2.1'>Xem chi tiết trên GitHub</a></p>",
-      "pubDate": "2025-12-20T12:18:14Z",
+      "title": "Version 1.2.3",
+      "version": "1.2.3",
+      "url": "https://github.com/xmannv/xkey/releases/tag/1.2.3",
+      "releaseNotesHTML": "<p>feat: Implement automatic appcast generation from GitHub Releases\r</p>\n<ul>\n<li>Add GitHub Actions workflow to auto-generate appcast.json on new releases</li>\n<li>Create Python script to fetch releases from GitHub API and convert markdown to HTML</li>\n<li>Deploy appcast.json to GitHub Pages (gh-pages branch) for CDN delivery</li>\n<li>Update SUFeedURL to use GitHub Pages instead of raw.githubusercontent.com</li>\n<li>Only include latest release in appcast to reduce file size</li>\n<li>Preserve EdDSA signatures from existing appcast</li>\n<li>Add comprehensive documentation (APPCAST<em>AUTO</em>UPDATE.md, QUICK_SETUP.md)</li>\n<li>Ignore appcast.json in git since it's auto-generated</li>\n</ul>\n<p>Benefits:\r</p>\n<ul>\n<li>No manual appcast maintenance required</li>\n<li>No need to pull changes (deployed to separate gh-pages branch)</li>\n<li>Automatic release notes from GitHub Release descriptions</li>\n<li>Faster delivery via GitHub Pages CDN</li>\n</ul>\n<p><a href=\"https://github.com/xmannv/xkey/releases/tag/1.2.3\">Xem chi tiết trên GitHub</a></p>",
+      "pubDate": "2025-12-20T12:59:05Z",
       "minimumSystemVersion": "12.0",
       "enclosure": {
-      "url": "https://github.com/xmannv/xkey/releases/download/v1.2.1/XKey.dmg",
-      "version": "1.2.1",
-      "edSignature": "Bq6qTbEqJNBkmU40Yh83IqJD5XG6TsyABpx3q3gJIycSzJpkeTyWaK/90l5WZ1/2IOUE8SyWYyJ1lcgMkNigBw==",
-      "length": 8232012,
-      "type": "application/octet-stream"
+        "url": "https://github.com/xmannv/xkey/releases/download/1.2.3/XKey.dmg",
+        "version": "1.2.3",
+        "length": 8232080,
+        "type": "application/octet-stream"
       }
     }
   ]
