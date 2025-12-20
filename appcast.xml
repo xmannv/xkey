@@ -33,7 +33,7 @@
       ]]></description>
       <pubDate>Sat, 20 Dec 2025 12:59:05 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/1.2.3/XKey.dmg" sparkle:version="1.2.3" sparkle:shortVersionString="1.2.3" length="8232080" type="application/octet-stream" sparkle:edSignature="XObQXreI50pZ6Q+R+pGa2S4Wox6+FDPUQJCuRUqCrpo71g1FfgfBZYjtQDEVzKf9VmEC9tZAsKjuqhJBhtBqDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/1.2.3/XKey.dmg" sparkle:version="1.2.3" sparkle:shortVersionString="1.2.3" length="8235982" type="application/octet-stream" sparkle:edSignature="p6T2qdvU9wXCmRAc6dxMiCWr4mPINNBK2ZZi+9UmK+3m+F7DCv/O3fQfBLGxKyhxmX7AEyqs4uZgsMB6km3kBA==" />
     </item>
   </channel>
 </rss>
