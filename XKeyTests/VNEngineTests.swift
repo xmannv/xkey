@@ -729,6 +729,141 @@ class VNEngineTests: XCTestCase {
         let output = result.newCharacters.map { $0.toUnicode() }.joined()
         XCTAssertEqual(output, "được", "VNI: 'd9uo7c5' should become 'được'")
     }
+    
+    // MARK: - Macro Tests with Special Characters
+    
+    func testMacro_SimpleTextMacro() {
+        engine.reset()
+        engine.vUseMacro = 1
+        engine.vLanguage = 1  // Vietnamese mode
+        
+        // Setup macro "bb" -> "bạn bè"
+        let macroManager = MacroManager()
+        _ = macroManager.addMacro(text: "bb", content: "bạn bè")
+        VNEngine.setSharedMacroManager(macroManager)
+        
+        // Type "bb "
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        
+        // Check macroKey before space
+        let macroKeyBeforeSpace = engine.hookState.macroKey
+        XCTAssertEqual(macroKeyBeforeSpace.count, 2, "macroKey should have 2 entries before space")
+        
+        // Process space (word break)
+        let result = engine.processWordBreak(character: " ")
+        
+        // Verify macro was found and replaced
+        XCTAssertTrue(result.shouldConsume, "Macro should be found and consumed")
+        XCTAssertEqual(result.backspaceCount, 2, "Should delete 2 characters (bb)")
+    }
+    
+    func testMacro_WithExclamationMark() {
+        engine.reset()
+        engine.vUseMacro = 1
+        engine.vLanguage = 1  // Vietnamese mode
+        
+        // Setup macro "!bb" -> "bằng hữu"
+        let macroManager = MacroManager()
+        _ = macroManager.addMacro(text: "!bb", content: "bằng hữu")
+        VNEngine.setSharedMacroManager(macroManager)
+        
+        // Enable macro manager logging
+        macroManager.logCallback = { message in
+            print("Macro: \(message)")
+        }
+        engine.logCallback = { message in
+            print("Engine: \(message)")
+        }
+        
+        // Type "!" (word break character)
+        let resultExclaim = engine.processWordBreak(character: "!")
+        XCTAssertFalse(resultExclaim.shouldConsume, "! should not consume yet")
+        
+        // Check macroKey after "!"
+        let macroKeyAfterExclaim = engine.hookState.macroKey
+        print("macroKey after '!': \(macroKeyAfterExclaim.map { String(format: "0x%X", $0) })")
+        XCTAssertEqual(macroKeyAfterExclaim.count, 1, "macroKey should have 1 entry (!) after typing !")
+        
+        // Type "b"
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        let macroKeyAfterB1 = engine.hookState.macroKey
+        print("macroKey after 'b': \(macroKeyAfterB1.map { String(format: "0x%X", $0) })")
+        XCTAssertEqual(macroKeyAfterB1.count, 2, "macroKey should have 2 entries (!b) after typing b")
+        
+        // Type "b" again
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        let macroKeyAfterB2 = engine.hookState.macroKey
+        print("macroKey after second 'b': \(macroKeyAfterB2.map { String(format: "0x%X", $0) })")
+        XCTAssertEqual(macroKeyAfterB2.count, 3, "macroKey should have 3 entries (!bb)")
+        
+        // Process space (word break) - this should trigger macro replacement
+        let result = engine.processWordBreak(character: " ")
+        
+        // Verify macro was found and replaced
+        XCTAssertTrue(result.shouldConsume, "Macro '!bb' should be found and consumed")
+        XCTAssertEqual(result.backspaceCount, 3, "Should delete 3 characters (!bb)")
+    }
+    
+    func testMacro_WithAtSign() {
+        engine.reset()
+        engine.vUseMacro = 1
+        engine.vLanguage = 1  // Vietnamese mode
+        
+        // Setup macro "you@" -> "công ty"
+        let macroManager = MacroManager()
+        _ = macroManager.addMacro(text: "you@", content: "công ty")
+        VNEngine.setSharedMacroManager(macroManager)
+        
+        // Type "you"
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        
+        // Check macroKey before "@"
+        let macroKeyBeforeAt = engine.hookState.macroKey
+        XCTAssertEqual(macroKeyBeforeAt.count, 3, "macroKey should have 3 entries (you) before @")
+        
+        // Type "@" (word break character)
+        let resultAt = engine.processWordBreak(character: "@")
+        XCTAssertFalse(resultAt.shouldConsume, "@ should not consume yet")
+        
+        // Check macroKey after "@"
+        let macroKeyAfterAt = engine.hookState.macroKey
+        print("macroKey after '@': \(macroKeyAfterAt.map { String(format: "0x%X", $0) })")
+        XCTAssertEqual(macroKeyAfterAt.count, 4, "macroKey should have 4 entries (you@)")
+        
+        // Process space (word break) - this should trigger macro replacement
+        let result = engine.processWordBreak(character: " ")
+        
+        // Verify macro was found and replaced
+        XCTAssertTrue(result.shouldConsume, "Macro 'you@' should be found and consumed")
+        XCTAssertEqual(result.backspaceCount, 4, "Should delete 4 characters (you@)")
+    }
+    
+    func testMacro_KeyCodeMapping() {
+        // Test that getCharacterCode correctly maps keycode + CAPS_MASK to character
+        let macroManager = MacroManager()
+        
+        // Verify "!" mapping: keyCode 0x12 (KEY_1) with CAPS_MASK should map to '!' (0x21)
+        let exclamKeyData: UInt32 = 0x12 | 0x10000  // KEY_1 with CAPS_MASK
+        
+        // Test through the macro search mechanism
+        _ = macroManager.addMacro(text: "!test", content: "result")
+        
+        // Simulate typing "!test" as keycodes
+        let typedKey: [UInt32] = [
+            0x10012,  // ! (Shift+1)
+            0x11,     // t
+            0x0E,     // e
+            0x01,     // s
+            0x11      // t
+        ]
+        
+        // Find macro
+        let foundMacro = macroManager.findMacro(key: typedKey)
+        XCTAssertNotNil(foundMacro, "Macro '!test' should be found with keycode input")
+    }
 }
 
 

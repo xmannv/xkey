@@ -179,6 +179,7 @@ struct WindowTitleRule: Codable, Identifiable {
     // MARK: - Matching
     
     /// Check if this rule matches the given bundle ID and window title
+    /// When titlePattern is empty, the rule matches any window of the app (skip window title check)
     func matches(bundleId: String, windowTitle: String) -> Bool {
         // Check bundle ID pattern
         if !bundleIdPattern.isEmpty {
@@ -205,6 +206,11 @@ struct WindowTitleRule: Codable, Identifiable {
                     return false
                 }
             }
+        }
+        
+        // If titlePattern is empty, match any window of the app (skip window title check)
+        if titlePattern.isEmpty {
+            return true
         }
         
         // Check window title pattern
@@ -365,7 +371,56 @@ class AppBehaviorDetector {
             injectionDelays: [5000, 10000, 8000],
             textSendingMethod: .oneByOne,
             description: "Google Sheets in Safari - one-by-one text sending"
-        )        
+        ),
+        
+        // ============================================
+        // Firefox rules (autocomplete method)
+        // ============================================
+        
+        // Firefox (all windows) - uses autocomplete injection like Spotlight
+        WindowTitleRule(
+            name: "Firefox",
+            bundleIdPattern: "org.mozilla.firefox",
+            titlePattern: "",  // Empty = match all windows
+            matchMode: .contains,
+            useMarkedText: true,
+            hasMarkedTextIssues: false,
+            commitDelay: 3000,
+            injectionMethod: .autocomplete,
+            injectionDelays: [1000, 3000, 1000],
+            textSendingMethod: .chunked,
+            description: "Firefox - dùng autocomplete injection (Forward Delete + backspace + text)"
+        ),
+        
+        // Firefox Developer Edition
+        WindowTitleRule(
+            name: "Firefox Developer Edition",
+            bundleIdPattern: "org.mozilla.firefoxdeveloperedition",
+            titlePattern: "",  // Empty = match all windows
+            matchMode: .contains,
+            useMarkedText: true,
+            hasMarkedTextIssues: false,
+            commitDelay: 3000,
+            injectionMethod: .autocomplete,
+            injectionDelays: [1000, 3000, 1000],
+            textSendingMethod: .chunked,
+            description: "Firefox Developer Edition - dùng autocomplete injection"
+        ),
+        
+        // Firefox Nightly
+        WindowTitleRule(
+            name: "Firefox Nightly",
+            bundleIdPattern: "org.mozilla.nightly",
+            titlePattern: "",  // Empty = match all windows
+            matchMode: .contains,
+            useMarkedText: true,
+            hasMarkedTextIssues: false,
+            commitDelay: 3000,
+            injectionMethod: .autocomplete,
+            injectionDelays: [1000, 3000, 1000],
+            textSendingMethod: .chunked,
+            description: "Firefox Nightly - dùng autocomplete injection"
+        )
     ]
     
     // MARK: - Static App Lists (Single Source of Truth)
@@ -653,11 +708,8 @@ class AppBehaviorDetector {
             return rule
         }
         
-        // Empty window title means we can't match any rule
-        if windowTitle.isEmpty {
-            cachedMatchedRule = nil
-            return nil
-        }
+        // Note: Empty window title is OK - rules with empty titlePattern will still match
+        // This allows rules that apply to all windows of an app (e.g., Firefox rule)
         
         // Search in custom rules first (higher priority)
         for rule in customRules where rule.isEnabled {

@@ -227,13 +227,20 @@ struct RuleRowView: View {
                     Text("Pattern:")
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    Text("\"\(rule.titlePattern)\"")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .fontWeight(.medium)
-                    Text("(\(rule.matchMode.rawValue))")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if rule.titlePattern.isEmpty {
+                        Text("(Tất cả windows)")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("\"\(rule.titlePattern)\"")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fontWeight(.medium)
+                        Text("(\(rule.matchMode.rawValue))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
@@ -384,15 +391,18 @@ struct AddRuleSheet: View {
                         .padding(.vertical, 4)
                     }
                     
-                    // Pattern Matching
                     GroupBox(label: Label("Pattern matching", systemImage: "text.magnifyingglass")) {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Title Pattern:")
                                     .frame(width: 100, alignment: .leading)
-                                TextField("VD: Google Docs", text: $titlePattern)
+                                TextField("VD: Google Docs (để trống = tất cả)", text: $titlePattern)
                                     .textFieldStyle(.roundedBorder)
                             }
+                            
+                            Text("💡 Để trống Title Pattern để áp dụng cho tất cả windows của app")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
                             
                             HStack {
                                 Text("Match mode:")
@@ -404,11 +414,14 @@ struct AddRuleSheet: View {
                                 }
                                 .labelsHidden()
                                 .frame(width: 150)
+                                .disabled(titlePattern.isEmpty)  // Disable when pattern is empty
                             }
                             
-                            Text(matchModeDescription(matchMode))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            if !titlePattern.isEmpty {
+                                Text(matchModeDescription(matchMode))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         .padding(.vertical, 4)
                     }
@@ -559,7 +572,7 @@ struct AddRuleSheet: View {
                 }
                 .keyboardShortcut(.return)
                 .buttonStyle(.borderedProminent)
-                .disabled(name.isEmpty || titlePattern.isEmpty)
+                .disabled(name.isEmpty)  // Only name is required, titlePattern can be empty
             }
         }
         .padding()
@@ -618,10 +631,7 @@ struct AddRuleSheet: View {
             showErrorMessage("Vui lòng nhập tên quy tắc")
             return
         }
-        guard !titlePattern.isEmpty else {
-            showErrorMessage("Vui lòng nhập title pattern")
-            return
-        }
+        // Note: titlePattern can be empty (means match all windows of the app)
         
         // Build injection delays array if overriding
         var injectionDelaysArray: [UInt32]? = nil

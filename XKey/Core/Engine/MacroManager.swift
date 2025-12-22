@@ -80,17 +80,35 @@ class MacroManager {
         // Convert key to character codes
         let searchKey = key.map { getCharacterCode($0) }
 
-        // Debug logging
+        // Debug logging - detailed information about key comparison
         let keyStr = key.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-        let searchKeyStr = searchKey.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-        logCallback?("🔍 MacroManager.findMacro: input key=[\(keyStr)]")
-        logCallback?("🔍 MacroManager.findMacro: searchKey=[\(searchKeyStr)]")
-        logCallback?("🔍 MacroManager.findMacro: macroMap has \(macroMap.count) macros")
+        let searchKeyStr = searchKey.map { String(format: "0x%X ('%@')", $0, String(UnicodeScalar($0) ?? UnicodeScalar(0))) }.joined(separator: ", ")
+        logCallback?("🔍 MacroManager.findMacro:")
+        logCallback?("🔍   input key (raw): [\(keyStr)]")
+        logCallback?("🔍   searchKey (converted): [\(searchKeyStr)]")
+        logCallback?("🔍   macroMap has \(macroMap.count) macros")
 
-        // Debug: show all stored macros
+        // Debug: show all stored macros with their keys
         for (storedKey, macro) in macroMap {
-            let storedKeyStr = storedKey.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-            logCallback?("🔍   - Stored macro: key=[\(storedKeyStr)] text='\(macro.macroText)'")
+            let storedKeyStr = storedKey.map { String(format: "0x%X ('%@')", $0, String(UnicodeScalar($0) ?? UnicodeScalar(0))) }.joined(separator: ", ")
+            logCallback?("🔍   - Stored: key=[\(storedKeyStr)] text='\(macro.macroText)'")
+            
+            // Compare keys element by element
+            if storedKey.count == searchKey.count {
+                var matches = true
+                for i in 0..<storedKey.count {
+                    if storedKey[i] != searchKey[i] {
+                        matches = false
+                        logCallback?("🔍     ↳ Mismatch at index \(i): stored=0x\(String(format: "%X", storedKey[i])) vs search=0x\(String(format: "%X", searchKey[i]))")
+                        break
+                    }
+                }
+                if matches {
+                    logCallback?("🔍     ↳ ALL ELEMENTS MATCH!")
+                }
+            } else {
+                logCallback?("🔍     ↳ Length mismatch: stored=\(storedKey.count) vs search=\(searchKey.count)")
+            }
         }
 
         // Try exact match first
