@@ -6,27 +6,29 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.9</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.9</link>
-      <sparkle:version>1.2.9</sparkle:version>
-      <sparkle:shortVersionString>1.2.9</sparkle:shortVersionString>
+      <title>Version 1.2.10</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.10</link>
+      <sparkle:version>1.2.10</sparkle:version>
+      <sparkle:shortVersionString>1.2.10</sparkle:shortVersionString>
       <description><![CDATA[
-        <p><h2>What's New</h2></p>
-<p>Fix macro special characters handling and improve window title rules</p>
+        <p><h2>What's New</h2></p>
+<p>Refactor Settings UI & Add English Detection Feature</p>
 <ul>
-<li>Add comprehensive special character support for macros</li>
-<li>Update KeyboardEventHandler to properly handle special chars in macroKey buffer</li>
-<li>Enhance MacroManager with detailed logging for debugging</li>
-<li>Improve AppBehaviorDetector with better Firefox and Google Docs detection</li>
-<li>Add comprehensive VNI unit tests</li>
-<li>Update WindowTitleRulesView UI for better rule management</li>
-<li>Version 1.2.9</li>
+<li>Refactor Settings/Preferences views into reusable section components</li>
+<li>Add new SettingsSections folder with modular Swift files for each section</li>
+<li>Separate English word detection from spell check feature</li>
+<li>Add import/export functionality for Window Title Rules (JSON format)</li>
+<li>Add enable/disable toggles for built-in window title rules</li>
+<li>Add quick add button for detected apps in Window Title Rules</li>
+<li>Move DebugLogger to Shared for better code organization</li>
+<li>Add auto-restart countdown after settings import</li>
+<li>Update version to 1.2.10</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.9">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.10">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 22 Dec 2025 05:50:00 +0000</pubDate>
+      <pubDate>Mon, 22 Dec 2025 16:42:31 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.9/XKey.dmg" sparkle:version="1.2.9" sparkle:shortVersionString="1.2.9" length="8581945" type="application/octet-stream" sparkle:edSignature="MsL1Z+iZdgR8QQA+jXVbTiZ8xagPDLIt/wit/USsJYz+tcnCGaxekkMwUHFVFpamOudPkjxBnN0S4MS0PVT9DA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.10/XKey.dmg" sparkle:version="1.2.10" sparkle:shortVersionString="1.2.10" length="8676561" type="application/octet-stream" sparkle:edSignature="mnn1HVhzQ0MxqsoiBKf4Zg68yPDFuecfLuUsRAM9xqDwEaFYQ29GJOcCv/+qeLkIyKGOjp9XDPQfSpBN2ouwBQ==" />
     </item>
   </channel>
 </rss>
