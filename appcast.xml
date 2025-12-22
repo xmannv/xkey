@@ -6,26 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.8</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.8</link>
-      <sparkle:version>1.2.8</sparkle:version>
-      <sparkle:shortVersionString>1.2.8</sparkle:shortVersionString>
+      <title>Version 1.2.9</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.9</link>
+      <sparkle:version>1.2.9</sparkle:version>
+      <sparkle:shortVersionString>1.2.9</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix VNI typing logic and improve cursor position handling</p>
+<p>Fix macro special characters handling and improve window title rules</p>
 <ul>
-<li>Enhance VNEngine to properly handle VNI diacritics and tone marks</li>
-<li>Fix cursor position tracking to prevent incorrect character deletion</li>
-<li>Improve isTypingMidSentence flag handling in CharacterInjector</li>
-<li>Add comprehensive unit tests for VNI input scenarios</li>
-<li>Update README with Window Title Rules setup instructions</li>
-<li>Version 1.2.8</li>
+<li>Add comprehensive special character support for macros</li>
+<li>Update KeyboardEventHandler to properly handle special chars in macroKey buffer</li>
+<li>Enhance MacroManager with detailed logging for debugging</li>
+<li>Improve AppBehaviorDetector with better Firefox and Google Docs detection</li>
+<li>Add comprehensive VNI unit tests</li>
+<li>Update WindowTitleRulesView UI for better rule management</li>
+<li>Version 1.2.9</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.8">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.9">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 21 Dec 2025 16:22:50 +0000</pubDate>
+      <pubDate>Mon, 22 Dec 2025 05:50:00 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.8/XKey.dmg" sparkle:version="1.2.8" sparkle:shortVersionString="1.2.8" length="8579491" type="application/octet-stream" sparkle:edSignature="iTZTAneLjOqiez43PDG/4KeMt0pA3B0LOrV+Cu1yg8XBmA4qAQ1xareAbaYswL8D0R1Jybq2N5mW4ma3AKCuAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.9/XKey.dmg" sparkle:version="1.2.9" sparkle:shortVersionString="1.2.9" length="8589849" type="application/octet-stream" sparkle:edSignature="eAfyg/qBtCeaK+c2FKsV7Z/dgkX0L08P4SEhl53nlHAkx3MFnI3CHA+xQTWEueW9BJF9sZjkyyElfN4F3t80Cw==" />
     </item>
   </channel>
 </rss>
