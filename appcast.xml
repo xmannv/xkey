@@ -6,26 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.11</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.11</link>
-      <sparkle:version>1.2.11</sparkle:version>
-      <sparkle:shortVersionString>1.2.11</sparkle:shortVersionString>
+      <title>Version 1.2.12</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.12</link>
+      <sparkle:version>1.2.12</sparkle:version>
+      <sparkle:shortVersionString>1.2.12</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Version 1.2.11</p>
-<p>Changes:</p>
+<p>Version 1.2.12: Add Always On Top feature and improve update dialog visibility</p>
 <ul>
-<li>Improve App Group: use Team ID prefix for macOS Sequoia compatibility</li>
-<li>Add SparkleUpdateDelegate to backup settings before update</li>
-<li>Add Macro Shortcut validation: disallow Vietnamese diacritics and spaces</li>
-<li>Disable Quick Telex by default</li>
-<li>Update entitlements for XKey and XKeyIM</li>
+<li>Add pin button to Settings and Preferences windows for always-on-top functionality</li>
+<li>Implement SPUStandardUserDriverDelegate to bring update dialogs to front</li>
+<li>Ensure Sparkle update notifications are visible for menu bar apps</li>
+<li>Bump version to 1.2.12</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.11">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.12">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 23 Dec 2025 06:13:05 +0000</pubDate>
+      <pubDate>Tue, 23 Dec 2025 06:28:29 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.11/XKey.dmg" sparkle:version="1.2.11" sparkle:shortVersionString="1.2.11" length="8673868" type="application/octet-stream" sparkle:edSignature="w1wx90gN9j7aEiJgLNHFvV3M4hzhzYjmRbGh2ukP6TpavTl9/37cm6iSm170sOdVNDMCjj88gKBuwjMXcIDMDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.12/XKey.dmg" sparkle:version="1.2.12" sparkle:shortVersionString="1.2.12" length="8682686" type="application/octet-stream" sparkle:edSignature="lTXNyztYs6pMKn2ctAqXfCm9FjHJBKW2h5Zaf5GMXuhsH5i4gY7ESAgeh5jmhXQ/Ajl6jVvzrl1Cl7TMVXXdAw==" />
     </item>
   </channel>
 </rss>
