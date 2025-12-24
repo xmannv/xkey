@@ -6,39 +6,40 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.14</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.14</link>
-      <sparkle:version>1.2.14</sparkle:version>
-      <sparkle:shortVersionString>1.2.14</sparkle:shortVersionString>
+      <title>Version 1.2.15</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.15</link>
+      <sparkle:version>1.2.15</sparkle:version>
+      <sparkle:shortVersionString>1.2.15</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Release v1.2.14</p>
+<p>Release v1.2.15: Enhanced User Dictionary Management</p>
 <p>Features:</p>
 <ul>
-<li>Add user dictionary feature for custom word management</li>
-<li>Implement word ignore list in spell checker</li>
-<li>Add UI for managing user dictionary in Advanced settings</li>
+<li>Add Import/Export functionality for User Dictionary</li>
+<li>Implement file-based import/export with .txt format</li>
+<li>Add proper error handling and user feedback for import/export operations</li>
+<li>Enhance WindowTitleRulesView with better UI controls</li>
+<li>Improve keyboard event handling logic</li>
 </ul>
 <p>Improvements:</p>
 <ul>
-<li>Fix engine buffer reset logic for non-space word breaks</li>
-<li>Prioritize macro processing over spell check</li>
-<li>Clear typing states after restore operations</li>
-<li>Fix shortcut conflict detection in HotkeyRecorderView</li>
-<li>Improve input source detection and handling</li>
+<li>Add UniformTypeIdentifiers support for file operations</li>
+<li>Implement UserDictionaryDocument for file export</li>
+<li>Better validation for imported dictionary words</li>
+<li>Enhanced user experience with success/error alerts</li>
+<li>Improved code organization in AdvancedSection</li>
 </ul>
 <p>Bug Fixes:</p>
 <ul>
-<li>Fix buffer not clearing correctly after injections</li>
-<li>Fix typing states persisting after restore</li>
-<li>Resolve shortcut recording conflicts</li>
-<li>Improve engine state management</li>
+<li>Fix keyboard event handler edge cases</li>
+<li>Improve IMController composing text handling</li>
+<li>Better engine state management</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.14">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.15">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 24 Dec 2025 09:21:09 +0000</pubDate>
+      <pubDate>Wed, 24 Dec 2025 10:16:15 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.14/XKey.dmg" sparkle:version="1.2.14" sparkle:shortVersionString="1.2.14" length="8881915" type="application/octet-stream" sparkle:edSignature="sNX38RhL+556bgN9cpUn/MTCWEPN34s2TJMignzsvJXVth1AJMZkwrcInkVYad0v4kngdDPg3yw1Pdx+C9Z4AA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.15/XKey.dmg" sparkle:version="1.2.15" sparkle:shortVersionString="1.2.15" length="8968794" type="application/octet-stream" sparkle:edSignature="ZxocWIvrDfHgWTsMZDr3MmMRgPaNiOxMJCkU53zuJ8QsLpYqKiL9V454/GWDnLkroULqVBfgivo5XpUoRI4fDw==" />
     </item>
   </channel>
 </rss>
