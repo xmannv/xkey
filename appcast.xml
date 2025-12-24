@@ -6,24 +6,46 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.12</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.12</link>
-      <sparkle:version>1.2.12</sparkle:version>
-      <sparkle:shortVersionString>1.2.12</sparkle:shortVersionString>
+      <title>Version 1.2.13</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.13</link>
+      <sparkle:version>1.2.13</sparkle:version>
+      <sparkle:shortVersionString>1.2.13</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Version 1.2.12: Add Always On Top feature and improve update dialog visibility</p>
+<p>Release v1.2.13: Major improvements to spell checking, Vietnamese code tables, and debug logging</p>
+<p>Features:</p>
 <ul>
-<li>Add pin button to Settings and Preferences windows for always-on-top functionality</li>
-<li>Implement SPUStandardUserDriverDelegate to bring update dialogs to front</li>
-<li>Ensure Sparkle update notifications are visible for menu bar apps</li>
-<li>Bump version to 1.2.12</li>
+<li>Add VNDictionaryManager and VNEngineSpellCheck for enhanced spell checking</li>
+<li>Implement Unicode Compound and CP1258 Vietnamese code tables</li>
+<li>Add comprehensive Vietnamese character mapping with combining diacritics</li>
+<li>Move spell check settings to Advanced section with cascading disable logic</li>
+<li>Optimize debug logging with file-based async logging (LogFileReader)</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.12">Xem chi tiết trên GitHub</a></p>
+<p>Improvements:</p>
+<ul>
+<li>Refine English auto-restore functionality and word-break detection</li>
+<li>Enhance VNCharacter and VNCharacterMap with better diacritic handling</li>
+<li>Improve keyboard event handling and buffer reset logic</li>
+<li>Update status bar manager with better state management</li>
+<li>Refactor VNEngine for better code organization</li>
+</ul>
+<p>Bug Fixes:</p>
+<ul>
+<li>Fix buffer reset issue preventing proper session cleanup</li>
+<li>Fix spell check feature cascading when parent setting is disabled</li>
+<li>Improve build script for better release handling</li>
+</ul>
+<p>Settings:</p>
+<ul>
+<li>Reorganize Advanced section with better grouping</li>
+<li>Update SharedSettings with new spell check options</li>
+<li>Improve preferences model structure</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.13">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 23 Dec 2025 06:28:29 +0000</pubDate>
+      <pubDate>Wed, 24 Dec 2025 04:40:34 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.12/XKey.dmg" sparkle:version="1.2.12" sparkle:shortVersionString="1.2.12" length="8682686" type="application/octet-stream" sparkle:edSignature="lTXNyztYs6pMKn2ctAqXfCm9FjHJBKW2h5Zaf5GMXuhsH5i4gY7ESAgeh5jmhXQ/Ajl6jVvzrl1Cl7TMVXXdAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.13/XKey.dmg" sparkle:version="1.2.13" sparkle:shortVersionString="1.2.13" length="8801598" type="application/octet-stream" sparkle:edSignature="xKs0J/rbCvfgQXJ6LuzlD3mrG7v8Bao1Ed2q51Hf5vDFEUk05+uwvBB2DhmHE+Po8ifK4Z1+jolA1AdR4W0GAg==" />
     </item>
   </channel>
 </rss>
