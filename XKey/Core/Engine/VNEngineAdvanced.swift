@@ -223,9 +223,10 @@ extension VNEngine {
         
         logCallback?("Restore Wrong Spelling: Restoring \(originalWord.count) characters")
         
-        // Reset state
+        // Reset state - use reset() to also clear typingStates
+        // This prevents stale words from appearing when backspacing after restore
         if handleCode == vRestoreAndStartNewSession {
-            startNewSession()
+            reset()
         }
         
         return true

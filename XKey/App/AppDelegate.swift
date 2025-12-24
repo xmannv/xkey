@@ -554,6 +554,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // and doesn't reach other applications
         eventTapManager?.toggleHotkey = hotkey
         eventTapManager?.onToggleHotkey = { [weak self] in
+            // If using Fn key or Ctrl+Space, temporarily ignore input source changes
+            // This prevents macOS's input source switching from interfering
+            if hotkey.modifiers.contains(.function) || 
+               (hotkey.modifiers == [.control] && hotkey.keyCode == 49) { // Space keyCode
+                self?.inputSourceManager?.temporarilyIgnoreInputSourceChanges(forSeconds: 0.5)
+            }
+            
             self?.statusBarManager?.viewModel.toggleVietnamese()
             
             self?.debugWindowController?.logEvent("🔄 Toggled Vietnamese mode via hotkey (\(hotkey.displayString))")

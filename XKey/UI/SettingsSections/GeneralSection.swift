@@ -23,6 +23,27 @@ struct GeneralSection: View {
                                 .frame(width: 150)
                         }
                         
+                        // Show hint when using Fn or Ctrl+Space
+                        if viewModel.preferences.toggleHotkey.modifiers.contains(.function) ||
+                           (viewModel.preferences.toggleHotkey.modifiers == [.control] && 
+                            viewModel.preferences.toggleHotkey.keyCode == 49) { // Space keyCode
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "info.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Lưu ý: Phím tắt này có thể trùng với macOS")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                Text("Để tránh xung đột, vào System Settings → Keyboard → Keyboard Shortcuts → Input Sources và tắt các phím tắt chuyển đổi nguồn nhập.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(8)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(6)
+                        }
+                        
                         Toggle("Phát âm thanh khi bật/tắt", isOn: $viewModel.preferences.beepOnToggle)
                         
                         Divider()

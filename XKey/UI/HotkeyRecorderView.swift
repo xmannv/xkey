@@ -7,6 +7,30 @@
 
 import SwiftUI
 
+// MARK: - Preset Hotkeys
+
+/// Common hotkey presets that users can quickly select
+private struct HotkeyPreset: Identifiable {
+    let id = UUID()
+    let name: String
+    let hotkey: Hotkey
+    
+    static let presets: [HotkeyPreset] = [
+        // Modifier-only presets
+        HotkeyPreset(name: "⌃Space (Ctrl+Space)", hotkey: Hotkey(keyCode: 49, modifiers: [.control], isModifierOnly: false)), // Space = 49
+        HotkeyPreset(name: "Fn", hotkey: Hotkey(keyCode: 0, modifiers: [.function], isModifierOnly: true)),
+        HotkeyPreset(name: "⌥Z (Alt+Z)", hotkey: Hotkey(keyCode: 6, modifiers: [.option], isModifierOnly: false)), // Z = 6
+        HotkeyPreset(name: "⌃⇧ (Ctrl+Shift)", hotkey: Hotkey(keyCode: 0, modifiers: [.control, .shift], isModifierOnly: true)),
+        HotkeyPreset(name: "⌥⇧ (Option+Shift)", hotkey: Hotkey(keyCode: 0, modifiers: [.option, .shift], isModifierOnly: true)),
+        HotkeyPreset(name: "⌘⇧ (Cmd+Shift)", hotkey: Hotkey(keyCode: 0, modifiers: [.command, .shift], isModifierOnly: true)),
+        
+        // Common key combinations
+        HotkeyPreset(name: "⌘⇧V", hotkey: Hotkey(keyCode: 9, modifiers: [.command, .shift], isModifierOnly: false)), // V = 9
+        HotkeyPreset(name: "⌘⇧Z", hotkey: Hotkey(keyCode: 6, modifiers: [.command, .shift], isModifierOnly: false)), // Z = 6
+        HotkeyPreset(name: "⌃⌥V", hotkey: Hotkey(keyCode: 9, modifiers: [.control, .option], isModifierOnly: false)),
+    ]
+}
+
 struct HotkeyRecorderView: View {
     @Binding var hotkey: Hotkey
     @State private var isRecording = false
@@ -41,6 +65,21 @@ struct HotkeyRecorderView: View {
             .buttonStyle(.plain)
             .help(isRecording ? "Nhấn phím tắt hoặc giữ modifier keys 0.5s..." : "Nhấn để ghi phím tắt")
             
+            // Preset menu - allows selecting common hotkeys that may be hard to record
+            Menu {
+                ForEach(HotkeyPreset.presets) { preset in
+                    Button(preset.name) {
+                        selectPreset(preset)
+                    }
+                }
+            } label: {
+                Image(systemName: "list.bullet")
+                    .foregroundColor(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 20)
+            .help("Chọn phím tắt có sẵn (hữu ích cho Ctrl+Space, Fn...)")
+            
             // Clear button
             Button(action: clearHotkey) {
                 Image(systemName: "xmark.circle.fill")
@@ -55,6 +94,15 @@ struct HotkeyRecorderView: View {
         .onDisappear {
             stopRecording()
         }
+    }
+    
+    private func selectPreset(_ preset: HotkeyPreset) {
+        // Stop recording if active
+        if isRecording {
+            stopRecording()
+        }
+        hotkey = preset.hotkey
+        updateDisplay()
     }
     
     private func startRecording() {
@@ -91,22 +139,29 @@ struct HotkeyRecorderView: View {
             return nil
         }
         
-        // Monitor flags changed events (for modifier-only hotkeys like Ctrl+Shift)
+        // Monitor flags changed events (for modifier-only hotkeys like Ctrl+Shift or Fn)
         flagsChangedMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [self] event in
             guard isRecording else { return event }
             
-            let modifiers = event.modifierFlags.intersection([.control, .option, .shift, .command])
+            // Include .function for Fn key support
+            let modifiers = event.modifierFlags.intersection([.control, .option, .shift, .command, .function])
             
-            // Check if we have at least 2 modifiers pressed
-            let modifierCount = [
+            // Check modifier conditions:
+            // - If Fn is pressed (alone or with others), allow it
+            // - Otherwise require at least 2 modifiers
+            let hasFn = modifiers.contains(.function)
+            let otherModifierCount = [
                 modifiers.contains(.control),
                 modifiers.contains(.option),
                 modifiers.contains(.shift),
                 modifiers.contains(.command)
             ].filter { $0 }.count
             
-            if modifierCount >= 2 {
-                // Started pressing multiple modifiers
+            // Allow: Fn alone, Fn + others, or 2+ other modifiers
+            let isValidModifierCombo = hasFn || otherModifierCount >= 2
+            
+            if isValidModifierCombo {
+                // Started pressing valid modifier combination
                 if currentModifiers != modifiers {
                     currentModifiers = modifiers
                     modifierPressTime = Date()
@@ -136,7 +191,7 @@ struct HotkeyRecorderView: View {
                     }
                 }
             } else {
-                // Modifiers released or only one modifier
+                // Modifiers released or insufficient modifiers
                 currentModifiers = []
                 modifierPressTime = nil
                 if isRecording {

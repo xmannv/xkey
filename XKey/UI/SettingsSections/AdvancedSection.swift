@@ -15,6 +15,11 @@ struct AdvancedSection: View {
     @State private var downloadError: String?
     @State private var showDownloadSuccess = false
     
+    // State properties for user dictionary section
+    @State private var newUserWord = ""
+    @State private var userDictionaryWords: [String] = []
+    @State private var showUserDictionaryList = false
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -99,6 +104,11 @@ struct AdvancedSection: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
+                                
+                                Divider()
+                                
+                                // User Dictionary section
+                                userDictionarySection
                             }
                             .padding(.leading, 20)
                         }
@@ -389,6 +399,97 @@ struct AdvancedSection: View {
         }
         .padding(.top, 4)
     }
+    
+    // MARK: - User Dictionary Section
+    
+    private var userDictionarySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 4) {
+                Image(systemName: "person.text.rectangle")
+                    .foregroundColor(.blue)
+                Text("Từ điển cá nhân")
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            
+            Text("Thêm các từ bạn muốn bỏ qua kiểm tra chính tả")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            
+            // Add new word form
+            HStack(spacing: 8) {
+                TextField("Nhập từ mới...", text: $newUserWord)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                    .frame(maxWidth: 200)
+                    .onChange(of: newUserWord) { newValue in
+                        // Remove spaces - only single words allowed
+                        let filtered = newValue.replacingOccurrences(of: " ", with: "")
+                        if filtered != newValue {
+                            newUserWord = filtered
+                        }
+                    }
+                    .onSubmit {
+                        addUserWord()
+                    }
+                
+                Button(action: addUserWord) {
+                    Image(systemName: "plus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .disabled(newUserWord.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            
+            // Word count and toggle list
+            HStack {
+                Text("\(userDictionaryWords.count) từ")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if !userDictionaryWords.isEmpty {
+                    Button(showUserDictionaryList ? "Ẩn danh sách" : "Xem danh sách") {
+                        withAnimation {
+                            showUserDictionaryList.toggle()
+                        }
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+            }
+            
+            // Word list (expandable)
+            if showUserDictionaryList && !userDictionaryWords.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(userDictionaryWords.sorted(), id: \.self) { word in
+                        HStack {
+                            Text(word)
+                                .font(.caption)
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                removeUserWord(word)
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(4)
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .onAppear {
+            loadUserDictionaryWords()
+        }
+    }
 
     // MARK: - Computed Properties (moved from SpellCheckSection)
     
@@ -435,5 +536,25 @@ struct AdvancedSection: View {
                 }
             }
         }
+    }
+    
+    // MARK: - User Dictionary Actions
+    
+    private func loadUserDictionaryWords() {
+        userDictionaryWords = Array(SharedSettings.shared.getUserDictionaryWords())
+    }
+    
+    private func addUserWord() {
+        let word = newUserWord.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !word.isEmpty else { return }
+        
+        SharedSettings.shared.addUserDictionaryWord(word)
+        loadUserDictionaryWords()
+        newUserWord = ""
+    }
+    
+    private func removeUserWord(_ word: String) {
+        SharedSettings.shared.removeUserDictionaryWord(word)
+        loadUserDictionaryWords()
     }
 }

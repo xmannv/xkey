@@ -102,12 +102,14 @@ struct Hotkey: Codable, Equatable {
     var displayString: String {
         var parts: [String] = []
         
+        // Fn key first (if present)
+        if modifiers.contains(.function) { parts.append("Fn") }
         if modifiers.contains(.control) { parts.append("⌃") }
         if modifiers.contains(.option) { parts.append("⌥") }
         if modifiers.contains(.shift) { parts.append("⇧") }
         if modifiers.contains(.command) { parts.append("⌘") }
         
-        // For modifier-only hotkeys, don't add key character
+        // For modifier-only hotkeys (including Fn-only), don't add key character
         if isModifierOnly {
             return parts.joined()
         }
@@ -143,6 +145,7 @@ struct ModifierFlags: OptionSet, Codable {
     static let option = ModifierFlags(rawValue: 1 << 1)
     static let shift = ModifierFlags(rawValue: 1 << 2)
     static let command = ModifierFlags(rawValue: 1 << 3)
+    static let function = ModifierFlags(rawValue: 1 << 4)  // Fn key support
     
     init(rawValue: UInt) {
         self.rawValue = rawValue
@@ -154,6 +157,7 @@ struct ModifierFlags: OptionSet, Codable {
         if eventFlags.contains(.option) { flags.insert(.option) }
         if eventFlags.contains(.shift) { flags.insert(.shift) }
         if eventFlags.contains(.command) { flags.insert(.command) }
+        if eventFlags.contains(.function) { flags.insert(.function) }
         self = flags
     }
 }

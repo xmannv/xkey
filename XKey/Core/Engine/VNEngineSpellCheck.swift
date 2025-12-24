@@ -37,8 +37,14 @@ extension VNEngine {
                 }
             }
         }
+        
+        // First, check user dictionary (custom words defined by user)
+        if SharedSettings.shared.isWordInUserDictionary(currentWord) {
+            logCallback?("📖 Dictionary check: FOUND in User Dictionary, word='\(currentWord)'")
+            return true // Word is in user dictionary, considered valid
+        }
 
-        // Check against dictionary
+        // Check against hunspell dictionary
         let style: VNDictionaryManager.DictionaryStyle = SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
         let styleName = style == .dauCu ? "Dấu cũ" : "Dấu mới"
         

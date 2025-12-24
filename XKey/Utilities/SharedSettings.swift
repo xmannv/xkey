@@ -76,6 +76,9 @@ enum SharedSettingsKey: String {
     case macrosData = "XKey.macrosData"
     case windowTitleRules = "XKey.windowTitleRules"
     case disabledBuiltInRules = "XKey.disabledBuiltInRules"
+    
+    // User dictionary (custom words to skip spell check)
+    case userDictionaryWords = "XKey.userDictionaryWords"
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -509,6 +512,45 @@ class SharedSettings {
         if let data = try? JSONEncoder().encode(Array(names)) {
             writeData(data, forKey: SharedSettingsKey.disabledBuiltInRules.rawValue)
         }
+    }
+    
+    // MARK: - User Dictionary (Custom Words)
+    
+    /// Get the list of user-defined words (to skip spell check)
+    func getUserDictionaryWords() -> Set<String> {
+        guard let data = readData(forKey: SharedSettingsKey.userDictionaryWords.rawValue),
+              let words = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(words)
+    }
+    
+    /// Set the list of user-defined words
+    func setUserDictionaryWords(_ words: Set<String>) {
+        if let data = try? JSONEncoder().encode(Array(words).sorted()) {
+            writeData(data, forKey: SharedSettingsKey.userDictionaryWords.rawValue)
+            notifySettingsChanged()
+        }
+    }
+    
+    /// Add a word to the user dictionary
+    func addUserDictionaryWord(_ word: String) {
+        var words = getUserDictionaryWords()
+        words.insert(word.lowercased().trimmingCharacters(in: .whitespaces))
+        setUserDictionaryWords(words)
+    }
+    
+    /// Remove a word from the user dictionary
+    func removeUserDictionaryWord(_ word: String) {
+        var words = getUserDictionaryWords()
+        words.remove(word.lowercased().trimmingCharacters(in: .whitespaces))
+        setUserDictionaryWords(words)
+    }
+    
+    /// Check if a word exists in the user dictionary
+    func isWordInUserDictionary(_ word: String) -> Bool {
+        let words = getUserDictionaryWords()
+        return words.contains(word.lowercased().trimmingCharacters(in: .whitespaces))
     }
 
     // MARK: - Sync

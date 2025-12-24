@@ -38,14 +38,21 @@ class VNDictionaryManager {
 
     // MARK: - Public API
 
-    /// Check if a word exists in the dictionary
+    /// Check if a word exists in the dictionary (either user dictionary or hunspell dictionary)
     func isValidWord(_ word: String, style: DictionaryStyle = .dauMoi) -> Bool {
+        // Normalize the word (lowercase and remove tones for checking)
+        let normalized = word.lowercased().trimmingCharacters(in: .whitespaces)
+        
+        // First, check user dictionary (custom words defined by user)
+        if SharedSettings.shared.isWordInUserDictionary(normalized) {
+            return true // Word is in user dictionary, skip spell check
+        }
+        
+        // Then check hunspell dictionary
         guard let wordSet = wordSets[style.rawValue] else {
             return false // Dictionary not loaded
         }
 
-        // Normalize the word (lowercase and remove tones for checking)
-        let normalized = word.lowercased().trimmingCharacters(in: .whitespaces)
         return wordSet.contains(normalized)
     }
 

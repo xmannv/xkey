@@ -218,8 +218,9 @@ class EventTapManager {
                     
                     // Check if all required modifiers are currently pressed
                     // Use "contains" to allow for additional modifiers like CapsLock
+                    // Include .function for Fn key support
                     let hasAllRequiredModifiers = hotkey.modifiers.isSubset(of: eventModifiers) &&
-                                                   eventModifiers.intersection([.control, .shift, .option, .command]) == hotkey.modifiers
+                                                   eventModifiers.intersection([.control, .shift, .option, .command, .function]) == hotkey.modifiers
                     
                     if hasAllRequiredModifiers {
                         // All required modifiers are pressed
@@ -328,6 +329,7 @@ extension ModifierFlags {
         if cgFlags.contains(.maskShift) { flags.insert(.shift) }
         if cgFlags.contains(.maskControl) { flags.insert(.control) }
         if cgFlags.contains(.maskAlternate) { flags.insert(.option) }
+        if cgFlags.contains(.maskSecondaryFn) { flags.insert(.function) }
         self = flags
     }
     

@@ -2456,8 +2456,24 @@ extension VNEngine {
         
         logCallback?("processWordBreak: char='\(character)', isSpace=\(isSpace), tempDisableKey=\(tempDisableKey), index=\(index)")
         
-        // Check spelling before any other processing (for restore if wrong spelling feature)
+        // IMPORTANT: Check macro FIRST before spell check
+        // This ensures that macros like "dc" get replaced instead of being restored as invalid spelling
+        // Macro check takes priority because user explicitly defined these shortcuts
+        if isSpace && shouldUseMacro() && !hasHandledMacro {
+            let macroFound = findAndReplaceMacro()
+
+            if macroFound {
+                logCallback?("processWordBreak: Macro found, replacing")
+                let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
+                // Reset after macro replacement
+                reset()
+                return result
+            }
+        }
+        
+        // Check spelling AFTER macro check (for restore if wrong spelling feature)
         // Only run if BOTH spell check AND restore if wrong spelling are enabled
+        // AND no macro was found above
         if isSpace && vCheckSpelling == 1 && vRestoreIfWrongSpelling == 1 {
             // Re-check spelling with full vowel check
             if !tempDisableKey {
@@ -2470,23 +2486,13 @@ extension VNEngine {
                 if checkRestoreIfWrongSpelling(handleCode: vRestore) {
                     logCallback?("processWordBreak: Restore successful, returning result")
                     let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
-                    // Reset after restore
-                    startNewSession()
+                    // Reset after restore - use reset() instead of just startNewSession()
+                    // This clears typingStates to prevent old words from appearing when backspacing
+                    // Without this, backspacing after restore would bring back old words from typingStates
+                    reset()
                     spaceCount = 1
                     return result
                 }
-            }
-        }
-        
-        // Check macro before resetting - ONLY for space
-        if isSpace && shouldUseMacro() && !hasHandledMacro {
-            let macroFound = findAndReplaceMacro()
-
-            if macroFound {
-                let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
-                // Reset after macro replacement
-                reset()
-                return result
             }
         }
         
@@ -2539,10 +2545,29 @@ extension VNEngine {
             // macroKey is cleared by startNewSession()
             // This allows macros like "hello" -> "hello world" to work correctly
         } else {
-            // For non-space word breaks (!, @, #, etc.), don't reset session
-            // macroKey is preserved to build macros like "!bb"
-            // Just increment space count
+            // For non-space word breaks (!, @, #, etc.), we still need to reset the buffer
+            // but preserve macroKey to build macros like "!bb"
+            // 
+            // IMPORTANT: We must reset index here to prevent double-processing.
+            // Example: Typing "space" - when " is pressed, saveWord() saves "space"
+            // If we don't reset index, when space is pressed next, engine still sees
+            // index=5 and tries to restore "space", deleting the opening " incorrectly.
             spaceCount = 1
+            
+            // Reset buffer but preserve macroKey (don't use startNewSession which clears macroKey)
+            index = 0
+            hookState.backspaceCount = 0
+            hookState.newCharCount = 0
+            tempDisableKey = false
+            stateIndex = 0
+            hasHandledMacro = false
+            hasHandleQuickConsonant = false
+            longWordHelper.removeAll()
+            
+            // Clear typingWord array to prevent stale data
+            for i in 0..<VNEngine.MAX_BUFF {
+                typingWord[i] = 0
+            }
         }
         
         // Reset spell checking to original setting

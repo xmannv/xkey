@@ -58,6 +58,9 @@ class InputSourceManager {
 
     /// Debug log callback
     var debugLogCallback: ((String) -> Void)?
+    
+    /// Flag to temporarily ignore input source changes (used when hotkey conflicts with macOS shortcuts)
+    private var ignoreInputSourceChangesUntil: Date?
 
     // MARK: - Initialization
 
@@ -93,6 +96,16 @@ class InputSourceManager {
     }
 
     @objc private func inputSourceDidChange(_ notification: Notification) {
+        // Check if we should ignore this change (hotkey was just pressed)
+        if let ignoreUntil = ignoreInputSourceChangesUntil, Date() < ignoreUntil {
+            debugLogCallback?("⏭️ Ignoring input source change (hotkey was just used)")
+            // Still update current source for tracking
+            if let newSource = Self.getCurrentInputSource() {
+                currentInputSource = newSource
+            }
+            return
+        }
+        
         // Get new input source
         guard let newSource = Self.getCurrentInputSource() else { return }
 
@@ -124,6 +137,15 @@ class InputSourceManager {
             object: nil,
             userInfo: ["source": newSource]
         )
+    }
+    
+    // MARK: - Hotkey Coordination
+    
+    /// Temporarily ignore input source changes for the given duration
+    /// This is used when a hotkey that conflicts with macOS input source shortcuts is pressed
+    func temporarilyIgnoreInputSourceChanges(forSeconds seconds: TimeInterval = 0.5) {
+        ignoreInputSourceChangesUntil = Date().addingTimeInterval(seconds)
+        debugLogCallback?("⏸️ Temporarily ignoring input source changes for \(seconds)s")
     }
 
     // MARK: - Configuration Management
