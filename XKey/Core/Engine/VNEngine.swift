@@ -714,7 +714,7 @@ class VNEngine {
                         }
                     }
                     
-                    insertMarkInternal(markMask: markMask, canModifyFlag: true)
+                    insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
                     break
                 }
             }
@@ -749,7 +749,7 @@ class VNEngine {
                     }
                     
                     if markMask != 0 {
-                        insertMarkInternal(markMask: markMask, canModifyFlag: true)
+                        insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
                         return
                     }
                 }
@@ -1547,7 +1547,28 @@ class VNEngine {
                 hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
             }
             hookState.newCharCount = hookState.backspaceCount
-            hookState.backspaceCount = hookState.backspaceCount + deltaBackSpace
+            
+            logCallback?("  → Before deltaBackSpace adjustment: backspaceCount=\(hookState.backspaceCount), deltaBackSpace=\(deltaBackSpace)")
+            
+            // IMPORTANT: deltaBackSpace handling
+            // When deltaBackSpace = -1, it means the last character hasn't been sent to screen yet
+            // In this case, we need to delete one less character from the screen
+            // Example: Screen has "thuở" (4 chars), we want to send "ưởn" (3 chars)
+            // - backspaceCount = 3 (for u, ở, n in buffer)
+            // - But 'n' hasn't been sent yet, so screen only has "thuở"
+            // - We need to delete "uở" (2 chars) from screen, not 3
+            // - So: backspaceCount = 3 + (-1) = 2 ✓
+            //
+            // When deltaBackSpace = 0, the last character has been sent
+            // - backspaceCount already correct, no adjustment needed
+            if deltaBackSpace == -1 {
+                // Last char not on screen yet, delete one less
+                hookState.backspaceCount = hookState.backspaceCount + deltaBackSpace
+            }
+            // If deltaBackSpace = 0, don't adjust (last char already on screen)
+            
+            logCallback?("  → After deltaBackSpace adjustment: backspaceCount=\(hookState.backspaceCount), newCharCount=\(hookState.newCharCount)")
+            
             hookState.extCode = 4
         }
     }
@@ -1574,17 +1595,32 @@ class VNEngine {
         
         // Check mark position
         if index >= 2 {
+            // IMPORTANT: Save current hookState before calling insertMarkInternal
+            // If mark position doesn't need adjustment (isAdjusted=false), we should
+            // preserve the hookState calculated by checkVowelAutoFix
+            let savedBackspaceCount = hookState.backspaceCount
+            let savedNewCharCount = hookState.newCharCount
+            let savedCode = hookState.code
+            
             for i in vowelStartIndex...vowelEndIndex {
                 logCallback?("  → Checking typingWord[\(i)]=\(String(format: "0x%X", typingWord[i])), hasMark=\((typingWord[i] & VNEngine.MARK_MASK) != 0)")
                 if typingWord[i] & VNEngine.MARK_MASK != 0 {
                     let mark = typingWord[i] & VNEngine.MARK_MASK
                     logCallback?("  → Found mark at index \(i), mark=\(String(format: "0x%X", mark))")
                     typingWord[i] &= ~VNEngine.MARK_MASK
-                    insertMarkInternal(markMask: mark, canModifyFlag: false)
+                    insertMarkInternal(markMask: mark, canModifyFlag: false, deltaBackSpace: deltaBackSpace)
                     logCallback?("  → After insertMarkInternal: vowelWillSetMark=\(vowelWillSetMark)")
                     if i != vowelWillSetMark {
                         isAdjusted = true
                         logCallback?("  → Mark position adjusted from \(i) to \(vowelWillSetMark)")
+                    } else {
+                        // Mark position is correct, restore saved hookState
+                        // This prevents insertMarkInternal from overwriting the correct
+                        // backspaceCount calculated by checkVowelAutoFix
+                        hookState.backspaceCount = savedBackspaceCount
+                        hookState.newCharCount = savedNewCharCount
+                        hookState.code = savedCode
+                        logCallback?("  → Mark position already correct, restored hookState (bs=\(savedBackspaceCount), chars=\(savedNewCharCount))")
                     }
                     break
                 }
@@ -1617,7 +1653,7 @@ class VNEngine {
         }
     }
     
-    private func insertMarkInternal(markMask: UInt32, canModifyFlag: Bool) {
+    private func insertMarkInternal(markMask: UInt32, canModifyFlag: Bool, deltaBackSpace: Int) {
         logCallback?("insertMarkInternal: markMask=\(String(format: "0x%X", markMask)), canModifyFlag=\(canModifyFlag)")
         logCallback?("  Before: typingWord[1]=\(String(format: "0x%X", typingWord[1])), hasTone=\((typingWord[1] & VNEngine.TONE_MASK) != 0)")
         
@@ -1636,6 +1672,8 @@ class VNEngine {
         // IMPORTANT: Auto-fix "ưo" → "ươ" case (OpenKey checkGrammar logic)
         // If we have "uo" pattern where one has TONEW_MASK but the other doesn't,
         // add TONEW_MASK to both to make "ươ"
+        // BUT: Only apply this when there's an ending consonant (like "thương", "người")
+        // Do NOT apply to words without ending consonant (like "thuở")
         if vowelCount >= 2 {
             let v1Key = chr(vowelStartIndex)
             let v2Key = chr(vowelStartIndex + 1)
@@ -1645,10 +1683,27 @@ class VNEngine {
             // Check for "uo" pattern with mismatched TONEW_MASK
             if v1Key == VietnameseData.KEY_U && v2Key == VietnameseData.KEY_O {
                 if v1HasToneW != v2HasToneW {
-                    // Add TONEW_MASK to both to make "ươ"
-                    typingWord[vowelStartIndex] |= VNEngine.TONEW_MASK
-                    typingWord[vowelStartIndex + 1] |= VNEngine.TONEW_MASK
-                    logCallback?("  Auto-fixed ưo → ươ")
+                    // Check if there's an ending consonant after the vowel pair
+                    var hasEndConsonant = false
+                    if vowelEndIndex + 1 < Int(index) {
+                        let nextKey = chr(vowelEndIndex + 1)
+                        // Check for common ending consonants: n, c, i, m, p, t
+                        if nextKey == VietnameseData.KEY_N || nextKey == VietnameseData.KEY_C ||
+                           nextKey == VietnameseData.KEY_I || nextKey == VietnameseData.KEY_M ||
+                           nextKey == VietnameseData.KEY_P || nextKey == VietnameseData.KEY_T {
+                            hasEndConsonant = true
+                        }
+                    }
+                    
+                    // Only auto-fix if there's an ending consonant
+                    if hasEndConsonant {
+                        // Add TONEW_MASK to both to make "ươ"
+                        typingWord[vowelStartIndex] |= VNEngine.TONEW_MASK
+                        typingWord[vowelStartIndex + 1] |= VNEngine.TONEW_MASK
+                        logCallback?("  Auto-fixed ưo → ươ (has ending consonant)")
+                    } else {
+                        logCallback?("  Skipped auto-fix ưo → ươ (no ending consonant, e.g., 'thuở')")
+                    }
                 }
             }
         }
@@ -1720,6 +1775,10 @@ class VNEngine {
             }
             
             hookState.backspaceCount = Int(index) - vowelStartIndex
+            // Apply deltaBackSpace adjustment if last char not on screen yet
+            if deltaBackSpace == -1 {
+                hookState.backspaceCount += deltaBackSpace
+            }
         }
         hookState.newCharCount = hookState.backspaceCount
         logCallback?("  Result: backspaceCount=\(hookState.backspaceCount), newCharCount=\(hookState.newCharCount)")
