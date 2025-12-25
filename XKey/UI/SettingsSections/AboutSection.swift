@@ -36,7 +36,7 @@ struct AboutSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text("Version \(AppVersion.current)")
+                    Text("\(AppVersion.fullVersion)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.top, 2)
