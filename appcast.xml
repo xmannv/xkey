@@ -6,40 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.15</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.15</link>
-      <sparkle:version>1.2.15</sparkle:version>
-      <sparkle:shortVersionString>1.2.15</sparkle:shortVersionString>
+      <title>Version 1.2.16</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16</link>
+      <sparkle:version>1.2.16</sparkle:version>
+      <sparkle:shortVersionString>1.2.16</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Release v1.2.15: Enhanced User Dictionary Management</p>
-<p>Features:</p>
+<p>Fix spell check restore when editing mid-word after cursor movement</p>
 <ul>
-<li>Add Import/Export functionality for User Dictionary</li>
-<li>Implement file-based import/export with .txt format</li>
-<li>Add proper error handling and user feedback for import/export operations</li>
-<li>Enhance WindowTitleRulesView with better UI controls</li>
-<li>Improve keyboard event handling logic</li>
+<li>Add cursorMovedSinceReset flag to VNEngine to track cursor movements</li>
+<li>Implement resetWithCursorMoved() method to set cursor moved flag</li>
+<li>Skip spell check restore logic when cursor was moved (prevents incorrect restoration when editing middle of existing words)</li>
+<li>Improve word break handling for macros with special characters</li>
+<li>Fix macro processing for characters like @ in macros (e.g., you@)</li>
+<li>Update cursor movement key handling to use new resetWithCursorMoved()</li>
+<li>Bump version to 1.2.16</li>
 </ul>
-<p>Improvements:</p>
-<ul>
-<li>Add UniformTypeIdentifiers support for file operations</li>
-<li>Implement UserDictionaryDocument for file export</li>
-<li>Better validation for imported dictionary words</li>
-<li>Enhanced user experience with success/error alerts</li>
-<li>Improved code organization in AdvancedSection</li>
-</ul>
-<p>Bug Fixes:</p>
-<ul>
-<li>Fix keyboard event handler edge cases</li>
-<li>Improve IMController composing text handling</li>
-<li>Better engine state management</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.15">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 24 Dec 2025 10:16:15 +0000</pubDate>
+      <pubDate>Thu, 25 Dec 2025 06:53:47 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.15/XKey.dmg" sparkle:version="1.2.15" sparkle:shortVersionString="1.2.15" length="8968794" type="application/octet-stream" sparkle:edSignature="ZxocWIvrDfHgWTsMZDr3MmMRgPaNiOxMJCkU53zuJ8QsLpYqKiL9V454/GWDnLkroULqVBfgivo5XpUoRI4fDw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16/XKey.dmg" sparkle:version="1.2.16" sparkle:shortVersionString="1.2.16" length="8971827" type="application/octet-stream" sparkle:edSignature="rvKhqtPLk6HDFje7IBrrMv6YgCoibNUjDJakYuwglUa2Cjq8J6CjG6w1oIMiWiRqMi5ezFDSwu+kUgdEBZfwCA==" />
     </item>
   </channel>
 </rss>
