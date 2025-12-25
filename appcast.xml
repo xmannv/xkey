@@ -6,27 +6,25 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.16</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16</link>
-      <sparkle:version>1.2.16</sparkle:version>
+      <title>Version 1.2.16 (Build 20251225.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251225.1</link>
+      <sparkle:version>20251225.1</sparkle:version>
       <sparkle:shortVersionString>1.2.16</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix spell check restore when editing mid-word after cursor movement</p>
+<p>Improve build process and engine enhancements</p>
 <ul>
-<li>Add cursorMovedSinceReset flag to VNEngine to track cursor movements</li>
-<li>Implement resetWithCursorMoved() method to set cursor moved flag</li>
-<li>Skip spell check restore logic when cursor was moved (prevents incorrect restoration when editing middle of existing words)</li>
-<li>Improve word break handling for macros with special characters</li>
-<li>Fix macro processing for characters like @ in macros (e.g., you@)</li>
-<li>Update cursor movement key handling to use new resetWithCursorMoved()</li>
-<li>Bump version to 1.2.16</li>
+<li>Enhanced build_release.sh with better error handling and validation</li>
+<li>Improved generate_appcast.py script for release management</li>
+<li>Updated VNEngine with cursor movement tracking improvements</li>
+<li>Enhanced VNEngineAdvanced with better word processing logic</li>
+<li>Bumped version in Info.plist</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251225.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 25 Dec 2025 06:53:47 +0000</pubDate>
+      <pubDate>Thu, 25 Dec 2025 09:02:56 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16/XKey.dmg" sparkle:version="1.2.16" sparkle:shortVersionString="1.2.16" length="8971827" type="application/octet-stream" sparkle:edSignature="rvKhqtPLk6HDFje7IBrrMv6YgCoibNUjDJakYuwglUa2Cjq8J6CjG6w1oIMiWiRqMi5ezFDSwu+kUgdEBZfwCA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16-20251225.1/XKey.dmg" sparkle:version="20251225.1" sparkle:shortVersionString="1.2.16" length="8974933" type="application/octet-stream" sparkle:edSignature="vemiGLSRTtFb1ynGZvON7ueSTLY+H3R5slaznJ8K0utKbvxlx+kB/mqeh6+PCWmjJ/TiSBX72+315u+UVGY7Cg==" />
     </item>
   </channel>
 </rss>
