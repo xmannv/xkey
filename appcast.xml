@@ -6,25 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.16 (Build 20251226)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226</link>
-      <sparkle:version>20251226</sparkle:version>
+      <title>Version 1.2.16 (Build 20251226.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226.1</link>
+      <sparkle:version>20251226.1</sparkle:version>
       <sparkle:shortVersionString>1.2.16</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix spell check restore bug when undoing standalone 'ư' to 'w'</p>
-<ul>
-<li>Fixed issue where typing 'w + w + i + t + h' + space would restore as 'wwith' instead of 'with'</li>
-<li>Root cause: When undoing standalone char 'ư' → 'w', stateIndex wasn't decremented</li>
-<li>Solution: Decrease stateIndex by 1 when processing standalone KEY_U undo in insertW()</li>
-<li>This ensures keyStates correctly reflects the actual typed characters after undo</li>
-<li>Bump version to 20251226</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226">Xem chi tiết trên GitHub</a></p>
+<p>Enhance dictionary management with reload functionality</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 26 Dec 2025 06:15:20 +0000</pubDate>
+      <pubDate>Fri, 26 Dec 2025 10:21:36 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16-20251226/XKey.dmg" sparkle:version="20251226" sparkle:shortVersionString="1.2.16" length="8978066" type="application/octet-stream" sparkle:edSignature="5+AXDTsMdvL6UMD3fAP2BjXMfnI6XSYlE8V8OGIxQehc3wngGF7HZOoIV2EeTqmpfV5ACs8LQEqZrSX3682DDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16-20251226.1/XKey.dmg" sparkle:version="20251226.1" sparkle:shortVersionString="1.2.16" length="8955043" type="application/octet-stream" sparkle:edSignature="ZiPGj3L7dm78Awir28GSSGENSkHoYJh/mFrlOy0AmAQDHujUr6ys0dsxFLx1bNyZxlJ2O15++9H/7rbF4wyJBw==" />
     </item>
   </channel>
 </rss>
