@@ -1325,6 +1325,14 @@ class VNEngine {
                         hookState.code = UInt8(vWillProcess)
                         if key == VietnameseData.KEY_U {
                             typingWord[i] = UInt32(VietnameseData.KEY_W) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
+                            // IMPORTANT: When undoing standalone "ư" → "w", we need to decrease stateIndex
+                            // to remove the first "w" keystroke from keyStates that was converted to "ư".
+                            // Without this, restore would send "ww" instead of just "w".
+                            // Example: typing "w + w + i + t + h" would restore "wwith" instead of "with"
+                            isRestoredW = true
+                            if stateIndex > 1 {
+                                stateIndex -= 1
+                            }
                         } else if key == VietnameseData.KEY_O {
                             hookState.code = UInt8(vRestore)
                             typingWord[i] = UInt32(VietnameseData.KEY_O) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
