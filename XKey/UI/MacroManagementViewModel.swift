@@ -99,6 +99,33 @@ class MacroManagementViewModel: ObservableObject {
         return true
     }
     
+    func updateMacro(_ macro: MacroItem, newText: String, newContent: String) -> Bool {
+        log("✏️ updateMacro called: '\(macro.text)' → '\(newText)' with content '\(newContent)'")
+        
+        // Check if new text conflicts with another macro (but not itself)
+        if newText != macro.text && macros.contains(where: { $0.text == newText }) {
+            log("   ❌ Macro '\(newText)' already exists")
+            return false
+        }
+        
+        // Find and update the macro
+        if let index = macros.firstIndex(where: { $0.id == macro.id }) {
+            macros[index] = MacroItem(id: macro.id, text: newText, content: newContent)
+            macros.sort { $0.text < $1.text }
+            
+            // Save to plist first
+            saveMacros()
+            
+            // Always post notification to ensure engine reloads macros
+            log("   📢 Posting macrosDidChange notification...")
+            NotificationCenter.default.post(name: .macrosDidChange, object: nil)
+            
+            return true
+        }
+        
+        return false
+    }
+    
     func deleteMacro(_ macro: MacroItem) {
         log("🗑️ deleteMacro called: '\(macro.text)'")
         macros.removeAll { $0.id == macro.id }

@@ -14,6 +14,7 @@ struct MacroSection: View {
     @State private var newMacroContent: String = ""
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
+    @State private var editingMacro: MacroItem? = nil
 
     var body: some View {
         ScrollView {
@@ -61,6 +62,9 @@ struct MacroSection: View {
                                     .foregroundColor(.secondary)
                                 TextField("vd: by the way", text: $newMacroContent)
                                     .textFieldStyle(.roundedBorder)
+                                Text(" ")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.clear)
                             }
                             
                             Button("Thêm") {
@@ -124,9 +128,15 @@ struct MacroSection: View {
                         } else {
                             LazyVStack(spacing: 8) {
                                 ForEach(viewModel.macros) { macro in
-                                    MacroRowView(macro: macro) {
-                                        viewModel.deleteMacro(macro)
-                                    }
+                                    MacroRowView(
+                                        macro: macro,
+                                        onEdit: {
+                                            editMacro(macro)
+                                        },
+                                        onDelete: {
+                                            viewModel.deleteMacro(macro)
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -136,10 +146,21 @@ struct MacroSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
         }
+        .sheet(item: $editingMacro) { macro in
+            EditMacroSheet(
+                macro: macro,
+                viewModel: viewModel,
+                isPresented: Binding(
+                    get: { editingMacro != nil },
+                    set: { if !$0 { editingMacro = nil } }
+                )
+            )
+        }
         .onAppear {
             viewModel.loadMacros()
         }
     }
+    
     
     private func addMacro() {
         let trimmedText = newMacroText.trimmingCharacters(in: .whitespaces)
@@ -163,6 +184,11 @@ struct MacroSection: View {
             showErrorMessage("Macro '\(trimmedText)' đã tồn tại")
         }
     }
+    
+    private func editMacro(_ macro: MacroItem) {
+        editingMacro = macro
+    }
+
     
     private func showErrorMessage(_ message: String) {
         errorMessage = message
@@ -196,6 +222,7 @@ struct MacroSection: View {
 
 struct MacroRowView: View {
     let macro: MacroItem
+    let onEdit: () -> Void
     let onDelete: () -> Void
     @State private var isHovered = false
     
@@ -223,14 +250,26 @@ struct MacroRowView: View {
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Delete button
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .font(.system(size: 12))
-                    .foregroundColor(isHovered ? .red : .secondary)
+            // Action buttons
+            HStack(spacing: 8) {
+                // Edit button
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12))
+                        .foregroundColor(isHovered ? .accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovered ? 1 : 0.5)
+                
+                // Delete button
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                        .foregroundColor(isHovered ? .red : .secondary)
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovered ? 1 : 0.5)
             }
-            .buttonStyle(.plain)
-            .opacity(isHovered ? 1 : 0.5)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -243,3 +282,157 @@ struct MacroRowView: View {
         }
     }
 }
+
+// MARK: - Edit Macro Sheet
+
+struct EditMacroSheet: View {
+    let macro: MacroItem
+    @ObservedObject var viewModel: MacroManagementViewModel
+    @Binding var isPresented: Bool
+    
+    @State private var editedText: String
+    @State private var editedContent: String
+    @State private var showError: Bool = false
+    @State private var errorMessage: String = ""
+    
+    init(macro: MacroItem, viewModel: MacroManagementViewModel, isPresented: Binding<Bool>) {
+        self.macro = macro
+        self.viewModel = viewModel
+        self._isPresented = isPresented
+        self._editedText = State(initialValue: macro.text)
+        self._editedContent = State(initialValue: macro.content)
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Sửa Macro")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: { isPresented = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            
+            Divider()
+            
+            // Form
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Từ viết tắt")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("vd: btw", text: $editedText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                        .onChange(of: editedText) { newValue in
+                            let filtered = filterMacroAbbreviation(newValue)
+                            if filtered != newValue {
+                                editedText = filtered
+                            }
+                        }
+                    
+                    Text("Không hỗ trợ dấu tiếng Việt và khoảng cách")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Nội dung thay thế")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("vd: by the way", text: $editedContent)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                }
+                
+                if showError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.callout)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            .padding()
+            
+            Divider()
+            
+            // Footer buttons
+            HStack(spacing: 12) {
+                Spacer()
+                
+                Button("Hủy") {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+                .keyboardShortcut(.cancelAction)
+                
+                Button("Cập nhật") {
+                    updateMacro()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(editedText.isEmpty || editedContent.isEmpty)
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+        }
+        .frame(width: 500)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+    
+    private func updateMacro() {
+        let trimmedText = editedText.trimmingCharacters(in: .whitespaces)
+        let trimmedContent = editedContent.trimmingCharacters(in: .whitespaces)
+        
+        guard !trimmedText.isEmpty && !trimmedContent.isEmpty else {
+            showErrorMessage("Vui lòng nhập đầy đủ thông tin")
+            return
+        }
+        
+        guard trimmedText.count >= 2 else {
+            showErrorMessage("Từ viết tắt phải có ít nhất 2 ký tự")
+            return
+        }
+        
+        if viewModel.updateMacro(macro, newText: trimmedText, newContent: trimmedContent) {
+            isPresented = false
+        } else {
+            showErrorMessage("Macro '\(trimmedText)' đã tồn tại")
+        }
+    }
+    
+    private func showErrorMessage(_ message: String) {
+        errorMessage = message
+        showError = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            showError = false
+        }
+    }
+    
+    private func filterMacroAbbreviation(_ text: String) -> String {
+        let noSpaces = text.replacingOccurrences(of: " ", with: "")
+        let normalized = noSpaces.folding(options: .diacriticInsensitive, locale: .current)
+        let filtered = normalized.unicodeScalars.filter { scalar in
+            return scalar.value >= 33 && scalar.value <= 126
+        }
+        return String(String.UnicodeScalarView(filtered))
+    }
+}
+
