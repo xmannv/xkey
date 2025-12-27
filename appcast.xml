@@ -6,26 +6,22 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.16 (Build 20251226.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226.2</link>
-      <sparkle:version>20251226.2</sparkle:version>
-      <sparkle:shortVersionString>1.2.16</sparkle:shortVersionString>
+      <title>Version 1.2.17 (Build 20251227)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251227</link>
+      <sparkle:version>20251227</sparkle:version>
+      <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Add macro edit functionality</p>
-<ul>
-<li>Add edit button to macro rows with pencil icon</li>
-<li>Implement EditMacroSheet for editing existing macros</li>
-<li>Add updateMacro method to MacroManagementViewModel</li>
-<li>Support editing both macro abbreviation and content</li>
-<li>Include validation for duplicate macros and minimum length</li>
-<li>Update version to 1.2.16 (20251226.2)</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.16-20251226.2">Xem chi tiết trên GitHub</a></p>
+<p>Add NSSpellChecker fallback for spell checking</p>
+<p>When a word is not found in the custom dictionary (Hunspell),</p>
+<p>now falls back to macOS NSSpellChecker with Vietnamese language</p>
+<p>support. This allows recognizing more valid Vietnamese words</p>
+<p>that may not be in the custom dictionary.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251227">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 26 Dec 2025 11:57:24 +0000</pubDate>
+      <pubDate>Sat, 27 Dec 2025 13:03:32 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.16-20251226.2/XKey.dmg" sparkle:version="20251226.2" sparkle:shortVersionString="1.2.16" length="9032121" type="application/octet-stream" sparkle:edSignature="Up0uJmlLxBhN1Atkgj55oKIliVvh4+VWsYpgfAF1EqMxOev0dCiSfRQY64lnq5pXAXG4abnkcQfdaewRYX+XBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251227/XKey.dmg" sparkle:version="20251227" sparkle:shortVersionString="1.2.17" length="9033539" type="application/octet-stream" sparkle:edSignature="odwN9uAGI8Hs7fJkDX6mNHbC4h00N4yV6RAumxMRGsv+iWPCzYAL6FUE4oQmkhKkwhoAKj2MeXvmrVYoyl+WDw==" />
     </item>
   </channel>
 </rss>
