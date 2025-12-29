@@ -2596,7 +2596,41 @@ extension VNEngine {
             if tempDisableKey {
                 logCallback?("processWordBreak: Word invalid, attempting restore...")
                 if checkRestoreIfWrongSpelling(handleCode: vRestore) {
-                    logCallback?("processWordBreak: Restore successful, returning result")
+                    logCallback?("processWordBreak: Restore successful")
+                    
+                    // IMPORTANT: After restore, check if restored word is a macro
+                    // Example: "intẻ" (invalid) restored to "inter" which may be a macro
+                    if shouldUseMacro() {
+                        // Rebuild macroKey from keyStates (original keystrokes)
+                        var restoredMacroKey = [UInt32]()
+                        for i in 0..<Int(stateIndex) {
+                            restoredMacroKey.append(keyStates[i])
+                        }
+                        
+                        if !restoredMacroKey.isEmpty {
+                            // Save the original backspace count from restore operation
+                            // This is the number of characters on screen (transformed text like "intẻ")
+                            let originalBackspaceCount = hookState.backspaceCount
+                            
+                            hookState.macroKey = restoredMacroKey
+                            logCallback?("processWordBreak: After restore, checking macro with keyStates (count=\(restoredMacroKey.count))")
+                            
+                            if findAndReplaceMacro() {
+                                // Macro found - need to fix backspaceCount
+                                // findAndReplaceMacro sets backspaceCount = macroKey.count (original keystrokes)
+                                // But text on screen is transformed text, so we need original backspaceCount
+                                hookState.backspaceCount = originalBackspaceCount
+                                logCallback?("processWordBreak: Macro found after restore! Using backspaceCount=\(originalBackspaceCount)")
+                                
+                                let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
+                                reset()
+                                return result
+                            }
+                        }
+                    }
+                    
+                    // No macro found, return restore result
+                    logCallback?("processWordBreak: No macro, returning restore result")
                     let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
                     // Reset after restore - use reset() instead of just startNewSession()
                     // This clears typingStates to prevent old words from appearing when backspacing
