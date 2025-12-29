@@ -6,26 +6,40 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20251229)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229</link>
-      <sparkle:version>20251229</sparkle:version>
+      <title>Version 1.2.17 (Build 20251229.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229.1</link>
+      <sparkle:version>20251229.1</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Improve event handling, spell check, and app behavior detection</p>
+<p>feat: Implement automatic XKeyIM updates</p>
 <ul>
-<li>Fixed XKeyIM pre-load library</li>
-<li>Optimized for Claude Code CLI</li>
-<li>Fixed spell check restore when typing after existing text</li>
-<li>Improved event handling and injection methods</li>
-<li>Enhanced app behavior detection</li>
-<li>Added advanced injection methods for better compatibility</li>
+<li>Add XKeyIMUpdateManager for silent auto-update of XKeyIM</li>
+<li>Automatically install bundled XKeyIM on XKey app startup</li>
+<li>Sync XKeyIM version with XKey app version (1.2.17 build 20251229.1)</li>
+<li>No user interaction required - fully automatic background process</li>
+<li>Connect debug logging to DebugWindow for troubleshooting</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229">Xem chi tiết trên GitHub</a></p>
+<p>Implementation details:</p>
+<ul>
+<li>XKeyIMUpdateManager.swift: Core update logic (246 lines)</li>
+<li>AppDelegate: Trigger update 3 seconds after app launch</li>
+<li>SparkleUpdateDelegate: Connect debug logging</li>
+<li>Force install mode: Always sync XKeyIM with bundled version</li>
+<li>Silent operation: No notifications, no prompts, no user interruption</li>
+</ul>
+<p>Benefits:</p>
+<ul>
+<li>XKeyIM always in sync with XKey app</li>
+<li>Zero maintenance for users</li>
+<li>Handles corrupted/missing XKeyIM automatically</li>
+<li>Clean, professional user experience</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 29 Dec 2025 00:58:00 +0000</pubDate>
+      <pubDate>Mon, 29 Dec 2025 03:57:57 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251229/XKey.dmg" sparkle:version="20251229" sparkle:shortVersionString="1.2.17" length="9028428" type="application/octet-stream" sparkle:edSignature="W7oTxz8q7VdppAs9s/llZgRdm9/fBj0dD5HECjFE6qNJaygh2DzcMkpY5Gq69uiOF3eNYPLrQz2h/ep6SxF9Dg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251229.1/XKey.dmg" sparkle:version="20251229.1" sparkle:shortVersionString="1.2.17" length="9038458" type="application/octet-stream" sparkle:edSignature="oMPKNpu2Z1rIrIXsU4rNRFrndoj0K8SswX+EvnkPc2h0ZX9hMLeyFf1GONkK/D+DAyDmVo8NQDa3qGUUyYxVAg==" />
     </item>
   </channel>
 </rss>
