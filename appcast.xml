@@ -6,22 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20251227)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251227</link>
-      <sparkle:version>20251227</sparkle:version>
+      <title>Version 1.2.17 (Build 20251229)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229</link>
+      <sparkle:version>20251229</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Add NSSpellChecker fallback for spell checking</p>
-<p>When a word is not found in the custom dictionary (Hunspell),</p>
-<p>now falls back to macOS NSSpellChecker with Vietnamese language</p>
-<p>support. This allows recognizing more valid Vietnamese words</p>
-<p>that may not be in the custom dictionary.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251227">Xem chi tiết trên GitHub</a></p>
+<p>Improve event handling, spell check, and app behavior detection</p>
+<ul>
+<li>Fixed XKeyIM pre-load library</li>
+<li>Optimized for Claude Code CLI</li>
+<li>Fixed spell check restore when typing after existing text</li>
+<li>Improved event handling and injection methods</li>
+<li>Enhanced app behavior detection</li>
+<li>Added advanced injection methods for better compatibility</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 27 Dec 2025 13:03:32 +0000</pubDate>
+      <pubDate>Mon, 29 Dec 2025 00:58:00 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251227/XKey.dmg" sparkle:version="20251227" sparkle:shortVersionString="1.2.17" length="9033539" type="application/octet-stream" sparkle:edSignature="odwN9uAGI8Hs7fJkDX6mNHbC4h00N4yV6RAumxMRGsv+iWPCzYAL6FUE4oQmkhKkwhoAKj2MeXvmrVYoyl+WDw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251229/XKey.dmg" sparkle:version="20251229" sparkle:shortVersionString="1.2.17" length="9028428" type="application/octet-stream" sparkle:edSignature="W7oTxz8q7VdppAs9s/llZgRdm9/fBj0dD5HECjFE6qNJaygh2DzcMkpY5Gq69uiOF3eNYPLrQz2h/ep6SxF9Dg==" />
     </item>
   </channel>
 </rss>
