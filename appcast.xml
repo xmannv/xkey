@@ -6,36 +6,41 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20251230.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.1</link>
-      <sparkle:version>20251230.1</sparkle:version>
+      <title>Version 1.2.17 (Build 20251230.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.2</link>
+      <sparkle:version>20251230.2</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Smart Forward Delete using Accessibility API</p>
-<p>Replace simple isTypingMidSentence check with AX API to detect if</p>
-<p>there's actually text after cursor before sending Forward Delete.</p>
-<p>Changes:</p>
+<p>feat: Add TempOffToolbar for quick toggling of Vietnamese input</p>
+<p>Introduces a floating toolbar that allows users to temporarily disable</p>
+<p>spell checking and/or Vietnamese engine processing without navigating</p>
+<p>to settings. Perfect for mixed-language typing scenarios.</p>
+<p>Features:</p>
 <ul>
-<li>Add hasTextAfterCursor() using AX API to check cursor position</li>
-<li>Add shouldSendForwardDelete() with smart detection logic:</li>
+<li>Floating toolbar with two toggle buttons (spelling/engine)</li>
+<li>Auto-shows when focusing text fields (using Accessibility API)</li>
+<li>Hotkey Cmd+Option+T to toggle toolbar visibility</li>
+<li>Automatically hides when non-text elements are focused</li>
+<li>Toolbar state persists during session but resets on app restart</li>
 </ul>
-<p>  1. Check fixAutocomplete setting</p>
-<p>  2. Check isTypingMidSentence flag</p>
-<p>  3. Use AX API to confirm no text after cursor</p>
-<p>  4. Fallback to allow for apps without AX support (Spotlight, etc.)</p>
+<p>Implementation:</p>
 <ul>
-<li>Log fixAutocomplete setting in AppDelegate</li>
-<li>Add version info to debug log header</li>
+<li>TempOffToolbarController: Manages toolbar visibility and state</li>
+<li>TempOffToolbarView: SwiftUI-based floating UI</li>
+<li>AX focus monitoring: Detects text fields (TextField, TextArea, etc.)</li>
+<li>Engine integration: vTempOffSpelling and vTempOffEngine flags</li>
 </ul>
-<p>This prevents Forward Delete from accidentally deleting text when</p>
-<p>cursor is in the middle of existing text, while still working for</p>
-<p>autocomplete suggestions at end of text.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.1">Xem chi tiết trên GitHub</a></p>
+<p>Settings:</p>
+<ul>
+<li>Added tempOffToolbarEnabled preference in Advanced section</li>
+<li>Hotkey and auto-detection can be toggled independently</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 30 Dec 2025 09:16:25 +0000</pubDate>
+      <pubDate>Tue, 30 Dec 2025 16:39:13 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251230.1/XKey.dmg" sparkle:version="20251230.1" sparkle:shortVersionString="1.2.17" length="9081412" type="application/octet-stream" sparkle:edSignature="b/k4q1Q3kMEClW6R4emT7tRVm/ASnT++MZzpGTXrheC4ncP9kL8ci/y7/D/R3240H+2RbSxa3jNP/FUSfHZSBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251230.2/XKey.dmg" sparkle:version="20251230.2" sparkle:shortVersionString="1.2.17" length="9134365" type="application/octet-stream" sparkle:edSignature="chhsK/jZ2PvuNVWZhavNflZ1Nh5aNLZZoiCKzB+X50WVhN9Mv/hztxIHY6hJS4YifAlDs9v0r26xyG7NzqgpAQ==" />
     </item>
   </channel>
 </rss>
