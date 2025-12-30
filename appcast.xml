@@ -6,24 +6,31 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20251229.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229.2</link>
-      <sparkle:version>20251229.2</sparkle:version>
+      <title>Version 1.2.17 (Build 20251230)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230</link>
+      <sparkle:version>20251230</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix macro trigger after spell check restore</p>
+<p>Refine English detection and preserve mid-sentence state</p>
 <ul>
-<li>Macro check now happens AFTER successful spell check restore in processWordBreak</li>
-<li>Fixed backspaceCount to use transformed text length instead of original keystrokes</li>
-<li>Ensures macros work correctly when spell check restores invalid words</li>
-<li>Example: typing 'intẻ' (invalid) → 'inter' (restored) → macro expansion works</li>
+<li>Add hasEnglishStartPattern to detect English words without conflicting with Telex mark keys (s/f/r/x/j)</li>
+<li>Expand English detection rules with 13 comprehensive patterns including:</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251229.2">Xem chi tiết trên GitHub</a></p>
+<p>  * Consonant clusters (bl, cl, str, spr, etc.)</p>
+<p>  * Double consonants (bb, cc, dd, etc.)</p>
+<p>  * Silent letter patterns (kn, wr, ps, pn)</p>
+<p>  * Vowel combinations (ough, eigh, augh)</p>
+<p>  * Position-specific rules (x in middle, q not followed by u)</p>
+<ul>
+<li>Fix mid-sentence typing by preserving state in reset() to prevent incorrect Forward Delete</li>
+<li>Update build version to 20251230</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 29 Dec 2025 08:19:26 +0000</pubDate>
+      <pubDate>Tue, 30 Dec 2025 06:14:17 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251229.2/XKey.dmg" sparkle:version="20251229.2" sparkle:shortVersionString="1.2.17" length="9040724" type="application/octet-stream" sparkle:edSignature="BOGCkjVxycXkDqa6trjU+IVr5LaE9xw1GLPynAJ86EmLs/MdOFmmMx+qjXle8oy0e7cCwxCVhh2+sxLYX2pyCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251230/XKey.dmg" sparkle:version="20251230" sparkle:shortVersionString="1.2.17" length="9077508" type="application/octet-stream" sparkle:edSignature="/OZ9W5QBPnYnW16Les8Y7ngL2JjE+94spAt2mFonzRP1MZMNUj0WHravOKNmQm4lecCzdTp/p13dnrQrqyU2BA==" />
     </item>
   </channel>
 </rss>
