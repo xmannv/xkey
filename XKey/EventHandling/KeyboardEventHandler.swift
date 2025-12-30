@@ -623,7 +623,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     func reset() {
         engine.reset()
-        injector.markNewSession()  // Mark as new input session
+        injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state to avoid Forward Delete in wrong context
         injector.clearMethodCache()  // Clear injection method cache
     }
     
