@@ -6,41 +6,44 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20251230.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.2</link>
-      <sparkle:version>20251230.2</sparkle:version>
+      <title>Version 1.2.17 (Build 20251231)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251231</link>
+      <sparkle:version>20251231</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Add TempOffToolbar for quick toggling of Vietnamese input</p>
-<p>Introduces a floating toolbar that allows users to temporarily disable</p>
-<p>spell checking and/or Vietnamese engine processing without navigating</p>
-<p>to settings. Perfect for mixed-language typing scenarios.</p>
-<p>Features:</p>
+<p>feat: add custom hotkey support for Temp Off Toolbar and improve toggle logic</p>
 <ul>
-<li>Floating toolbar with two toggle buttons (spelling/engine)</li>
-<li>Auto-shows when focusing text fields (using Accessibility API)</li>
-<li>Hotkey Cmd+Option+T to toggle toolbar visibility</li>
-<li>Automatically hides when non-text elements are focused</li>
-<li>Toolbar state persists during session but resets on app restart</li>
+<li>Add customizable hotkey for showing/hiding Temp Off Toolbar via EventTapManager</li>
+<li>Implement minimum modifiers requirement (2+) to avoid conflicts with Ctrl/Option toggles</li>
+<li>Add HotkeyRecorderView with preset options and validation</li>
+<li>Add settings observer to enable/disable toolbar dynamically</li>
 </ul>
-<p>Implementation:</p>
+<p>Improve Ctrl/Option toggle behavior:</p>
 <ul>
-<li>TempOffToolbarController: Manages toolbar visibility and state</li>
-<li>TempOffToolbarView: SwiftUI-based floating UI</li>
-<li>AX focus monitoring: Detects text fields (TextField, TextArea, etc.)</li>
-<li>Engine integration: vTempOffSpelling and vTempOffEngine flags</li>
+<li>Add cooldown period (500ms) after hotkey toggle to prevent race conditions</li>
+<li>Track modifier key press/release separately to detect single modifier usage</li>
+<li>Cancel toggle if other modifiers or keys are pressed during hold</li>
 </ul>
-<p>Settings:</p>
+<p>Refactor toolbar management:</p>
 <ul>
-<li>Added tempOffToolbarEnabled preference in Advanced section</li>
-<li>Hotkey and auto-detection can be toggled independently</li>
+<li>Split setupTempOffToolbar into enableTempOffToolbar/disableTempOffToolbar</li>
+<li>Move hotkey setup from NSEvent monitors to EventTapManager for better event handling</li>
+<li>Add notification for toolbar settings changes (tempOffToolbarSettingsDidChange)</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251230.2">Xem chi tiết trên GitHub</a></p>
+<p>Clean up code:</p>
+<ul>
+<li>Remove debug logging statements from positioning logic</li>
+<li>Remove unused getElementBounds method</li>
+<li>Remove unnecessary coordinate conversion logging</li>
+<li>Improve positioning fallback with saved mouse position</li>
+</ul>
+<p>Update version to 20251231</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20251231">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 30 Dec 2025 16:39:13 +0000</pubDate>
+      <pubDate>Wed, 31 Dec 2025 07:06:31 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251230.2/XKey.dmg" sparkle:version="20251230.2" sparkle:shortVersionString="1.2.17" length="9134365" type="application/octet-stream" sparkle:edSignature="chhsK/jZ2PvuNVWZhavNflZ1Nh5aNLZZoiCKzB+X50WVhN9Mv/hztxIHY6hJS4YifAlDs9v0r26xyG7NzqgpAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20251231/XKey.dmg" sparkle:version="20251231" sparkle:shortVersionString="1.2.17" length="9148922" type="application/octet-stream" sparkle:edSignature="BE6k6yzonDT043GWJU1AmW+o8rj6ibKrG0QXgr7edqc3WMi8yAZCQNqfQDoFLAlF7kZG/m9tad8yPi4k4o2lDA==" />
     </item>
   </channel>
 </rss>
