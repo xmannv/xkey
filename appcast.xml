@@ -6,27 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.17 (Build 20260101)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20260101</link>
-      <sparkle:version>20260101</sparkle:version>
+      <title>Version 1.2.17 (Build 20260102)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.17-20260102</link>
+      <sparkle:version>20260102</sparkle:version>
       <sparkle:shortVersionString>1.2.17</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix: Autocomplete method now respects mid-sentence detection</p>
-<ul>
-<li>Added shouldSendForwardDeleteForAutocomplete() to check isTypingMidSentence and AX API</li>
-<li>Modified injectSync() autocomplete case to skip Forward Delete when typing mid-sentence</li>
-<li>Added skipForwardDelete parameter to injectViaAutocompleteInternal()</li>
-<li>Updated injectViaAutocomplete() to check isTypingMidSentence flag</li>
-</ul>
-<p>This fixes the bug where Forward Delete incorrectly deletes text to the right</p>
-<p>when user moves cursor (Home/Cmd+Left) and continues typing in Firefox/ChatGPT.</p>
-<p>Bump build version to 20260101</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20260101">Xem chi tiết trên GitHub</a></p>
+<p>Fix Input Source configuration and Smart Switch integration</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.17-20260102">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 01 Jan 2026 08:01:54 +0000</pubDate>
+      <pubDate>Fri, 02 Jan 2026 06:44:55 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20260101/XKey.dmg" sparkle:version="20260101" sparkle:shortVersionString="1.2.17" length="9148802" type="application/octet-stream" sparkle:edSignature="8QQexEio2YFJgaq+iFfTEs9Zbol/GDrUT97+CsMUsyc5zI7ASPs+TBMNnjjiNmhXRmRvQSByt+uO3fjiYkvnCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.17-20260102/XKey.dmg" sparkle:version="20260102" sparkle:shortVersionString="1.2.17" length="9156119" type="application/octet-stream" sparkle:edSignature="kMZYWkHsy6DQSeZJdPkKKIVTAC0KNQZtiEqgKV0SH9Hc1dGRkHG1rREuRbLX5LhzoYOuiwp2ezP/tGsHStdzCw==" />
     </item>
   </channel>
 </rss>
