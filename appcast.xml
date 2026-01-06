@@ -6,25 +6,33 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260105)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260105</link>
-      <sparkle:version>20260105</sparkle:version>
+      <title>Version 1.2.18 (Build 20260106)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106</link>
+      <sparkle:version>20260106</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: improve debug window and add macro auto-space option</p>
+<p>feat: add hotkey support for Convert Tool and paste from clipboard</p>
 <ul>
-<li>Clean up debug log messages by removing emojis and icons</li>
-<li>Display current configuration when debug window opens</li>
-<li>Add "Add Space After Macro" option for macro expansion</li>
-<li>Refine forward delete logic for mid-sentence typing</li>
-<li>Various UI and log formatting improvements</li>
+<li>Add configurable hotkey to open Convert Tool from anywhere</li>
+<li>Add "Paste from clipboard" button next to input text header</li>
+<li>Save hotkey immediately when changed via HotkeyRecorderView</li>
+<li>Requires 2+ modifier keys (Cmd, Option, Ctrl, Shift)</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260105">Xem chi tiết trên GitHub</a></p>
+<p>Changes:</p>
+<ul>
+<li>Preferences: add convertToolHotkey property</li>
+<li>SharedSettings: add storage and notification for convert tool hotkey</li>
+<li>EventTapManager: handle convert tool hotkey detection</li>
+<li>AppDelegate: setup hotkey observer and open Convert Tool on trigger</li>
+<li>ConvertToolSection: add hotkey recorder UI and paste button</li>
+<li>ConvertToolViewModel: add pasteFromClipboard() function</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 05 Jan 2026 09:57:34 +0000</pubDate>
+      <pubDate>Tue, 06 Jan 2026 02:31:53 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260105/XKey.dmg" sparkle:version="20260105" sparkle:shortVersionString="1.2.18" length="9274243" type="application/octet-stream" sparkle:edSignature="WfIAMO9SJ56ofLQn+5e63jpJU8U+rOVOz9EUbqjIY3HK/TfbDGxSa2EQQAqgldDYIMYBraun1FvwBg55OFoQBQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106/XKey.dmg" sparkle:version="20260106" sparkle:shortVersionString="1.2.18" length="9387010" type="application/octet-stream" sparkle:edSignature="Y+EUpV05FJ212CNs+Ie26WQwM/I/UMq6R/gn5aLZQrbXRSDHpscmQxcrDo42jROTxLdXMzq6VaV7U2hXk7PnAQ==" />
     </item>
   </channel>
 </rss>
