@@ -6,28 +6,35 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260106.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.3</link>
-      <sparkle:version>20260106.3</sparkle:version>
+      <title>Version 1.2.18 (Build 20260106.4)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.4</link>
+      <sparkle:version>20260106.4</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: enable free mark by default and improve input method labels</p>
+<p>fix: re-detect injection method when focused element role changes</p>
+<p>Previously, the injection method cache only validated bundleId and</p>
+<p>windowTitle. This caused issues when focus changed within the same app</p>
+<p>via keyboard shortcuts (e.g., Cmd+T in Chrome to open new tab).</p>
+<p>The problem:</p>
 <ul>
-<li>Change freeMarkEnabled default from false to true for better UX</li>
-<li>Update input method display names with clearer descriptions:</li>
+<li>User clicks on web content → AXWebArea → method: fast</li>
+<li>User presses Cmd+T → focus moves to address bar (AXTextField)</li>
+<li>Cache still valid (same bundleId, same windowTitle) → returns fast</li>
+<li>But address bar needs selection method for autocomplete handling</li>
 </ul>
-<p>  - Telex: show w→ư, []→ơư behavior</p>
-<p>  - Simple Telex 1: show w→w, []→[] behavior</p>
-<p>  - Simple Telex 2: show w→ư, []→[] behavior</p>
+<p>Solution:</p>
 <ul>
-<li>Bump version to 20260106.3</li>
+<li>Added cachedRole to track focused element role</li>
+<li>Cache validation now checks bundleId + windowTitle + role</li>
+<li>When role changes (AXWebArea → AXTextField), cache invalidates</li>
+<li>Re-detection returns correct method for new focus context</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.3">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 06 Jan 2026 09:36:39 +0000</pubDate>
+      <pubDate>Tue, 06 Jan 2026 10:13:17 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.3/XKey.dmg" sparkle:version="20260106.3" sparkle:shortVersionString="1.2.18" length="9401974" type="application/octet-stream" sparkle:edSignature="wImXKMeP3f5qPsdp0wxCK0U7y9xKcb/3dsimrMUb3pDZkMH+gD3FwadKTK+33zIA5n3HQvSu1maBGDoIXVtjAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.4/XKey.dmg" sparkle:version="20260106.4" sparkle:shortVersionString="1.2.18" length="9402243" type="application/octet-stream" sparkle:edSignature="daez23QsdTyDXkY1sS5DYpZdVL/ipDEByp63M3aE510PklADjHZeAdLu+gpP89bNVcH3IDKWbecoX7FR0QCADg==" />
     </item>
   </channel>
 </rss>
