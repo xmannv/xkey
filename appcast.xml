@@ -6,37 +6,51 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260106.5)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.5</link>
-      <sparkle:version>20260106.5</sparkle:version>
+      <title>Version 1.2.18 (Build 20260106.6)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.6</link>
+      <sparkle:version>20260106.6</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: re-detect injection method when focused element role changes</p>
-<p>Previously, the injection method cache only validated bundleId and</p>
-<p>windowTitle. This caused issues when focus changed within the same app</p>
-<p>via keyboard shortcuts (e.g., Cmd+T in Chrome to open new tab).</p>
-<p>The problem:</p>
+<p>fix: allow W key for O+A and U+O patterns when Free Mark is OFF</p>
+<p>Previously, when Free Mark was disabled, the W key was rejected whenever</p>
+<p>there were unmodified vowels before the last character. This was too</p>
+<p>restrictive and blocked valid Vietnamese words like "hoặc" and "được".</p>
+<p>The issue was that the check didn't consider HOW insertW() would actually</p>
+<p>modify the vowels. insertW() has specific logic for different vowel pairs:</p>
 <ul>
-<li>User clicks on web content → AXWebArea → method: fast</li>
-<li>User presses Cmd+T → focus moves to address bar (AXTextField)</li>
-<li>Cache still valid (same bundleId, same windowTitle) → returns fast</li>
-<li>But address bar needs selection method for autocomplete handling</li>
+<li>U+O → both vowels get modified (ươ) - should be ALLOWED</li>
+<li>O+A → only second vowel (v2) modified (oă) - should be ALLOWED</li>
+<li>I+O → only second vowel (v2) modified (iơ) - should be ALLOWED</li>
+<li>U+A, U+I, U+U, O+I → only first vowel (v1) modified - should be REJECTED</li>
 </ul>
-<p>Solution:</p>
+<p>The fix now checks the actual vowel pattern and only rejects when insertW()</p>
+<p>would modify an earlier vowel (v1 only), which is true "free mark" behavior.</p>
+<p>Examples now working with Free Mark OFF:</p>
 <ul>
-<li>Removed caching from detectInjectionMethod() entirely</li>
-<li>Always detect fresh based on current focused element role</li>
-<li>This is safe because:</li>
+<li>h+o+a+w+j+c → "hoặc" ✓ (was "hoawjc")</li>
+<li>d+d+u+o+w+j+c → "được" ✓ (was "đuowjc")</li>
+<li>t+u+o+i+w → "tươi" ✓</li>
 </ul>
-<p>  1. AX API calls are required anyway to get current role</p>
-<p>  2. Detection logic (string comparisons, Set lookups) is very fast</p>
-<p>  3. Simpler code without cache = fewer bugs</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.5">Xem chi tiết trên GitHub</a></p>
+<p>Still correctly rejected (must type W immediately after vowel):</p>
+<ul>
+<li>u+a+w → "uaw" (should type u+w+a for "ưa")</li>
+<li>o+i+w → "oiw" (should type o+w+i for "ơi")</li>
+</ul>
+<p>Other changes:</p>
+<ul>
+<li>Add getFocusedElementTextValue() and isFocusedElementEmpty() to AppBehaviorDetector</li>
+<li>Reset mid-sentence flag when clicking into overlay app with empty input</li>
+<li>Add resetMidSentenceFlag() to KeyboardEventHandler</li>
+<li>Remove duplicate getFocusedTextViaAX() from DebugViewModel</li>
+<li>Fix MacroSection UI alignment for "Thêm" button</li>
+<li>Bump version to 20260106.6</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.6">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 06 Jan 2026 10:36:44 +0000</pubDate>
+      <pubDate>Tue, 06 Jan 2026 15:23:35 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.5/XKey.dmg" sparkle:version="20260106.5" sparkle:shortVersionString="1.2.18" length="9395743" type="application/octet-stream" sparkle:edSignature="AwR32/g/bgsDwk0/yoriIT1kaqT1b2NEZSWU6dzsthC6NDfjZxOREc1tTQRCaYEkEiDqeZE6iofRaemekj7+Ag==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.6/XKey.dmg" sparkle:version="20260106.6" sparkle:shortVersionString="1.2.18" length="9401420" type="application/octet-stream" sparkle:edSignature="OK8MFYV6x5T0BiVE5nYK0vaEVZ0OhVjWtURdT+rFY7BVW6qhrUwRB5Ok+gbPbWW5MeHIgaamFTKF7JdtziFBAQ==" />
     </item>
   </channel>
 </rss>
