@@ -6,25 +6,37 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260106.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.1</link>
-      <sparkle:version>20260106.1</sparkle:version>
+      <title>Version 1.2.18 (Build 20260106.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.2</link>
+      <sparkle:version>20260106.2</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: add open dictionary folder button and debug logging</p>
-<ul>
-<li>Add button to open dictionary folder next to "Reload" button in settings</li>
-<li>Add getDictionaryDirectoryURL() method to VNDictionaryManager</li>
-<li>Add comprehensive debug logging for dictionary download/load process</li>
-<li>Check HTTP status code and empty data during download</li>
-<li>Helps diagnose "file doesn't exist" errors during dictionary operations</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.1">Xem chi tiết trên GitHub</a></p>
+<p>Fix Free Mark feature to correctly enforce immediate mark placement</p>
+<p>When Free Mark is OFF, marks/modifiers must be typed immediately after the vowel:</p>
+<ol>
+<li>Tone marks (s/f/r/x/j for Telex, 1-5 for VNI):</li>
+</ol>
+<p>   - Only allow if last char is a vowel</p>
+<p>   - Example: 'a+s+n+h' → 'ánh' ✓, 'a+n+h+s' → 'anhs' ✗</p>
+<ol>
+<li>Vowel modifiers (aa→â, oo→ô, ee→ê, w→ư/ơ/ă):</li>
+</ol>
+<p>   - Only allow if last char matches the expected vowel</p>
+<p>   - Additional check for 'w': reject if there are unmodified vowels before lastChar</p>
+<p>   - Example: 'u+a+w' → 'uaw' ✗, 'u+w+o+w' → 'ươ' ✓</p>
+<ol>
+<li>D modifier (dd→đ for Telex, d+9 for VNI):</li>
+</ol>
+<p>   - Only allow if last char is 'd'</p>
+<p>   - Example: 'd+d+i' → 'đi' ✓, 'd+i+d' → 'did' ✗</p>
+<p>The fix correctly handles already-modified vowels (with TONEW<em>MASK or TONE</em>MASK)</p>
+<p>so that sequential modifications like 'ư+o+w' → 'ươ' still work.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260106.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 06 Jan 2026 05:45:06 +0000</pubDate>
+      <pubDate>Tue, 06 Jan 2026 06:26:01 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.1/XKey.dmg" sparkle:version="20260106.1" sparkle:shortVersionString="1.2.18" length="9391843" type="application/octet-stream" sparkle:edSignature="sJvmVedZNfjUCsHZTzGR0rklfuiwOssJZEtJer+Q07Qs2uCd5K+TVmBbqv8xQBzd7QL1o/EcAiHpBkc4VQcTAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260106.2/XKey.dmg" sparkle:version="20260106.2" sparkle:shortVersionString="1.2.18" length="9401201" type="application/octet-stream" sparkle:edSignature="jPfpw4xBaZ9LEX3iuXadJ7bxApXlBg/1TZOya4qU538LwkJ4LEghBBsNlfCSyIDz2eK7xruBlNkfs/XUO63zBA==" />
     </item>
   </channel>
 </rss>
