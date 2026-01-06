@@ -331,9 +331,10 @@ class AppBehaviorDetector {
     var overlayAppNameProvider: (() -> String?)?
     
     // MARK: - Cache
-    
+
     private var cachedBundleId: String?
     private var cachedWindowTitle: String?
+    private var cachedRole: String?  // Cache focused element role for injection method detection
     private var cachedMatchedRule: WindowTitleRule?
     private var cachedBehavior: AppBehavior?
     private var cachedIMKitBehavior: IMKitBehavior?
@@ -681,6 +682,7 @@ class AppBehaviorDetector {
     func clearCache() {
         cachedBundleId = nil
         cachedWindowTitle = nil
+        cachedRole = nil
         cachedMatchedRule = nil
         cachedBehavior = nil
         cachedIMKitBehavior = nil
@@ -1024,18 +1026,25 @@ class AppBehaviorDetector {
         guard let bundleId = getCurrentBundleId() else {
             return .defaultFast
         }
-        
-        // Check cache (must also check window title for full cache validity)
+
+        // Get current role - important for detecting focus changes within same app
+        // (e.g., Cmd+T in Chrome switches from AXWebArea to AXTextField)
+        let currentRole = getFocusedElementRole()
+
+        // Check cache (must also check window title AND role for full cache validity)
+        // Role check is critical: focus can change within same app without mouse click
         let windowTitle = getCachedWindowTitle()
         if bundleId == cachedBundleId,
            windowTitle == cachedWindowTitle,
+           currentRole == cachedRole,
            let method = cachedInjectionMethod {
             return method
         }
-        
+
         cachedBundleId = bundleId
         cachedWindowTitle = windowTitle
-        
+        cachedRole = currentRole
+
         // Priority 1: Check Window Title Rules for context-specific injection method
         if let rule = findMatchingRule(),
            let injectionMethod = rule.injectionMethod {
@@ -1051,10 +1060,10 @@ class AppBehaviorDetector {
                 case .autocomplete: delays = (1000, 3000, 1000)
                 }
             }
-            
+
             // Get text sending method from rule, default to chunked
             let textMethod = rule.textSendingMethod ?? .chunked
-            
+
             let info = InjectionMethodInfo(
                 method: injectionMethod,
                 delays: delays,
@@ -1064,10 +1073,10 @@ class AppBehaviorDetector {
             cachedInjectionMethod = info
             return info
         }
-        
-        // Priority 2: Fall back to bundle ID based detection  
+
+        // Priority 2: Fall back to bundle ID based detection (uses currentRole internally)
         cachedInjectionMethod = getInjectionMethod(for: bundleId)
-        
+
         return cachedInjectionMethod ?? .defaultFast
     }
     
