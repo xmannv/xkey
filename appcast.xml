@@ -6,32 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260107)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107</link>
-      <sparkle:version>20260107</sparkle:version>
+      <title>Version 1.2.18 (Build 20260107.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.1</link>
+      <sparkle:version>20260107.1</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: detect Terminal panels in VSCode/Cursor and improve overlay detection</p>
+<p>chore: update version, improve AX logging, and move Free Mark setting</p>
 <ul>
-<li>Add Terminal detection via AX Description attribute for integrated</li>
+<li>Bump version in Info.plist</li>
+<li>Improve AX error logging in DebugViewModel</li>
+<li>Move "Đặt dấu tự do" setting from Advanced to General section</li>
+<li>Improve Free Mark description text</li>
 </ul>
-<p>  terminals in VSCode, Cursor, and similar editors</p>
-<ul>
-<li>Terminal panels now use slow injection method like native terminals</li>
-<li>Fix false positive overlay detection when browser is focused but</li>
-</ul>
-<p>  Spotlight/Raycast window is visible in background</p>
-<ul>
-<li>Add AX RoleDescription, Description, and Placeholder display in Debug</li>
-<li>Improve App Detector test button UX with computed properties</li>
-<li>Update version to 20260107</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 07 Jan 2026 01:50:42 +0000</pubDate>
+      <pubDate>Wed, 07 Jan 2026 05:18:57 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260107/XKey.dmg" sparkle:version="20260107" sparkle:shortVersionString="1.2.18" length="9409339" type="application/octet-stream" sparkle:edSignature="fBtMYLARDcmIM6cyJQL3Dk9BcsV9WHOEUQyU4USbaXkxoxHyOIL3nvIo3hpxvRCDqE0ItUI5cw+V9otszZJuBQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260107.1/XKey.dmg" sparkle:version="20260107.1" sparkle:shortVersionString="1.2.18" length="9412987" type="application/octet-stream" sparkle:edSignature="iJcxdO42GB7C/oxuOl37S8uLfoXOYLvFvXSYwFBCVkgTwq177miyvE7+PY1V/o59sUlOC3gNM73oUHHOqiUYDg==" />
     </item>
   </channel>
 </rss>
