@@ -957,7 +957,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let detector = AppBehaviorDetector.shared
                     if detector.isFocusedElementEmpty() {
                         self?.keyboardHandler?.resetMidSentenceFlag()
-                        self?.debugWindowController?.logEvent("Overlay '\(overlayName)' with empty input → reset mid-sentence flag")
+                        self?.debugWindowController?.logEvent("'\(overlayName)' with empty input → reset mid-sentence flag")
                     }
                 }
             }

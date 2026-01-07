@@ -37,6 +37,9 @@ class DebugViewModel: ObservableObject {
     @Published var focusedWindowTitle = ""
     @Published var focusedInputRole = ""
     @Published var focusedInputSubrole = ""
+    @Published var focusedInputRoleDescription = ""
+    @Published var focusedInputDescription = ""
+    @Published var focusedInputPlaceholder = ""
     @Published var externalCaretPosition: Int = 0
     @Published var externalWordBeforeCaret = ""
     @Published var externalWordAfterCaret = ""
@@ -455,30 +458,31 @@ class DebugViewModel: ObservableObject {
         addAppDetectorLog("=== APP DETECTOR TEST ===")
         addAppDetectorLog("Starting test in 5 seconds...")
         addAppDetectorLog("Please open any app (Spotlight/Raycast/Alfred/etc.) when countdown reaches 0")
-        
+
         // Countdown timer
         appDetectorTestTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
                 return
             }
-            
+
             self.appDetectorTestCountdown -= 1
-            
+
             if self.appDetectorTestCountdown > 0 {
                 self.addAppDetectorLog("[\(self.appDetectorTestCountdown)] seconds remaining - GET READY!")
             } else if self.appDetectorTestCountdown == 0 {
+                // Stop countdown timer immediately when reaching 0
+                timer.invalidate()
+                self.appDetectorTestTimer = nil
+
                 self.addAppDetectorLog("[0] NOW! Open your target app (Cmd+Space for Spotlight, etc.)")
                 self.addAppDetectorLog("")
                 self.addAppDetectorLog("Starting to detect focused app in 2 seconds...")
-                
+
                 // Wait 2 seconds then start detecting
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     self.startDetectionPhase()
                 }
-            } else {
-                timer.invalidate()
-                self.appDetectorTestTimer = nil
             }
         }
     }
@@ -544,7 +548,7 @@ class DebugViewModel: ObservableObject {
             detectedAppName = overlayName
             detectedAppBundleID = bundleID
             
-            addAppDetectorLog("[Detection] App: \(overlayName) (\(bundleID)) [OVERLAY DETECTED via AX!]")
+            addAppDetectorLog("[Detection] App: \(overlayName) (\(bundleID))")
         } else {
             // Priority 2: Fallback to frontmost app (for non-overlay apps)
             guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
@@ -763,10 +767,37 @@ class DebugViewModel: ObservableObject {
             subrole = subroleStr
         }
         
+        // Get AX RoleDescription
+        var roleDescRef: CFTypeRef?
+        var roleDescription = ""
+        if AXUIElementCopyAttributeValue(axElement, kAXRoleDescriptionAttribute as CFString, &roleDescRef) == .success,
+           let roleDescStr = roleDescRef as? String {
+            roleDescription = roleDescStr
+        }
+
+        // Get AX Description
+        var descRef: CFTypeRef?
+        var axDescription = ""
+        if AXUIElementCopyAttributeValue(axElement, kAXDescriptionAttribute as CFString, &descRef) == .success,
+           let descStr = descRef as? String {
+            axDescription = descStr
+        }
+
+        // Get AX Placeholder
+        var placeholderRef: CFTypeRef?
+        var placeholder = ""
+        if AXUIElementCopyAttributeValue(axElement, kAXPlaceholderValueAttribute as CFString, &placeholderRef) == .success,
+           let placeholderStr = placeholderRef as? String {
+            placeholder = placeholderStr
+        }
+
         DispatchQueue.main.async {
             self.focusedWindowTitle = windowTitle
             self.focusedInputRole = role
             self.focusedInputSubrole = subrole
+            self.focusedInputRoleDescription = roleDescription
+            self.focusedInputDescription = axDescription
+            self.focusedInputPlaceholder = placeholder
         }
         
         // Get text info if it's a text element

@@ -233,7 +233,33 @@ struct DebugToolbar: View {
     @Binding var searchText: String
     @Binding var filterLevel: DebugView.LogLevel
     @Binding var autoScroll: Bool
-    
+
+    /// Computed text for App Detector button
+    private var appDetectorButtonText: String {
+        if viewModel.isAppDetectorTestRunning {
+            if viewModel.appDetectorTestCountdown > 0 {
+                return "Stop (\(viewModel.appDetectorTestCountdown))"
+            } else {
+                return "Checking app..."
+            }
+        } else {
+            return "Test App Detector"
+        }
+    }
+
+    /// Computed color for App Detector button
+    private var appDetectorButtonColor: Color {
+        if viewModel.isAppDetectorTestRunning {
+            if viewModel.appDetectorTestCountdown > 0 {
+                return .orange
+            } else {
+                return .gray
+            }
+        } else {
+            return .purple
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             // Search Field
@@ -304,23 +330,24 @@ struct DebugToolbar: View {
             
             // App Detector Test Button
             Button {
-                if viewModel.isAppDetectorTestRunning {
+                if viewModel.isAppDetectorTestRunning && viewModel.appDetectorTestCountdown > 0 {
                     viewModel.stopAppDetectorTest()
-                } else {
+                } else if !viewModel.isAppDetectorTestRunning {
                     viewModel.startAppDetectorTest()
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: viewModel.isAppDetectorTestRunning ? "stop.circle.fill" : "magnifyingglass.circle")
+                    Image(systemName: viewModel.isAppDetectorTestRunning ? (viewModel.appDetectorTestCountdown > 0 ? "stop.circle.fill" : "magnifyingglass") : "magnifyingglass.circle")
                         .font(.system(size: 12))
-                    Text(viewModel.isAppDetectorTestRunning ? "Stop (\(viewModel.appDetectorTestCountdown))" : "Test App Detector")
+                    Text(appDetectorButtonText)
                         .font(.system(size: 11, weight: .medium))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .foregroundColor(viewModel.isAppDetectorTestRunning ? .orange : .purple)
+                .foregroundColor(appDetectorButtonColor)
             }
             .buttonStyle(.plain)
+            .disabled(viewModel.isAppDetectorTestRunning && viewModel.appDetectorTestCountdown == 0)
             .help("Test App Behavior Detector (Spotlight/Raycast/Alfred/etc.)")
             
             Spacer()
@@ -547,9 +574,12 @@ struct TextTestTabView: View {
                             Text("Input Element")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(.secondary)
-                            
+
                             InfoRow(label: "AX Role", value: viewModel.focusedInputRole)
                             InfoRow(label: "AX Subrole", value: viewModel.focusedInputSubrole)
+                            InfoRow(label: "AX RoleDescription", value: viewModel.focusedInputRoleDescription)
+                            InfoRow(label: "AX Description", value: viewModel.focusedInputDescription)
+                            InfoRow(label: "AX Placeholder", value: viewModel.focusedInputPlaceholder)
                         }
                         
                         Divider()

@@ -902,12 +902,16 @@ class AppBehaviorDetector {
     private func detectBehavior(for bundleId: String) -> AppBehavior {
         // Priority: Check overlay launcher via injected provider (from OverlayAppDetector in XKey)
         // This detects Spotlight/Raycast/Alfred more accurately when user is focused on search field
+        // Also detects Terminal panels in VSCode/Cursor via AX Description
         if let overlayName = overlayAppNameProvider?() {
             switch overlayName {
             case "Spotlight":
                 return .spotlight
             case "Raycast", "Alfred":
                 return .overlayLauncher
+            case "Terminal":
+                // Terminal panel detected in VSCode/Cursor/etc via AX Description
+                return .terminal
             default:
                 // Unknown overlay, treat as spotlight-like
                 return .spotlight
@@ -1102,8 +1106,18 @@ class AppBehaviorDetector {
         }
         
         // Overlay launchers (Spotlight/Raycast/Alfred) - use autocomplete method
+        // Terminal panels in VSCode/Cursor - use slow method
         // Priority: Check via injected overlay provider (from OverlayAppDetector in XKey)
         if let overlayName = overlayAppNameProvider?() {
+            if overlayName == "Terminal" {
+                // Terminal panel in VSCode/Cursor/etc - use slow method like other terminals
+                return InjectionMethodInfo(
+                    method: .slow,
+                    delays: (3000, 6000, 3000),
+                    textSendingMethod: .chunked,
+                    description: "Terminal (VSCode/Cursor)"
+                )
+            }
             return InjectionMethodInfo(
                 method: .autocomplete,
                 delays: (1000, 3000, 1000),

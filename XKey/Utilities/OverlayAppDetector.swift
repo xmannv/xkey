@@ -111,20 +111,28 @@ class OverlayAppDetector {
     }
 
     // MARK: - AX Attribute Detection (Priority 1)
-    
+
     /// Detect overlay app by checking focused element's AX attributes
     /// - Returns: Name of detected overlay app, or nil if not found
     private func detectOverlayViaAXAttributes() -> String? {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedRef: CFTypeRef?
-        
+
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
               let focusedElement = focusedRef else {
             return nil
         }
-        
+
         let axElement = focusedElement as! AXUIElement
-        
+
+        // Priority 0: Skip overlay detection if focused element belongs to a browser
+        // This prevents false positives when browser is focused but Spotlight window is visible in background
+        if let bundleId = getAppBundleIdFromElement(axElement),
+           AppBehaviorDetector.browserApps.contains(bundleId) {
+            // No logging here - this is called frequently by monitor timer
+            return nil
+        }
+
         // Check AX Title
         if let title = getAXStringAttribute(axElement, attribute: kAXTitleAttribute) {
             for pattern in Self.axTitlePatterns {
@@ -133,7 +141,7 @@ class OverlayAppDetector {
                 }
             }
         }
-        
+
         // Check AX Subrole
         if let subrole = getAXStringAttribute(axElement, attribute: kAXSubroleAttribute) {
             for pattern in Self.axSubrolePatterns {
@@ -142,7 +150,7 @@ class OverlayAppDetector {
                 }
             }
         }
-        
+
         // Check AX Placeholder
         if let placeholder = getAXStringAttribute(axElement, attribute: kAXPlaceholderValueAttribute) {
             for pattern in Self.axPlaceholderPatterns {
@@ -151,7 +159,15 @@ class OverlayAppDetector {
                 }
             }
         }
-        
+
+        // Check AX Description (for Terminal panels in VSCode, Cursor, etc.)
+        // Terminal panels have descriptions like "Terminal 1", "Terminal 2", etc.
+        if let description = getAXStringAttribute(axElement, attribute: kAXDescriptionAttribute) {
+            if description.hasPrefix("Terminal") {
+                return "Terminal"  // Terminal in editors like VSCode, Cursor
+            }
+        }
+
         return nil
     }
     
@@ -165,11 +181,31 @@ class OverlayAppDetector {
         return value
     }
 
+    /// Helper to get bundle ID of the app that owns an AX element
+    private func getAppBundleIdFromElement(_ element: AXUIElement) -> String? {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success else {
+            return nil
+        }
+        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+    }
+
     // MARK: - Window Owner Detection (Priority 2 - Fallback)
-    
+
     /// Detect overlay app by checking window owner names
     /// - Returns: Name of detected overlay app, or nil if not found
     private func detectOverlayViaWindowOwner() -> String? {
+        // Don't detect overlay via window owner if focused element belongs to a browser
+        // This prevents false positives when browser is focused but Spotlight window
+        // is visible in background (e.g., user clicked Chrome address bar while XKey Debug Window is floating)
+        // Note: We check focused element's app, not frontmost app, because XKey's floating window
+        // can be frontmost while user is actually typing in Chrome
+        if let focusedAppBundleId = getFocusedElementAppBundleId(),
+           AppBehaviorDetector.browserApps.contains(focusedAppBundleId) {
+            // No logging here - this is called frequently by monitor timer
+            return nil
+        }
+
         guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
             return nil
         }
@@ -185,6 +221,32 @@ class OverlayAppDetector {
                     return owner
                 }
             }
+        }
+
+        return nil
+    }
+
+    /// Get bundle ID of the app that owns the currently focused element
+    /// This is more accurate than frontmostApplication when floating windows are involved
+    private func getFocusedElementAppBundleId() -> String? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focusedElement = focusedRef else {
+            return nil
+        }
+
+        let axElement = focusedElement as! AXUIElement
+        var pid: pid_t = 0
+
+        guard AXUIElementGetPid(axElement, &pid) == .success else {
+            return nil
+        }
+
+        // Get bundle ID from PID
+        if let app = NSRunningApplication(processIdentifier: pid) {
+            return app.bundleIdentifier
         }
 
         return nil
@@ -221,7 +283,7 @@ class OverlayAppDetector {
         if isCurrentlyVisible != wasOverlayVisible {
             let overlayName = lastDetectedOverlay ?? "unknown"
             if isCurrentlyVisible {
-                logDebug("Overlay appeared: '\(overlayName)'")
+                logDebug("found: '\(overlayName)'")
             } else {
                 logDebug("Overlay dismissed")
             }
