@@ -6,24 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260107.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.1</link>
-      <sparkle:version>20260107.1</sparkle:version>
+      <title>Version 1.2.18 (Build 20260107.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.2</link>
+      <sparkle:version>20260107.2</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>chore: update version, improve AX logging, and move Free Mark setting</p>
+<p>Add VNI number key logging for better debugging</p>
 <ul>
-<li>Bump version in Info.plist</li>
-<li>Improve AX error logging in DebugViewModel</li>
-<li>Move "Đặt dấu tự do" setting from Advanced to General section</li>
-<li>Improve Free Mark description text</li>
+<li>Add character display to handleMarkKey log (keys 1-5 for tone marks)</li>
+<li>Add character display to handleVowelKey log (keys 6-8 for circumflex/horn)</li>
+<li>Now VNI input shows pressed number keys like: keyCode=20 '3' instead of just keyCode=20</li>
+<li>Bump version to 20260107.2</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 07 Jan 2026 05:18:57 +0000</pubDate>
+      <pubDate>Wed, 07 Jan 2026 08:18:10 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260107.1/XKey.dmg" sparkle:version="20260107.1" sparkle:shortVersionString="1.2.18" length="9412987" type="application/octet-stream" sparkle:edSignature="iJcxdO42GB7C/oxuOl37S8uLfoXOYLvFvXSYwFBCVkgTwq177miyvE7+PY1V/o59sUlOC3gNM73oUHHOqiUYDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260107.2/XKey.dmg" sparkle:version="20260107.2" sparkle:shortVersionString="1.2.18" length="9413524" type="application/octet-stream" sparkle:edSignature="sN8i0hK14B6T/KQj643v3ceL5ddMZAVr+N13pw9YLaqJRHNBOK+K2QgHAX7on8/cB+14eOlaqlpUpf8YUOmUCA==" />
     </item>
   </channel>
 </rss>
