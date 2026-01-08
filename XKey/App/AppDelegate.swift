@@ -44,6 +44,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastFocusedElement: AXUIElement?
     private var updaterController: SPUStandardUpdaterController?
     private var sparkleUpdateDelegate: SparkleUpdateDelegate?
+    
+    /// Store Vietnamese state BEFORE Window Rule was applied
+    /// Used to restore state when overlay opens
+    private var preRuleVietnameseState: Bool? = nil
 
     // MARK: - Initialization
 
@@ -954,18 +958,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         OverlayAppDetector.shared.onOverlayVisibilityChanged = { [weak self] isVisible in
             guard let self = self else { return }
 
-            // When overlay closes (visible → hidden), restore language for current app
-            if !isVisible {
+            if isVisible {
+                // When overlay opens (hidden → visible), enable Vietnamese for overlay
+                // unless overlay has its own disable rule
+                self.debugWindowController?.logEvent("Overlay opened - checking overlay rules")
+                self.enableVietnameseForOverlay()
+            } else {
+                // When overlay closes (visible → hidden), restore language for current app
                 self.debugWindowController?.logEvent("Overlay closed - restoring language for current app")
                 self.restoreLanguageForCurrentApp()
             }
+        }
+    }
+    
+    /// Enable Vietnamese when overlay opens (Spotlight/Raycast/Alfred)
+    /// This ensures user can type Vietnamese in overlay, regardless of previous app's rule
+    private func enableVietnameseForOverlay() {
+        guard let handler = keyboardHandler else { return }
+        
+        // Check Input Source config first - it takes priority
+        if let currentSource = InputSourceManager.getCurrentInputSource() {
+            let inputSourceEnabled = InputSourceManager.shared.isEnabled(for: currentSource.id)
+            if !inputSourceEnabled {
+                return
+            }
+        }
+        
+        let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() ?? "Unknown"
+        
+        // Restore to pre-rule state if available
+        // This was saved before Window Rule was applied
+        if let savedState = preRuleVietnameseState {
+            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
+            
+            if savedState != currentlyEnabled {
+                statusBarManager?.viewModel.isVietnameseEnabled = savedState
+                handler.setVietnamese(savedState)
+                debugWindowController?.logEvent("Overlay '\(overlayName)' opened - restored pre-rule state: \(savedState ? "Vietnamese ON" : "Vietnamese OFF")")
+            } else {
+                debugWindowController?.logEvent("Overlay '\(overlayName)' opened - already in pre-rule state: \(savedState ? "ON" : "OFF")")
+            }
+        } else {
+            // No saved state - keep current state
+            debugWindowController?.logEvent("Overlay '\(overlayName)' opened - no pre-rule state saved, keeping current")
         }
     }
 
     /// Restore language for the current frontmost app from Smart Switch
     private func restoreLanguageForCurrentApp() {
         guard let handler = keyboardHandler else { return }
-        guard handler.smartSwitchEnabled else { return }
 
         // Check if overlay detection is enabled
         let prefs = SharedSettings.shared.loadPreferences()
@@ -982,6 +1023,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Get current frontmost app
         guard let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return }
+
+        // PRIORITY 1: Check Window Title Rule for Vietnamese input override
+        // This takes priority over Smart Switch
+        let detector = AppBehaviorDetector.shared
+        let vnOverride = detector.getVietnameseInputOverride()
+        
+        if vnOverride.shouldOverride {
+            let shouldDisable = vnOverride.disableVietnamese
+            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
+            
+            // Only update if state needs to change
+            if shouldDisable && currentlyEnabled {
+                // Rule says disable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = false
+                handler.setVietnamese(false)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (overlay closed)")
+            } else if !shouldDisable && !currentlyEnabled {
+                // Rule says enable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = true
+                handler.setVietnamese(true)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (overlay closed)")
+            }
+            
+            // Don't proceed to Smart Switch - rule takes priority
+            return
+        }
+        
+        // PRIORITY 2: Smart Switch (if enabled)
+        guard handler.smartSwitchEnabled else { return }
 
         // Get current language state
         let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
@@ -1016,10 +1086,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle Smart Switch when app changes
     private func handleSmartSwitch(notification: Notification) {
         guard let handler = keyboardHandler else { return }
-        guard handler.smartSwitchEnabled else { return }
         
-        // IMPORTANT: Check Input Source config first - it takes priority over Smart Switch
-        // If current Input Source is configured as disabled, don't allow Smart Switch to enable Vietnamese
+        // IMPORTANT: Check Input Source config first - it takes priority over everything
+        // If current Input Source is configured as disabled, don't allow Vietnamese to be enabled
         if let currentSource = InputSourceManager.getCurrentInputSource() {
             let inputSourceEnabled = InputSourceManager.shared.isEnabled(for: currentSource.id)
             if !inputSourceEnabled {
@@ -1030,6 +1099,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get the new active app
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let bundleId = app.bundleIdentifier else { return }
+        
+        // PRIORITY 1: Check Window Title Rule for Vietnamese input override
+        // This takes priority over Smart Switch
+        let detector = AppBehaviorDetector.shared
+        let vnOverride = detector.getVietnameseInputOverride()
+        
+        if vnOverride.shouldOverride {
+            let shouldDisable = vnOverride.disableVietnamese
+            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
+            
+            // Save current state BEFORE applying rule (for overlay restore)
+            preRuleVietnameseState = currentlyEnabled
+            
+            // Only update if state needs to change
+            if shouldDisable && currentlyEnabled {
+                // Rule says disable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = false
+                handler.setVietnamese(false)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (saved pre-rule: ON)")
+            } else if !shouldDisable && !currentlyEnabled {
+                // Rule says enable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = true
+                handler.setVietnamese(true)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (saved pre-rule: OFF)")
+            }
+            
+            // Don't proceed to Smart Switch - rule takes priority
+            return
+        } else {
+            // No rule override - clear the saved state
+            preRuleVietnameseState = nil
+        }
+        
+        // PRIORITY 2: Smart Switch (if enabled)
+        guard handler.smartSwitchEnabled else { return }
         
         // Get current language from UI (StatusBar) - this is the source of truth
         let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
@@ -1050,6 +1154,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Apply Vietnamese input rule if a matching Window Title Rule exists
+    /// This is called on mouse click to ensure rules are applied immediately
+    /// Also restores Vietnamese state when moving OUT of a rule-controlled context
+    private func applyVietnameseInputRule() {
+        guard let handler = keyboardHandler else { return }
+
+        // Check Input Source config first - it takes priority
+        if let currentSource = InputSourceManager.getCurrentInputSource() {
+            let inputSourceEnabled = InputSourceManager.shared.isEnabled(for: currentSource.id)
+            if !inputSourceEnabled {
+                return
+            }
+        }
+
+        // Check Window Title Rule for Vietnamese input override
+        let detector = AppBehaviorDetector.shared
+        let vnOverride = detector.getVietnameseInputOverride()
+
+        let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
+
+        if vnOverride.shouldOverride {
+            let shouldDisable = vnOverride.disableVietnamese
+
+            // Save current state BEFORE applying rule (for later restore)
+            if preRuleVietnameseState == nil {
+                preRuleVietnameseState = currentlyEnabled
+            }
+
+            // Only update if state needs to change
+            if shouldDisable && currentlyEnabled {
+                // Rule says disable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = false
+                handler.setVietnamese(false)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (click)")
+            } else if !shouldDisable && !currentlyEnabled {
+                // Rule says enable Vietnamese
+                statusBarManager?.viewModel.isVietnameseEnabled = true
+                handler.setVietnamese(true)
+                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (click)")
+            }
+        } else {
+            // No rule matches - restore pre-rule state if we had one
+            if let savedState = preRuleVietnameseState {
+                if savedState != currentlyEnabled {
+                    statusBarManager?.viewModel.isVietnameseEnabled = savedState
+                    handler.setVietnamese(savedState)
+                    debugWindowController?.logEvent("Rule ended: Vietnamese \(savedState ? "ON" : "OFF") (restored)")
+                }
+                preRuleVietnameseState = nil
+            }
+        }
+    }
+    
     private func setupMouseClickMonitor() {
         // Monitor mouse clicks to detect focus changes
         // When user clicks, they might be switching between input fields or moving cursor
@@ -1065,8 +1222,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Special case: If clicking into overlay app (Spotlight/Raycast/Alfred) with empty input,
             // reset mid-sentence flag to allow Forward Delete (safe since no text to delete)
-            // Use 0.1s delay to allow AX API to update focused element after click
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            // Use 0.15s delay to allow AX API to update window title (VSCode needs more time)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 if let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() {
                     let detector = AppBehaviorDetector.shared
                     if detector.isFocusedElementEmpty() {
@@ -1074,10 +1231,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.debugWindowController?.logEvent("'\(overlayName)' with empty input → reset mid-sentence flag")
                     }
                 }
-            }
 
-            // Log detailed input detection info (only when verbose logging is on - handled inside function)
-            self?.logMouseClickInputDetection()
+                // Check Window Title Rule for Vietnamese input override on click
+                self?.applyVietnameseInputRule()
+
+                // Log detailed input detection info
+                self?.logMouseClickInputDetection()
+            }
 
             // Reset lastFocusedElement to allow toolbar to re-show after auto-hide
             // When user clicks, they might be moving cursor within same field

@@ -167,13 +167,8 @@ class OverlayAppDetector {
             }
         }
 
-        // Check AX Description (for Terminal panels in VSCode, Cursor, etc.)
-        // Terminal panels have descriptions like "Terminal 1", "Terminal 2", etc.
-        if let description = getAXStringAttribute(axElement, attribute: kAXDescriptionAttribute) {
-            if description.hasPrefix("Terminal") {
-                return "Terminal"  // Terminal in editors like VSCode, Cursor
-            }
-        }
+        // Note: Terminal panel detection removed - Terminal is NOT an overlay app
+        // Overlay apps are: Spotlight, Raycast, Alfred (apps that appear temporarily over other apps)
 
         return nil
     }

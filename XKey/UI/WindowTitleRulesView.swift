@@ -466,6 +466,10 @@ struct RuleRowView: View {
             
             // Behavior badges
             HStack(spacing: 4) {
+                // Vietnamese input control badge
+                if let disableVN = rule.disableVietnameseInput {
+                    BehaviorBadge(text: disableVN ? "VN OFF" : "VN ON", color: disableVN ? .red : .green)
+                }
                 if rule.useMarkedText == false {
                     BehaviorBadge(text: "No Mark", color: .orange)
                 }
@@ -612,6 +616,7 @@ struct AddRuleSheet: View {
     @State private var waitDelay: String = "3000"
     @State private var textDelay: String = "1500"
     @State private var textSendingMethod: TextSendingMethod = .chunked
+    @State private var disableVietnameseInput: Bool = false
     @State private var description: String = ""
     
     @State private var showError = false
@@ -693,6 +698,13 @@ struct AddRuleSheet: View {
                         }
                         .padding(.vertical, 4)
                     }
+                    
+                    // Vietnamese Input Control
+                    Toggle("Tắt bộ gõ Tiếng Việt", isOn: $disableVietnameseInput)
+                    
+                    Text("Khi bật, bộ gõ Tiếng Việt sẽ tự động TẮT khi ứng dụng này được focus")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                     
                     // Behavior Overrides
                     GroupBox(label: Label("Ghi đè behavior", systemImage: "slider.horizontal.3")) {
@@ -903,6 +915,8 @@ struct AddRuleSheet: View {
         if let textMethod = rule.textSendingMethod {
             textSendingMethod = textMethod
         }
+        // Simple toggle: just load the value (default false if nil)
+        disableVietnameseInput = rule.disableVietnameseInput ?? false
     }
     
     private func saveRule() {
@@ -933,6 +947,7 @@ struct AddRuleSheet: View {
             injectionMethod: overrideInjection ? injectionMethod : nil,
             injectionDelays: injectionDelaysArray,
             textSendingMethod: overrideInjection ? textSendingMethod : nil,
+            disableVietnameseInput: disableVietnameseInput ? true : nil,
             description: description.isEmpty ? nil : description
         )
         

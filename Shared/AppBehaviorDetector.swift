@@ -195,6 +195,10 @@ struct WindowTitleRule: Codable, Identifiable {
     /// Override: Text sending method (nil = use default/auto-detect)
     let textSendingMethod: TextSendingMethod?
     
+    /// Override: Disable Vietnamese input for this context (nil = use default, true = disable, false = enable)
+    /// When enabled, XKey will automatically disable Vietnamese typing when this rule matches
+    let disableVietnameseInput: Bool?
+    
     /// Description for debugging
     let description: String?
     
@@ -244,7 +248,8 @@ struct WindowTitleRule: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, name, bundleIdPattern, titlePattern, matchMode, isEnabled
         case useMarkedText, hasMarkedTextIssues, commitDelay
-        case injectionMethod, injectionDelays, textSendingMethod, description
+        case injectionMethod, injectionDelays, textSendingMethod
+        case disableVietnameseInput, description
     }
     
     init(from decoder: Decoder) throws {
@@ -260,6 +265,7 @@ struct WindowTitleRule: Codable, Identifiable {
         commitDelay = try container.decodeIfPresent(UInt32.self, forKey: .commitDelay)
         injectionDelays = try container.decodeIfPresent([UInt32].self, forKey: .injectionDelays)
         textSendingMethod = try container.decodeIfPresent(TextSendingMethod.self, forKey: .textSendingMethod)
+        disableVietnameseInput = try container.decodeIfPresent(Bool.self, forKey: .disableVietnameseInput)
         description = try container.decodeIfPresent(String.self, forKey: .description)
         
         // Decode injection method from string
@@ -289,6 +295,7 @@ struct WindowTitleRule: Codable, Identifiable {
         try container.encodeIfPresent(commitDelay, forKey: .commitDelay)
         try container.encodeIfPresent(injectionDelays, forKey: .injectionDelays)
         try container.encodeIfPresent(textSendingMethod, forKey: .textSendingMethod)
+        try container.encodeIfPresent(disableVietnameseInput, forKey: .disableVietnameseInput)
         try container.encodeIfPresent(description, forKey: .description)
         
         // Encode injection method as string
@@ -319,6 +326,7 @@ struct WindowTitleRule: Codable, Identifiable {
         injectionMethod: InjectionMethod? = nil,
         injectionDelays: [UInt32]? = nil,
         textSendingMethod: TextSendingMethod? = nil,
+        disableVietnameseInput: Bool? = nil,
         description: String? = nil
     ) {
         self.id = UUID()
@@ -333,6 +341,7 @@ struct WindowTitleRule: Codable, Identifiable {
         self.injectionMethod = injectionMethod
         self.injectionDelays = injectionDelays
         self.textSendingMethod = textSendingMethod
+        self.disableVietnameseInput = disableVietnameseInput
         self.description = description
     }
 }
@@ -791,6 +800,14 @@ class AppBehaviorDetector {
         return false
     }
     
+    /// Check if focused element is a Terminal panel in VSCode/Cursor/etc
+    /// Detection via AX Description: starts with "Terminal"
+    /// - Returns: true if focused element is an integrated terminal panel
+    func isInTerminalPanel() -> Bool {
+        guard let desc = getFocusedElementDescription() else { return false }
+        return desc.hasPrefix("Terminal")
+    }
+    
     /// Get current focused element's DOM Classes using Accessibility API
     /// - Returns: Array of DOM class names, or nil if not available
     func getFocusedElementDOMClasses() -> [String]? {
@@ -938,6 +955,50 @@ class AppBehaviorDetector {
         return findMatchingRule() != nil
     }
     
+    /// Check if Vietnamese input is overridden by a matching rule
+    /// - Returns: A tuple (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?)
+    ///   - shouldOverride: true if a rule wants to override Vietnamese input state
+    ///   - disableVietnamese: true = disable Vietnamese, false = enable Vietnamese
+    ///   - ruleName: name of the matching rule for logging
+    func getVietnameseInputOverride() -> (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?) {
+        guard let rule = findMatchingRule(),
+              let disableVN = rule.disableVietnameseInput else {
+            return (false, false, nil)
+        }
+        return (true, disableVN, rule.name)
+    }
+    
+    /// Check if Vietnamese input is overridden for a specific bundle ID
+    /// Used for overlay apps (Spotlight, Raycast, Alfred) where we need to check
+    /// the overlay's rule instead of the background app's rule
+    /// - Parameter bundleId: The bundle ID to check rules for
+    /// - Returns: A tuple (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?)
+    func getVietnameseInputOverrideForApp(bundleId: String) -> (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?) {
+        // Search in custom rules first (higher priority)
+        for rule in customRules where rule.isEnabled {
+            if rule.matches(bundleId: bundleId, windowTitle: "") {
+                if let disableVN = rule.disableVietnameseInput {
+                    return (true, disableVN, rule.name)
+                }
+            }
+        }
+        
+        // Then search in built-in rules
+        let disabledBuiltInRules = SharedSettings.shared.getDisabledBuiltInRules()
+        for rule in Self.builtInWindowTitleRules {
+            if disabledBuiltInRules.contains(rule.name) {
+                continue
+            }
+            if rule.matches(bundleId: bundleId, windowTitle: "") {
+                if let disableVN = rule.disableVietnameseInput {
+                    return (true, disableVN, rule.name)
+                }
+            }
+        }
+        
+        return (false, false, nil)
+    }
+    
     /// Get current window title
     /// Note: Name kept for backward compatibility, but no longer uses cache
     func getCachedWindowTitle() -> String {
@@ -1018,18 +1079,20 @@ class AppBehaviorDetector {
     }
     
     private func detectBehavior(for bundleId: String) -> AppBehavior {
-        // Priority: Check overlay launcher via injected provider (from OverlayAppDetector in XKey)
+        // Priority 0: Check if in Terminal panel (VSCode/Cursor/etc) directly via AX Description
+        // This is more reliable than overlay detection and doesn't interfere with overlay logic
+        if isInTerminalPanel() {
+            return .terminal
+        }
+        
+        // Priority 1: Check overlay launcher via injected provider (from OverlayAppDetector in XKey)
         // This detects Spotlight/Raycast/Alfred more accurately when user is focused on search field
-        // Also detects Terminal panels in VSCode/Cursor via AX Description
         if let overlayName = overlayAppNameProvider?() {
             switch overlayName {
             case "Spotlight":
                 return .spotlight
             case "Raycast", "Alfred":
                 return .overlayLauncher
-            case "Terminal":
-                // Terminal panel detected in VSCode/Cursor/etc via AX Description
-                return .terminal
             default:
                 // Unknown overlay, treat as spotlight-like
                 return .spotlight
@@ -1213,21 +1276,23 @@ class AppBehaviorDetector {
 
         let currentRole = getFocusedElementRole()
 
+        // Priority 0.2: Terminal panels in VSCode/Cursor/etc
+        // Check directly via AX Description - doesn't go through overlay detection
+        if isInTerminalPanel() {
+            return InjectionMethodInfo(
+                method: .slow,
+                delays: (3000, 6000, 3000),
+                textSendingMethod: .chunked,
+                description: "Terminal (VSCode/Cursor)"
+            )
+        }
+
         // Priority 0.3: Overlay launchers (Spotlight/Raycast/Alfred)
         // MUST check this BEFORE browser address bar and Window Title Rules because:
         // - Spotlight opens as overlay while Chrome may still be "frontmost app"
         // - Window Title Rules (like Google Docs) would match first without this check
         // - Spotlight/Raycast/Alfred need .autocomplete method
         if let overlayName = overlayAppNameProvider?() {
-            if overlayName == "Terminal" {
-                // Terminal panel in VSCode/Cursor/etc - use slow method like other terminals
-                return InjectionMethodInfo(
-                    method: .slow,
-                    delays: (3000, 6000, 3000),
-                    textSendingMethod: .chunked,
-                    description: "Terminal (VSCode/Cursor)"
-                )
-            }
             return InjectionMethodInfo(
                 method: .autocomplete,
                 delays: (1000, 3000, 1000),
@@ -1326,20 +1391,20 @@ class AppBehaviorDetector {
 
     private func getInjectionMethod(for bundleId: String, role: String?) -> InjectionMethodInfo {
         
+        // Priority 0: Terminal panels in VSCode/Cursor/etc
+        // Check directly via AX Description - doesn't go through overlay detection
+        if isInTerminalPanel() {
+            return InjectionMethodInfo(
+                method: .slow,
+                delays: (3000, 6000, 3000),
+                textSendingMethod: .chunked,
+                description: "Terminal (VSCode/Cursor)"
+            )
+        }
+        
         // Priority 1: Overlay launchers (Spotlight/Raycast/Alfred) - use autocomplete method
         // MUST check this BEFORE AXComboBox/AXSearchField because Spotlight uses AXSearchField role
-        // Terminal panels in VSCode/Cursor - use slow method
-        // Priority: Check via injected overlay provider (from OverlayAppDetector in XKey)
         if let overlayName = overlayAppNameProvider?() {
-            if overlayName == "Terminal" {
-                // Terminal panel in VSCode/Cursor/etc - use slow method like other terminals
-                return InjectionMethodInfo(
-                    method: .slow,
-                    delays: (3000, 6000, 3000),
-                    textSendingMethod: .chunked,
-                    description: "Terminal (VSCode/Cursor)"
-                )
-            }
             return InjectionMethodInfo(
                 method: .autocomplete,
                 delays: (1000, 3000, 1000),
