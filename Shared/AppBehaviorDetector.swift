@@ -373,6 +373,48 @@ class AppBehaviorDetector {
     /// Force override delays (set by Injection Test)
     var forceDelays: InjectionDelays? = nil
     
+    // MARK: - Confirmed Injection Method
+    
+    /// Confirmed injection method (set when app is detected via mouse click or app switch)
+    /// When set, getConfirmedInjectionMethod() returns this instead of detecting every keystroke
+    /// This improves performance and avoids AX API timing issues
+    private var confirmedInjectionMethod: InjectionMethodInfo?
+    
+    /// Set confirmed injection method (call from mouse click handler or app switch)
+    /// - Parameter methodInfo: The injection method to use for subsequent keystrokes
+    func setConfirmedInjectionMethod(_ methodInfo: InjectionMethodInfo) {
+        confirmedInjectionMethod = methodInfo
+    }
+    
+    /// Get confirmed injection method, or detect if not set
+    /// - Returns: Confirmed method if available, otherwise detects fresh
+    func getConfirmedInjectionMethod() -> InjectionMethodInfo {
+        // Priority 0: Check force override (set by Injection Test)
+        if let forcedMethod = forceInjectionMethod {
+            let delays = forceDelays ?? getDefaultDelays(for: forcedMethod)
+            let textMethod = forceTextSendingMethod ?? .chunked
+            return InjectionMethodInfo(
+                method: forcedMethod,
+                delays: delays,
+                textSendingMethod: textMethod,
+                description: "Forced Override (\(forcedMethod.displayName))"
+            )
+        }
+        
+        // Priority 1: Use confirmed method if available
+        if let confirmed = confirmedInjectionMethod {
+            return confirmed
+        }
+        
+        // Priority 2: Fallback to live detection
+        return detectInjectionMethod()
+    }
+    
+    /// Clear confirmed injection method (call when context changes significantly)
+    func clearConfirmedInjectionMethod() {
+        confirmedInjectionMethod = nil
+    }
+    
     // MARK: - Cache (only for detect() which is used for UI display)
     // Note: detectInjectionMethod(), findMatchingRule(), and detectIMKitBehavior() 
     // don't use cache to ensure fresh detection on every keystroke

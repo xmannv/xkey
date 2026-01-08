@@ -1708,6 +1708,8 @@ class DebugViewModel: ObservableObject {
             AppBehaviorDetector.shared.forceInjectionMethod = nil
             AppBehaviorDetector.shared.forceTextSendingMethod = nil
             AppBehaviorDetector.shared.forceDelays = nil
+            // Also clear confirmed method to trigger fresh detection
+            AppBehaviorDetector.shared.clearConfirmedInjectionMethod()
         }
     }
     

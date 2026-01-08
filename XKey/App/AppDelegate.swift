@@ -943,8 +943,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Handle Smart Switch - auto switch language per app
             self.handleSmartSwitch(notification: notification)
+            
+            // Detect and set confirmed injection method for the new app
+            // This ensures keystrokes use correct method immediately after app switch
+            let detector = AppBehaviorDetector.shared
+            let injectionInfo = detector.detectInjectionMethod()
+            detector.setConfirmedInjectionMethod(injectionInfo)
 
             self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
+            self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
         }
 
         debugWindowController?.logEvent("App switch observer registered")
@@ -957,15 +964,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupOverlayDetectorCallback() {
         OverlayAppDetector.shared.onOverlayVisibilityChanged = { [weak self] isVisible in
             guard let self = self else { return }
+            
+            let detector = AppBehaviorDetector.shared
+            let injectionInfo = detector.detectInjectionMethod()
+            detector.setConfirmedInjectionMethod(injectionInfo)
 
             if isVisible {
-                // When overlay opens (hidden → visible), enable Vietnamese for overlay
-                // unless overlay has its own disable rule
+                // When overlay opens (hidden → visible):
+                // 1. Detect and set injection method for overlay (Spotlight/Raycast/Alfred)
+                // 2. Enable Vietnamese for overlay unless overlay has its own disable rule                
                 self.debugWindowController?.logEvent("Overlay opened - checking overlay rules")
+                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
                 self.enableVietnameseForOverlay()
             } else {
-                // When overlay closes (visible → hidden), restore language for current app
+                // When overlay closes (visible → hidden):
+                // 1. Detect and set injection method for the underlying app
+                // 2. Restore language for current app                
                 self.debugWindowController?.logEvent("Overlay closed - restoring language for current app")
+                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
                 self.restoreLanguageForCurrentApp()
             }
         }
@@ -1261,7 +1277,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Log detailed information about the input type when mouse is clicked
+    /// Uses 3x retry detection with 0.15s interval to handle AX API timing issues
+    /// This fixes false positive overlay detection when clicking another app while Spotlight is visible
     private func logMouseClickInputDetection() {
+        // Start 3x retry detection to handle AX API timing issues
+        // When user clicks, focused element may still report Spotlight (stale data)
+        // After 300ms (0.15s x 2), AX API should have updated to the new focused element
+        detectBehaviorWithRetry(attempt: 1, maxAttempts: 3, interval: 0.15)
+    }
+    
+    /// Perform behavior detection with retry to handle AX API timing issues
+    /// - Parameters:
+    ///   - attempt: Current attempt number (1-based)
+    ///   - maxAttempts: Maximum number of attempts
+    ///   - interval: Time interval between attempts in seconds
+    private func detectBehaviorWithRetry(attempt: Int, maxAttempts: Int, interval: TimeInterval) {
+        let detector = AppBehaviorDetector.shared
+        
+        // Get current detection results
+        let behavior = detector.detect()
+        let behaviorName = getBehaviorName(behavior)
+        let injectionInfo = detector.detectInjectionMethod()
+        
+        // IMMEDIATELY set confirmed injection method so keystrokes use this method
+        // This applies the best available method at each retry attempt
+        detector.setConfirmedInjectionMethod(injectionInfo)
+        
+        // Check if this is an overlay behavior (may be stale data)
+        let isOverlayBehavior = behavior == .spotlight || behavior == .overlayLauncher
+        
+        if attempt < maxAttempts && isOverlayBehavior {
+            // Overlay detected - might be timing issue, retry after interval
+            // Only log on first attempt to avoid spam
+            if attempt == 1 {
+                debugWindowController?.logEvent("Mouse click detected (checking for AX timing...)")
+                debugWindowController?.logEvent("   Attempt \(attempt): \(behaviorName) → \(injectionInfo.method) (applying...)")
+            } else {
+                debugWindowController?.logEvent("   Attempt \(attempt): \(behaviorName) → \(injectionInfo.method) (applying...)")
+            }
+            
+            // Schedule next attempt
+            DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
+                self?.detectBehaviorWithRetry(attempt: attempt + 1, maxAttempts: maxAttempts, interval: interval)
+            }
+            return
+        }
+        
+        // Final attempt OR not overlay behavior - log the result
+        logFinalMouseClickDetection(attempt: attempt, wasRetried: attempt > 1)
+    }
+    
+    /// Log final mouse click detection result
+    private func logFinalMouseClickDetection(attempt: Int, wasRetried: Bool) {
         // Get frontmost app info
         guard let app = NSWorkspace.shared.frontmostApplication,
               let bundleId = app.bundleIdentifier else {
@@ -1280,38 +1347,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Get app behavior type
         let behavior = detector.detect()
-        let behaviorName: String
-        switch behavior {
-        case .standard:
-            behaviorName = "Standard"
-        case .terminal:
-            behaviorName = "Terminal"
-        case .browserAddressBar:
-            behaviorName = "Browser Address Bar"
-        case .jetbrainsIDE:
-            behaviorName = "JetBrains IDE"
-        case .microsoftOffice:
-            behaviorName = "Microsoft Office"
-        case .spotlight:
-            behaviorName = "Spotlight"
-        case .overlayLauncher:
-            behaviorName = "Overlay Launcher (Raycast/Alfred)"
-        case .electronApp:
-            behaviorName = "Electron App"
-        case .codeEditor:
-            behaviorName = "Code Editor"
-        }
+        let behaviorName = getBehaviorName(behavior)
 
         // Get injection method info
         let injectionInfo = detector.detectInjectionMethod()
-        let injectionMethodName: String
-        switch injectionInfo.method {
-        case .fast: injectionMethodName = "Fast"
-        case .slow: injectionMethodName = "Slow"
-        case .selection: injectionMethodName = "Selection"
-        case .autocomplete: injectionMethodName = "Autocomplete"
-        case .axDirect: injectionMethodName = "AX Direct"
-        }
+        let injectionMethodName = getInjectionMethodName(injectionInfo.method)
+        
+        // Set as confirmed injection method (final result after all retries)
+        detector.setConfirmedInjectionMethod(injectionInfo)
 
         // Get current input source
         let inputSource = InputSourceManager.getCurrentInputSource()
@@ -1324,12 +1367,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let imkitBehavior = detector.detectIMKitBehavior()
 
         // Log everything with nice formatting
-        debugWindowController?.logEvent("Mouse click detected")
+        if wasRetried {
+            debugWindowController?.logEvent("Mouse click detected (after \(attempt) AX checks)")
+        } else {
+            debugWindowController?.logEvent("Mouse click detected")
+        }
         debugWindowController?.logEvent("   App: \(appName) (\(bundleId))")
         debugWindowController?.logEvent("   Window: \(windowTitle.isEmpty ? "(no title)" : windowTitle)")
         debugWindowController?.logEvent("   Input Type: \(elementRole)")
         debugWindowController?.logEvent("   Behavior: \(behaviorName)")
-        debugWindowController?.logEvent("   Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs]")
+        debugWindowController?.logEvent("   Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] ✓ confirmed")
         debugWindowController?.logEvent("   IMKit: markedText=\(imkitBehavior.useMarkedText), issues=\(imkitBehavior.hasMarkedTextIssues), delay=\(imkitBehavior.commitDelay)µs")
         debugWindowController?.logEvent("   Input Source: \(inputSourceName)")
         
@@ -1339,6 +1386,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugWindowController?.logEvent("   → Engine reset, mid-sentence mode")
+    }
+    
+    /// Get human-readable behavior name
+    private func getBehaviorName(_ behavior: AppBehavior) -> String {
+        switch behavior {
+        case .standard:
+            return "Standard"
+        case .terminal:
+            return "Terminal"
+        case .browserAddressBar:
+            return "Browser Address Bar"
+        case .jetbrainsIDE:
+            return "JetBrains IDE"
+        case .microsoftOffice:
+            return "Microsoft Office"
+        case .spotlight:
+            return "Spotlight"
+        case .overlayLauncher:
+            return "Overlay Launcher (Raycast/Alfred)"
+        case .electronApp:
+            return "Electron App"
+        case .codeEditor:
+            return "Code Editor"
+        }
+    }
+    
+    /// Get human-readable injection method name
+    private func getInjectionMethodName(_ method: InjectionMethod) -> String {
+        switch method {
+        case .fast: return "Fast"
+        case .slow: return "Slow"
+        case .selection: return "Selection"
+        case .autocomplete: return "Autocomplete"
+        case .axDirect: return "AX Direct"
+        }
     }
 
     private func setupInputSourceManager() {

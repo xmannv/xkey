@@ -28,11 +28,6 @@ class CharacterInjector {
     /// This prevents race conditions where backspace arrives before previous injection is rendered
     private let injectionSemaphore = DispatchSemaphore(value: 1)
     
-    // Cached injection method to avoid repeated detection
-    private var cachedMethod: InjectionMethod?
-    private var cachedDelays: InjectionDelays?
-    private var cachedBundleId: String?
-    
     // Debug callback
     var debugCallback: ((String) -> Void)?
     
@@ -891,27 +886,22 @@ class CharacterInjector {
 
     // MARK: - Injection Method Detection
     
-    /// Detect injection method based on frontmost app and focused element
-    /// Uses AppBehaviorDetector for centralized app detection
+    /// Get injection method for current context
+    /// Uses confirmed method from AppBehaviorDetector (set on mouse click/app switch)
+    /// This avoids repeated AX API calls and timing issues
     func detectInjectionMethod() -> InjectionMethodInfo {
-        // Use AppBehaviorDetector (Single Source of Truth)
-        let methodInfo = AppBehaviorDetector.shared.detectInjectionMethod()
+        // Use AppBehaviorDetector's confirmed method (Single Source of Truth)
+        let methodInfo = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
         
         debugCallback?("🌟 detectMethod: \(methodInfo.description) → \(methodInfo.method), textMode=\(methodInfo.textSendingMethod)")
-        
-        // Update local cache for compatibility
-        cachedMethod = methodInfo.method
-        cachedDelays = methodInfo.delays
         
         return methodInfo
     }
     
-    /// Clear cached injection method (call when app changes)
+    /// Clear method cache (call when app changes)
+    /// Delegates to AppBehaviorDetector which manages the confirmed method
     func clearMethodCache() {
-        cachedMethod = nil
-        cachedDelays = nil
-        cachedBundleId = nil
-        // Also clear AppBehaviorDetector cache
+        AppBehaviorDetector.shared.clearConfirmedInjectionMethod()
         AppBehaviorDetector.shared.clearCache()
     }
 }

@@ -125,14 +125,6 @@ class OverlayAppDetector {
 
         let axElement = focusedElement as! AXUIElement
 
-        // Priority 0: Skip overlay detection if focused element belongs to a browser
-        // This prevents false positives when browser is focused but Spotlight window is visible in background
-        if let bundleId = getAppBundleIdFromElement(axElement),
-           AppBehaviorDetector.browserApps.contains(bundleId) {
-            // No logging here - this is called frequently by monitor timer
-            return nil
-        }
-
         // Check AX Title
         if let title = getAXStringAttribute(axElement, attribute: kAXTitleAttribute) {
             for pattern in Self.axTitlePatterns {
@@ -197,16 +189,8 @@ class OverlayAppDetector {
     /// Detect overlay app by checking window owner names
     /// - Returns: Name of detected overlay app, or nil if not found
     private func detectOverlayViaWindowOwner() -> String? {
-        // Don't detect overlay via window owner if focused element belongs to a browser
-        // This prevents false positives when browser is focused but Spotlight window
-        // is visible in background (e.g., user clicked Chrome address bar while XKey Debug Window is floating)
-        // Note: We check focused element's app, not frontmost app, because XKey's floating window
-        // can be frontmost while user is actually typing in Chrome
-        if let focusedAppBundleId = getFocusedElementAppBundleId(),
-           AppBehaviorDetector.browserApps.contains(focusedAppBundleId) {
-            // No logging here - this is called frequently by monitor timer
-            return nil
-        }
+        // Note: Browser-specific checks removed. Timing issues are now handled by
+        // 3x retry detection in AppDelegate.detectBehaviorWithRetry()
 
         guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
             return nil
