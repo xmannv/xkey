@@ -6,29 +6,43 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260108.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.2</link>
-      <sparkle:version>20260108.2</sparkle:version>
+      <title>Version 1.2.18 (Build 20260108.3)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.3</link>
+      <sparkle:version>20260108.3</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Add Vietnamese input control to Window Title Rules</p>
+<p>Refactor injection method detection with confirmed method caching</p>
 <ul>
-<li>Add 'disableVietnameseInput' option to WindowTitleRule for automatic Vietnamese input toggling</li>
-<li>Implement state preservation: save Vietnamese state before rule applies, restore when rule ends</li>
-<li>Add overlay-aware Vietnamese control: restore pre-rule state when overlay apps (Spotlight/Raycast/Alfred) open</li>
-<li>Refactor Terminal panel detection: move from OverlayAppDetector to AppBehaviorDetector using AX Description</li>
-<li>Add UI toggle in WindowTitleRulesView for Vietnamese input control with visual badges (VN ON/OFF)</li>
-<li>Improve click detection timing: increase delay to 0.15s for better window title detection in VSCode</li>
-<li>Add comprehensive debug logging for Vietnamese state transitions</li>
-<li>Bump build version to 20260108.2</li>
+<li>Add confirmed injection method mechanism in AppBehaviorDetector</li>
 </ul>
-<p>This allows users to automatically disable Vietnamese input for specific apps/windows (e.g., coding environments) while preserving the state for overlay apps and restoring it when returning to normal contexts.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.2">Xem chi tiết trên GitHub</a></p>
+<p>  - Cache injection method after mouse click/app switch detection</p>
+<p>  - Use cached method for subsequent keystrokes to avoid repeated AX API calls</p>
+<p>  - Improve performance and avoid AX API timing issues</p>
+<ul>
+<li>Implement 3x retry detection for mouse click events (0.15s interval)</li>
+</ul>
+<p>  - Handle AX API timing issues when clicking while Spotlight is visible</p>
+<p>  - Fix false positive overlay detection</p>
+<p>  - Apply best available method at each retry attempt</p>
+<ul>
+<li>Simplify CharacterInjector by using confirmed method from AppBehaviorDetector</li>
+</ul>
+<p>  - Remove local cache in favor of centralized confirmed method</p>
+<p>  - Delegate cache clearing to AppBehaviorDetector</p>
+<ul>
+<li>Remove browser-specific checks from OverlayAppDetector</li>
+</ul>
+<p>  - Timing issues now handled by retry logic in AppDelegate</p>
+<p>  - Cleaner and more maintainable code</p>
+<ul>
+<li>Bump build version to 20260108.3</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.3">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 08 Jan 2026 06:59:27 +0000</pubDate>
+      <pubDate>Thu, 08 Jan 2026 08:52:31 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.2/XKey.dmg" sparkle:version="20260108.2" sparkle:shortVersionString="1.2.18" length="9667077" type="application/octet-stream" sparkle:edSignature="IwtgnKaaQMK8hc/u9hcQEcJAiGYdYrzNyOPBqW0xRrCIO7pqeUJX3fuiq0NuV9LGIn69ykuX1V2Mvgg0YY5iAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.3/XKey.dmg" sparkle:version="20260108.3" sparkle:shortVersionString="1.2.18" length="9673539" type="application/octet-stream" sparkle:edSignature="C1Hsq1ArblpfQr+QkqEM8+KCRATHKNUoHAVe0DTbYgHGoIDqErfJo7E55bMRKr8hPp93c028im5+ruDnGUG0Cw==" />
     </item>
   </channel>
 </rss>
