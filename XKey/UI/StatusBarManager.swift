@@ -373,17 +373,17 @@ class StatusBarManager: ObservableObject {
         }
         
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
             .foregroundColor: NSColor.labelColor
         ]
         
-        let size = NSSize(width: 20, height: 20)
+        let size = NSSize(width: 16, height: 16)
         let image = NSImage(size: size, flipped: false) { rect in
             // Vẽ viền trắng bao quanh
-            let borderRect = NSRect(x: 1.5, y: 1.5, width: size.width - 3, height: size.height - 3)
-            let borderPath = NSBezierPath(roundedRect: borderRect, xRadius: 2.5, yRadius: 2.5)
+            let borderRect = NSRect(x: 1.0, y: 1.0, width: size.width - 2, height: size.height - 2)
+            let borderPath = NSBezierPath(roundedRect: borderRect, xRadius: 2.4, yRadius: 2.4)
             NSColor.white.setStroke()
-            borderPath.lineWidth = 1.0
+            borderPath.lineWidth = 1.6
             borderPath.stroke()
             
             // Vẽ chữ ở giữa
