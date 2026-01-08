@@ -1130,15 +1130,12 @@ class AppBehaviorDetector {
         // Priority 1: Check overlay launcher via injected provider (from OverlayAppDetector in XKey)
         // This detects Spotlight/Raycast/Alfred more accurately when user is focused on search field
         if let overlayName = overlayAppNameProvider?() {
-            switch overlayName {
-            case "Spotlight":
+            if overlayName == "Spotlight" {
                 return .spotlight
-            case "Raycast", "Alfred":
+            } else if overlayName == "Raycast" || overlayName == "Alfred" {
                 return .overlayLauncher
-            default:
-                // Unknown overlay, treat as spotlight-like
-                return .spotlight
             }
+            // Unknown overlay name: fall through to bundle ID check below
         }
         
         // Fallback: Bundle ID check for Spotlight
