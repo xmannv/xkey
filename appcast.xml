@@ -6,43 +6,31 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260108.4)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.4</link>
-      <sparkle:version>20260108.4</sparkle:version>
+      <title>Version 1.2.18 (Build 20260108.5)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.5</link>
+      <sparkle:version>20260108.5</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Refactor injection method detection with confirmed method caching</p>
+<p>refactor: improve overlay app detection accuracy</p>
 <ul>
-<li>Add confirmed injection method mechanism in AppBehaviorDetector</li>
+<li>Remove window owner detection method from OverlayAppDetector</li>
 </ul>
-<p>  - Cache injection method after mouse click/app switch detection</p>
-<p>  - Use cached method for subsequent keystrokes to avoid repeated AX API calls</p>
-<p>  - Improve performance and avoid AX API timing issues</p>
+<p>  * Window owner detection is unreliable when app process runs in background</p>
+<p>  * Only keep AX attributes detection (more accurate, only detects when focused)</p>
 <ul>
-<li>Implement 3x retry detection for mouse click events (0.15s interval)</li>
+<li>Fix overlay fallback logic in AppBehaviorDetector</li>
 </ul>
-<p>  - Handle AX API timing issues when clicking while Spotlight is visible</p>
-<p>  - Fix false positive overlay detection</p>
-<p>  - Apply best available method at each retry attempt</p>
+<p>  * Unknown overlay names now fall through to bundle ID check</p>
+<p>  * Previously defaulted all unknown overlays to .spotlight behavior</p>
 <ul>
-<li>Simplify CharacterInjector by using confirmed method from AppBehaviorDetector</li>
+<li>Bump build version to 20260108.5</li>
 </ul>
-<p>  - Remove local cache in favor of centralized confirmed method</p>
-<p>  - Delegate cache clearing to AppBehaviorDetector</p>
-<ul>
-<li>Remove browser-specific checks from OverlayAppDetector</li>
-</ul>
-<p>  - Timing issues now handled by retry logic in AppDelegate</p>
-<p>  - Cleaner and more maintainable code</p>
-<ul>
-<li>Bump build version to 20260108.3</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.4">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.5">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 08 Jan 2026 10:16:35 +0000</pubDate>
+      <pubDate>Thu, 08 Jan 2026 12:25:14 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.4/XKey.dmg" sparkle:version="20260108.4" sparkle:shortVersionString="1.2.18" length="9672358" type="application/octet-stream" sparkle:edSignature="g9baMFkSeX/rfUUu05782yBt7vESmiXLpzKvXQOG78kHir+pc/hCfHYYh6ld2k1YxUNYJOE54Nm1WY3rTlpFBA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.5/XKey.dmg" sparkle:version="20260108.5" sparkle:shortVersionString="1.2.18" length="9669447" type="application/octet-stream" sparkle:edSignature="3zVtDJ8CpGFPCdi8f5ZYg93J0uJIGqA9Gvc2/1wgZiGUFYQFAIG5abZdWtoN69hWq91j5G79slY8dnhLIERaCQ==" />
     </item>
   </channel>
 </rss>
