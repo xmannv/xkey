@@ -6,26 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260107.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.3</link>
-      <sparkle:version>20260107.3</sparkle:version>
+      <title>Version 1.2.18 (Build 20260108)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108</link>
+      <sparkle:version>20260108</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Add Injection Test feature with force override and improved Spotlight detection</p>
+<p>feat: Add custom undo typing hotkey and improve debug window management</p>
 <ul>
-<li>Add comprehensive Injection Test section in Debug View</li>
-<li>Support force override for injection method, text sending method, and delays</li>
-<li>Add detailed AX element info logging for debugging</li>
-<li>Improve Spotlight detection using AXIdentifier (more reliable than placeholder)</li>
-<li>Add AX Direct method option to Window Title Rules</li>
-<li>Update InjectionMethod with displayName and description properties</li>
+<li>Add support for custom undo typing hotkey (not just Esc) including modifier-only hotkeys like Ctrl+Shift</li>
+<li>Auto-disable debug mode when debug window is closed via title bar</li>
+<li>Add debug window toggle in status bar menu</li>
+<li>Move IMKit Mode settings from Advanced tab to Input Sources tab</li>
+<li>Reorganize Input Sources section with tabs for better organization</li>
+<li>Fix flagsChanged event handling to not reset engine (preserves undo buffer for modifier-only hotkeys)</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260107.3">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 07 Jan 2026 14:50:12 +0000</pubDate>
+      <pubDate>Thu, 08 Jan 2026 01:17:39 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260107.3/XKey.dmg" sparkle:version="20260107.3" sparkle:shortVersionString="1.2.18" length="9638603" type="application/octet-stream" sparkle:edSignature="CwAm/s1501p5fKkkP7eNQYalbTB7826wQGwnXszlwXmJ4cAeSVl9zqois47c2ob+FvnmmgTMYTExtzGuGmPxBQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108/XKey.dmg" sparkle:version="20260108" sparkle:shortVersionString="1.2.18" length="9668727" type="application/octet-stream" sparkle:edSignature="tHcA8Ggl03n14iLhuvsv9h/S0k/YFkb7NoiEQbWRBvpNTj13Tuhha7KfkqUTr/IWRo/XOZTIGvhyGD+cBbumBQ==" />
     </item>
   </channel>
 </rss>
