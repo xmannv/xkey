@@ -6,9 +6,9 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260108.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.3</link>
-      <sparkle:version>20260108.3</sparkle:version>
+      <title>Version 1.2.18 (Build 20260108.4)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.4</link>
+      <sparkle:version>20260108.4</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -38,11 +38,11 @@
 <ul>
 <li>Bump build version to 20260108.3</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.3">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 08 Jan 2026 08:52:31 +0000</pubDate>
+      <pubDate>Thu, 08 Jan 2026 10:16:35 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.3/XKey.dmg" sparkle:version="20260108.3" sparkle:shortVersionString="1.2.18" length="9673539" type="application/octet-stream" sparkle:edSignature="C1Hsq1ArblpfQr+QkqEM8+KCRATHKNUoHAVe0DTbYgHGoIDqErfJo7E55bMRKr8hPp93c028im5+ruDnGUG0Cw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.4/XKey.dmg" sparkle:version="20260108.4" sparkle:shortVersionString="1.2.18" length="9672358" type="application/octet-stream" sparkle:edSignature="g9baMFkSeX/rfUUu05782yBt7vESmiXLpzKvXQOG78kHir+pc/hCfHYYh6ld2k1YxUNYJOE54Nm1WY3rTlpFBA==" />
     </item>
   </channel>
 </rss>
