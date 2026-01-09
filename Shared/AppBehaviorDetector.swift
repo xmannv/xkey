@@ -76,6 +76,18 @@ enum InjectionMethod: String, Codable, CaseIterable {
         case .axDirect: return "Dùng Accessibility API trực tiếp (Firefox content area)"
         }
     }
+    
+    /// Default delays for this injection method (backspace, wait, text) in microseconds
+    /// Centralized here to avoid duplication across codebase
+    var defaultDelays: (backspace: UInt32, wait: UInt32, text: UInt32) {
+        switch self {
+        case .fast:         return (1000, 3000, 1500)   // Low delays for responsive apps
+        case .slow:         return (3000, 6000, 3000)   // High delays for terminals/IDEs
+        case .selection:    return (1000, 3000, 2000)   // Medium delays for selection-based injection
+        case .autocomplete: return (1000, 3000, 1000)   // Fast text, for overlays like Spotlight
+        case .axDirect:     return (1000, 3000, 2000)   // Medium delays for AX API injection
+        }
+    }
 }
 
 /// Injection delays in microseconds (backspace, wait, text)
@@ -93,7 +105,7 @@ struct InjectionMethodInfo {
     
     static let defaultFast = InjectionMethodInfo(
         method: .fast,
-        delays: (1000, 3000, 1500),
+        delays: InjectionMethod.fast.defaultDelays,
         textSendingMethod: .chunked,
         description: "Default (fast)"
     )
@@ -1471,22 +1483,33 @@ class AppBehaviorDetector {
 
         let currentRole = getFocusedElementRole()
 
-        // Priority 0.2: Overlay launchers (Spotlight/Raycast/Alfred) - HIGHEST CONTEXT PRIORITY
-        // MUST check this first because:
+        // Priority 0.2: Terminal panels in VSCode/Cursor/etc
+        // Check directly via AX Description - doesn't go through overlay detection if it's a terminal panel (VSCode/Cursor)
+        if isInTerminalPanel() {
+            return InjectionMethodInfo(
+                method: .slow,
+                delays: InjectionMethod.slow.defaultDelays,
+                textSendingMethod: .chunked,
+                description: "Terminal (VSCode/Cursor)"
+            )
+        }
+
+        // Priority 0.3: Overlay launchers (Spotlight/Raycast/Alfred)
+        // MUST check this BEFORE browser address bar and Window Title Rules because:
         // - Spotlight opens as overlay while Chrome may still be "frontmost app"
-        // - Window Title Rules (like Google Docs) should NOT match when typing in Spotlight
-        // - Overlay apps always need .autocomplete method
+        // - Window Title Rules (like Google Docs) would match first without this check
+        // - Spotlight/Raycast/Alfred need .autocomplete method
         if let overlayName = overlayAppNameProvider?() {
             return InjectionMethodInfo(
                 method: .autocomplete,
-                delays: (1000, 3000, 1000),
+                delays: InjectionMethod.autocomplete.defaultDelays,
                 textSendingMethod: .chunked,
                 description: "\(overlayName) (Overlay Launcher)"
             )
         }
 
-        // Priority 0.3: Check if focused element is browser address bar
-        // MUST check before Window Title Rules because:
+        // Priority 0.5: Check if focused element is browser address bar
+        // This takes precedence over Window Title Rules because:
         // - User might be in Google Docs tab (Window Title = "Google Docs")
         // - But clicked on address bar (focused element = Omnibox/AXTextField)
         // - Address bar needs different injection method than Google Docs content
@@ -1500,7 +1523,7 @@ class AppBehaviorDetector {
                 && isSafariAddressBar() {
                 return InjectionMethodInfo(
                     method: .selection,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.selection.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Safari Address Bar"
                 )
@@ -1510,7 +1533,7 @@ class AppBehaviorDetector {
             if isChromiumAddressBar() {
                 return InjectionMethodInfo(
                     method: .selection,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.selection.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Chromium Address Bar"
                 )
@@ -1522,7 +1545,7 @@ class AppBehaviorDetector {
                     let method: InjectionMethod = Self.axAttributeDetectForBrowsers.contains(bundleId) ? .axDirect : .selection
                     return InjectionMethodInfo(
                         method: method,
-                        delays: (1000, 3000, 2000),
+                        delays: method.defaultDelays,
                         textSendingMethod: .chunked,
                         description: "Firefox-style Address Bar"
                     )
@@ -1530,18 +1553,20 @@ class AppBehaviorDetector {
             }
         }
 
-        // Priority 0.5: Window Title Rules (user rules can override terminal/app detection)
-        // This is AFTER overlay and address bar, but BEFORE terminal and bundle ID detection
-        // Allows users to customize injection for specific apps/contexts
+        // Priority 1: Check Window Title Rules for context-specific injection method (merged cascade)
         let mergedResult = getMergedRuleResult()
         if let injectionMethod = mergedResult.injectionMethod {
             let delays: InjectionDelays
             if let d = mergedResult.injectionDelays, d.count >= 3 {
                 delays = (d[0], d[1], d[2])
             } else {
-                delays = getDefaultDelays(for: injectionMethod)
+                // Use centralized default delays
+                delays = injectionMethod.defaultDelays
             }
+
+            // Get text sending method from merged result, default to chunked
             let textMethod = mergedResult.textSendingMethod ?? .chunked
+
             return InjectionMethodInfo(
                 method: injectionMethod,
                 delays: delays,
@@ -1550,30 +1575,14 @@ class AppBehaviorDetector {
             )
         }
 
-        // Priority 0.6: Terminal panels in VSCode/Cursor/etc
-        // Check directly via AX Description - doesn't go through overlay detection
-        if isInTerminalPanel() {
-            return InjectionMethodInfo(
-                method: .slow,
-                delays: (3000, 6000, 3000),
-                textSendingMethod: .chunked,
-                description: "Terminal (VSCode/Cursor)"
-            )
-        }
-
-        // Priority 1: Fall back to bundle ID based detection
+        // Priority 2: Fall back to bundle ID based detection
         return getInjectionMethod(for: bundleId, role: currentRole)
     }
     
     /// Get default delays for an injection method
+    /// Uses the centralized defaultDelays property on InjectionMethod
     private func getDefaultDelays(for method: InjectionMethod) -> InjectionDelays {
-        switch method {
-        case .fast: return (1000, 3000, 1500)
-        case .slow: return (3000, 6000, 3000)
-        case .selection: return (1000, 3000, 2000)
-        case .autocomplete: return (1000, 3000, 1000)
-        case .axDirect: return (1000, 3000, 2000)
-        }
+        return method.defaultDelays
     }
 
     private func getInjectionMethod(for bundleId: String, role: String?) -> InjectionMethodInfo {        
@@ -1581,7 +1590,7 @@ class AppBehaviorDetector {
         if role == "AXComboBox" || role == "AXSearchField" {
             return InjectionMethodInfo(
                 method: .selection,
-                delays: (1000, 3000, 2000),
+                delays: InjectionMethod.selection.defaultDelays,
                 textSendingMethod: .chunked,
                 description: "Selection (ComboBox/SearchField)"
             )
@@ -1594,7 +1603,7 @@ class AppBehaviorDetector {
             if isFirefoxStyleAddressBar() {
                 return InjectionMethodInfo(
                     method: .axDirect,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.axDirect.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Zen-style Address Bar"
                 )
@@ -1602,7 +1611,7 @@ class AppBehaviorDetector {
             // Content area - use default fast method
             return InjectionMethodInfo(
                 method: .fast,
-                delays: (1000, 3000, 1500),
+                delays: InjectionMethod.fast.defaultDelays,
                 textSendingMethod: .chunked,
                 description: "Zen Browser Content"
             )
@@ -1616,14 +1625,14 @@ class AppBehaviorDetector {
             if role == "AXTextField" {
                 return InjectionMethodInfo(
                     method: .selection,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.selection.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Firefox Address Bar"
                 )
             } else if role == "AXWindow" {
                 return InjectionMethodInfo(
                     method: .axDirect,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.axDirect.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Firefox Content Area"
                 )
@@ -1634,7 +1643,7 @@ class AppBehaviorDetector {
         if Self.browserApps.contains(bundleId) && role == "AXTextField" {
             return InjectionMethodInfo(
                 method: .selection,
-                delays: (1000, 3000, 2000),
+                delays: InjectionMethod.selection.defaultDelays,
                 textSendingMethod: .chunked,
                 description: "Browser Address Bar"
             )
@@ -1645,7 +1654,7 @@ class AppBehaviorDetector {
             if role == "AXTextField" {
                 return InjectionMethodInfo(
                     method: .selection,
-                    delays: (1000, 3000, 2000),
+                    delays: InjectionMethod.selection.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "JetBrains TextField"
                 )
@@ -1670,7 +1679,7 @@ class AppBehaviorDetector {
             }
             return InjectionMethodInfo(
                 method: .selection,
-                delays: (1000, 3000, 2000),
+                delays: InjectionMethod.selection.defaultDelays,
                 textSendingMethod: .chunked,
                 description: "Microsoft Office"
             )
