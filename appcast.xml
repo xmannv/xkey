@@ -6,23 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260109.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.1</link>
-      <sparkle:version>20260109.1</sparkle:version>
+      <title>Version 1.2.18 (Build 20260109.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.2</link>
+      <sparkle:version>20260109.2</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix mid-sentence flag handling for overlay apps (Spotlight/Raycast/Alfred)</p>
+<p>Improve XKeyIM direct input mode for Spotlight and overlay apps</p>
 <ul>
-<li>Reset mid-sentence flag when overlay opens (fresh input field)</li>
-<li>Set mid-sentence flag when overlay closes (protect underlying app text)</li>
-<li>Bump build version to 20260109.1</li>
+<li>Add automatic direct input mode detection for overlay apps (Spotlight, Raycast, Alfred)</li>
+<li>Fix ESC key handling: proper undo in direct mode, pass through when no content</li>
+<li>Add XKeyIM reset/reinstall functionality in IMKitHelper</li>
+<li>Update InputSourcesSection UI with reset button</li>
+<li>Clean up unused preferences and settings</li>
+<li>Bump version to 1.2.18</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 09 Jan 2026 02:30:54 +0000</pubDate>
+      <pubDate>Fri, 09 Jan 2026 09:25:23 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260109.1/XKey.dmg" sparkle:version="20260109.1" sparkle:shortVersionString="1.2.18" length="9300646" type="application/octet-stream" sparkle:edSignature="BGpmwDcW8mIxkmBp7MQ1+F/jGXXUHOd+dNsy5rDImvntA+8jWhAnlGDkb24Lj0XOFGAP+2X/lbajGk9llN1uBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260109.2/XKey.dmg" sparkle:version="20260109.2" sparkle:shortVersionString="1.2.18" length="9307555" type="application/octet-stream" sparkle:edSignature="yqqKyoDFvKTwxr043Q93yPy+G+zpwQjIMdav3/rmUzGAOgPlqeePoNVqydDPrCEo/RmZxOrCwbchGNxk9r4cCA==" />
     </item>
   </channel>
 </rss>
