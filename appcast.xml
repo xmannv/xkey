@@ -6,31 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260108.6)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.6</link>
-      <sparkle:version>20260108.6</sparkle:version>
+      <title>Version 1.2.18 (Build 20260109)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109</link>
+      <sparkle:version>20260109</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: improve overlay app detection accuracy</p>
+<p>Refactor: Merge focus timer with injection detection</p>
 <ul>
-<li>Remove window owner detection method from OverlayAppDetector</li>
+<li>Consolidate toolbar focus timer and injection detection into single timer</li>
+<li>Add handleFocusCheck() to get focused element once and pass to processors</li>
+<li>Add checkIntraAppFocusChange() for detecting focus changes within same app</li>
+<li>Add getElementSignature() to create element signature (role+subrole+description)</li>
+<li>Reduce timer interval from 0.5s to 0.3s for better responsiveness</li>
+<li>Keep focus timer running when toolbar is disabled (for injection detection)</li>
+<li>Update build version to 20260109</li>
 </ul>
-<p>  * Window owner detection is unreliable when app process runs in background</p>
-<p>  * Only keep AX attributes detection (more accurate, only detects when focused)</p>
-<ul>
-<li>Fix overlay fallback logic in AppBehaviorDetector</li>
-</ul>
-<p>  * Unknown overlay names now fall through to bundle ID check</p>
-<p>  * Previously defaulted all unknown overlays to .spotlight behavior</p>
-<ul>
-<li>Bump build version to 20260108.5</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260108.6">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 08 Jan 2026 13:04:56 +0000</pubDate>
+      <pubDate>Fri, 09 Jan 2026 02:08:32 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260108.6/XKey.dmg" sparkle:version="20260108.6" sparkle:shortVersionString="1.2.18" length="9294078" type="application/octet-stream" sparkle:edSignature="MclbFludbJXDtgJ5sciQ66T8EvkTyxMRRMapEdjTHCwuHHr5ofwkWzgqAIPxg9bRlWJJFr1G0KMSAFATrcnYBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260109/XKey.dmg" sparkle:version="20260109" sparkle:shortVersionString="1.2.18" length="9299709" type="application/octet-stream" sparkle:edSignature="8LhU3QftO6/q/VRIyoo0r3dNK5c68dIfbXZubDRTF9PVKuzhptdqUhIRYiYFdGBlWE0lAN2gkE25uqPwG3mkCQ==" />
     </item>
   </channel>
 </rss>
