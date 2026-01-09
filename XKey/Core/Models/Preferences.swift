@@ -62,7 +62,6 @@ struct Preferences: Codable {
     var debugModeEnabled: Bool = false           // Show debug window (even in production)
     
     // IMKit settings (experimental)
-    var imkitEnabled: Bool = false               // Use IMKit instead of CGEvent injection
     var imkitUseMarkedText: Bool = false         // Show underline when composing (IMKit mode)
     var switchToXKeyHotkey: Hotkey?              // Hotkey to quickly switch to XKeyIM input source
     

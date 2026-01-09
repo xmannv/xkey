@@ -61,7 +61,6 @@ enum SharedSettingsKey: String {
     case debugModeEnabled = "XKey.debugModeEnabled"
 
     // IMKit settings
-    case imkitEnabled = "XKey.imkitEnabled"
     case imkitUseMarkedText = "XKey.imkitUseMarkedText"
     case switchToXKeyHotkeyCode = "XKey.switchToXKeyHotkeyCode"
     case switchToXKeyHotkeyModifiers = "XKey.switchToXKeyHotkeyModifiers"
@@ -476,14 +475,6 @@ class SharedSettings {
 
     // MARK: - IMKit Settings
 
-    var imkitEnabled: Bool {
-        get { readBool(forKey: SharedSettingsKey.imkitEnabled.rawValue) }
-        set {
-            writeBool(newValue, forKey: SharedSettingsKey.imkitEnabled.rawValue)
-            notifySettingsChanged()
-        }
-    }
-
     var imkitUseMarkedText: Bool {
         get { readBool(forKey: SharedSettingsKey.imkitUseMarkedText.rawValue) }
         set {
@@ -819,7 +810,6 @@ class SharedSettings {
         prefs.debugModeEnabled = debugModeEnabled
 
         // IMKit
-        prefs.imkitEnabled = imkitEnabled
         prefs.imkitUseMarkedText = imkitUseMarkedText
 
         // Switch to XKey hotkey (optional)
@@ -913,7 +903,6 @@ class SharedSettings {
         debugModeEnabled = prefs.debugModeEnabled
 
         // IMKit
-        imkitEnabled = prefs.imkitEnabled
         imkitUseMarkedText = prefs.imkitUseMarkedText
 
         // Switch to XKey hotkey (optional)

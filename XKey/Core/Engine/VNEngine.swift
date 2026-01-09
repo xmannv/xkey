@@ -2691,12 +2691,29 @@ extension VNEngine {
     
     /// Check if there's something to undo
     /// Returns true if engine has Vietnamese-processed text that can be reverted
+    /// Only returns true when the word contains actual Vietnamese modifications (diacritics)
+    /// For plain text like "thu", ESC should pass through. For "thử", ESC should undo.
     func canUndoTyping() -> Bool {
-        // Can undo if we have both:
-        // 1. Current word in buffer (index > 0)
-        // 2. Original keystrokes saved (stateIndex > 0)
-        // 3. The word has been processed (not just raw characters)
-        return index > 0 && stateIndex > 0
+        // Must have both current word and original keystrokes
+        guard index > 0 && stateIndex > 0 else {
+            return false
+        }
+        
+        // Check if any character has Vietnamese modification (mark, tone, or horn/breve)
+        for i in 0..<Int(index) {
+            let charData = typingWord[i]
+            let hasMark = (charData & VNEngine.MARK_MASK) != 0      // Dấu thanh (sắc, huyền, hỏi, ngã, nặng)
+            let hasTone = (charData & VNEngine.TONE_MASK) != 0      // Dấu mũ (â, ê, ô)
+            let hasToneW = (charData & VNEngine.TONEW_MASK) != 0    // Dấu móc/ngoắc (ư, ơ, ă)
+            
+            if hasMark || hasTone || hasToneW {
+                // Found Vietnamese modification - can undo
+                return true
+            }
+        }
+        
+        // No Vietnamese modification found - nothing to undo
+        return false
     }
     
     /// Undo Vietnamese typing - restore original keystrokes

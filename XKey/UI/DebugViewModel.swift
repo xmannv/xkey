@@ -353,7 +353,6 @@ class DebugViewModel: ObservableObject {
         
         // IMKit
         lines.append("[IMKit]")
-        lines.append("  IMKit Enabled: \(settings.imkitEnabled ? "ON" : "OFF")")
         lines.append("  Use Marked Text: \(settings.imkitUseMarkedText ? "ON" : "OFF")")
         lines.append("")
         

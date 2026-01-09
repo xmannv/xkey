@@ -62,8 +62,29 @@ class IMKitHelper {
     
     // MARK: - Installation
     
+    /// Kill running XKeyIM process
+    private static func killXKeyIMProcess() {
+        let task = Process()
+        task.launchPath = "/usr/bin/killall"
+        task.arguments = ["XKeyIM"]
+        
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            // Process might not be running, that's okay
+        }
+    }
+    
     /// Install XKeyIM to ~/Library/Input Methods
+    /// This also handles reinstallation by killing any running process first
     static func installXKeyIM() {
+        // Kill running XKeyIM process first (safe even if not running)
+        killXKeyIMProcess()
+        
+        // Wait for process to fully terminate
+        Thread.sleep(forTimeInterval: 0.5)
+        
         // Get XKeyIM from app bundle Resources
         guard let xkeyIMSource = Bundle.main.path(forResource: "XKeyIM", ofType: "app") else {
             showAlert(

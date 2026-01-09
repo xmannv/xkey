@@ -21,9 +21,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.17</string>
+	<string>1.2.18</string>
 	<key>CFBundleVersion</key>
-	<string>20251229</string>
+	<string>20260109.2</string>
 	<key>InputMethodConnectionName</key>
 	<string>XKeyIM_Connection</string>
 	<key>InputMethodServerControllerClass</key>
@@ -41,7 +41,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025 XKey. All rights reserved.</string>
+	<string>Copyright © 2026 XKey. All rights reserved.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSupportsSuddenTermination</key>

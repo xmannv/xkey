@@ -41,6 +41,10 @@ class XKeyIMController: IMKInputController {
 
     /// Last settings reload time (for debouncing)
     private var lastReloadTime: Date = .distantPast
+    
+    /// Effective useMarkedText value for current client
+    /// This is false for overlay apps (Spotlight, Raycast, Alfred) to avoid "Enter twice" issue
+    private var effectiveUseMarkedText: Bool = true
 
     // MARK: - Initialization
 
@@ -119,6 +123,38 @@ class XKeyIMController: IMKInputController {
     
     // MARK: - IMKInputController Overrides
     
+    /// Bundle IDs of overlay apps that should use direct mode instead of marked text
+    /// This avoids the "Enter twice" issue in Spotlight and similar apps
+    private static let overlayAppBundleIds: Set<String> = [
+        "com.apple.Spotlight",           // Spotlight
+        "com.raycast.macos",             // Raycast
+        "com.runningwithcrayons.Alfred", // Alfred
+        "com.runningwithcrayons.Alfred-3", // Alfred 3
+    ]
+    
+    /// Check if current client is an overlay app that needs direct mode
+    private func isOverlayApp(_ client: IMKTextInput) -> Bool {
+        // bundleIdentifier() is a method on IMKTextInput that returns the client's bundle ID
+        let bundleId = client.bundleIdentifier()
+        if let bundleId = bundleId {
+            let isOverlay = Self.overlayAppBundleIds.contains(bundleId)
+            if isOverlay {
+                IMKitDebugger.shared.log("Detected overlay app: \(bundleId) - using direct mode", category: "OVERLAY")
+            }
+            return isOverlay
+        }
+        return false
+    }
+    
+    /// Determine if we should use marked text for this client
+    /// Returns false for overlay apps to avoid "Enter twice" issue
+    private func shouldUseMarkedText(_ client: IMKTextInput) -> Bool {
+        if isOverlayApp(client) {
+            return false  // Use direct mode for overlay apps
+        }
+        return settings.useMarkedText
+    }
+    
     /// Handle keyboard events
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event = event, event.type == .keyDown else {
@@ -128,6 +164,15 @@ class XKeyIMController: IMKInputController {
         guard let client = sender as? IMKTextInput else {
             return false
         }
+        
+        // Update effective useMarkedText based on current client
+        // For overlay apps (Spotlight, Raycast, Alfred), use direct mode to avoid "Enter twice"
+        let bundleId = client.bundleIdentifier() ?? "unknown"
+        let isOverlay = isOverlayApp(client)
+        effectiveUseMarkedText = shouldUseMarkedText(client)
+        
+        // Log the first time we see a new bundle ID to debug overlay detection
+        IMKitDebugger.shared.log("Client: \(bundleId), isOverlay=\(isOverlay), settings.useMarkedText=\(settings.useMarkedText), effective=\(effectiveUseMarkedText)", category: "OVERLAY")
 
         // Get character info
         guard let characters = event.characters,
@@ -212,10 +257,19 @@ class XKeyIMController: IMKInputController {
             return result
 
         case 0x24, 0x4C: // Return, Enter
+            let hadComposition = !composingText.isEmpty
+            IMKitDebugger.shared.log("ENTER - composingText='\(composingText)', hadComposition=\(hadComposition)", category: "ENTER")
+            
+            // Commit any marked text first
             commitComposition(client)
             engine.reset()
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
+            
+            // Pass through Enter to application
+            // Note: For overlay apps (Spotlight, Raycast, Alfred), effectiveUseMarkedText is false
+            // so there's no marked text commit issue - Enter works in one press
+            IMKitDebugger.shared.log("ENTER - committed and passing through", category: "ENTER")
             return false
 
         case 0x30: // Tab
@@ -246,9 +300,12 @@ class XKeyIMController: IMKInputController {
             return false // Let arrow key pass through for cursor movement
 
         case 0x35: // Escape
-            IMKitDebugger.shared.log("ESC - canUndo=\(engine.canUndoTyping()) composing='\(composingText)'", category: "ESC")
+            // Check for content: in marked text mode use composingText, in direct mode use currentWordLength
+            let hasContent = effectiveUseMarkedText ? !composingText.isEmpty : currentWordLength > 0
+            IMKitDebugger.shared.log("ESC - canUndo=\(engine.canUndoTyping()) hasContent=\(hasContent) composing='\(composingText)' wordLen=\(currentWordLength)", category: "ESC")
+            
             // Check if we can undo Vietnamese typing
-            if engine.canUndoTyping() && !composingText.isEmpty {
+            if engine.canUndoTyping() && hasContent {
                 let result = engine.undoTyping()
 
                 // Get undone text (raw keystrokes) from result.newCharacters
@@ -258,8 +315,8 @@ class XKeyIMController: IMKInputController {
                 }.joined()
                 IMKitDebugger.shared.log("ESC - undone text: '\(undoneText)' (from \(result.newCharacters.count) chars)", category: "ESC")
 
-                if settings.useMarkedText && !undoneText.isEmpty {
-                    // Clear current marked text and insert raw keystrokes
+                if effectiveUseMarkedText && !undoneText.isEmpty {
+                    // Marked text mode: Clear current marked text and insert raw keystrokes
                     // This shows "tieesng" instead of "tiếng"
                     client.setMarkedText(
                         "",
@@ -270,24 +327,69 @@ class XKeyIMController: IMKInputController {
                         undoneText,
                         replacementRange: NSRange(location: NSNotFound, length: 0)
                     )
-                } else {
-                    handleResult(result, client: client)
+                } else if !effectiveUseMarkedText && !undoneText.isEmpty {
+                    // Direct mode (Spotlight, Raycast, Alfred): Replace current word with raw keystrokes
+                    // Use the same approach as replaceTextDirect() for reliability
+                    let selectedRange = client.selectedRange()
+                    IMKitDebugger.shared.log("ESC - direct mode undo: replacing \(currentWordLength) chars at pos \(selectedRange.location) with '\(undoneText)'", category: "ESC")
+                    
+                    if currentWordLength > 0 && selectedRange.location >= currentWordLength {
+                        // Calculate replacement range based on tracked word length
+                        let replaceRange = NSRange(
+                            location: selectedRange.location - currentWordLength,
+                            length: currentWordLength
+                        )
+                        // Atomic replacement - delete old word and insert undone text
+                        client.insertText(undoneText, replacementRange: replaceRange)
+                    } else {
+                        // Fallback: just insert
+                        client.insertText(
+                            undoneText,
+                            replacementRange: NSRange(location: NSNotFound, length: 0)
+                        )
+                    }
                 }
 
                 // Reset state after undo
+                // Set currentWordLength = 0 so next ESC passes through to Spotlight
+                // The undone text ("thur") is now plain text - Spotlight will handle clearing it
                 composingText = ""
-                currentWordLength = 0
+                currentWordLength = 0  // Don't track undone text - let Spotlight handle it
                 markedTextStartLocation = NSNotFound
 
                 IMKitDebugger.shared.log("ESC - undo completed, returning true", category: "ESC")
                 return true
-            } else {
-                // No undo available - cancel composition
-                IMKitDebugger.shared.log("ESC - no undo, canceling composition", category: "ESC")
-                cancelComposition(client)
+            } else if hasContent {
+                // Has content but cannot undo (no Vietnamese diacritics) - just cancel/clear
+                // Consume ESC to match native Spotlight behavior:
+                // - ESC 1: Clear text (handled here)
+                // - ESC 2: Close Spotlight (pass through in the 'else' branch below)
+                IMKitDebugger.shared.log("ESC - no diacritics, canceling composition only", category: "ESC")
+                
+                if effectiveUseMarkedText {
+                    cancelComposition(client)
+                } else {
+                    // Direct mode: clear the word using insertText with empty string
+                    let selectedRange = client.selectedRange()
+                    if currentWordLength > 0 && selectedRange.location >= currentWordLength {
+                        let replaceRange = NSRange(
+                            location: selectedRange.location - currentWordLength,
+                            length: currentWordLength
+                        )
+                        client.insertText("", replacementRange: replaceRange)
+                    }
+                }
+                
                 currentWordLength = 0
                 markedTextStartLocation = NSNotFound
-                return true
+                engine.reset()
+                return true  // Consume ESC - don't pass through yet
+            } else {
+                // No content - let ESC pass through to application
+                // This allows Spotlight and other apps to close with ESC
+                IMKitDebugger.shared.log("ESC - no content, passing through", category: "ESC")
+                engine.reset()  // Reset engine state just in case
+                return false
             }
 
         case 0x31: // Space
@@ -305,7 +407,7 @@ class XKeyIMController: IMKInputController {
                 // and result.backspaceCount > 0 indicates how many chars to delete
                 let isRestoreCase = result.shouldConsume && result.backspaceCount > 0
 
-                if isRestoreCase && settings.useMarkedText {
+                if isRestoreCase && effectiveUseMarkedText {
                     // Restore case in marked text mode
                     // Replace current marked text with restored text from result.newCharacters
                     let restoredText = result.newCharacters.map { $0.unicode(codeTable: .unicode) }.joined()
@@ -399,7 +501,7 @@ class XKeyIMController: IMKInputController {
 
         // IMKit marked text mode requires ALWAYS consuming Vietnamese-eligible characters
         // This is different from Accessibility mode where we only consume when processing
-        if settings.useMarkedText {
+        if effectiveUseMarkedText {
             if result.shouldConsume {
                 // Engine processed the key
                 IMKitDebugger.shared.log("Calling handleResult...", category: "TIMING")
@@ -449,7 +551,7 @@ class XKeyIMController: IMKInputController {
         // OPTIMIZATION: Use user's settings directly instead of detecting app behavior
         // This eliminates Accessibility API calls that cause 3-5s lag when switching apps
         // User can control marked text mode via XKey settings
-        let useMarkedText = settings.useMarkedText
+        let useMarkedText = effectiveUseMarkedText
 
         if useMarkedText {
             // Option 1: Marked text mode - RECOMMENDED
@@ -554,11 +656,11 @@ class XKeyIMController: IMKInputController {
     
     /// Handle backspace
     private func handleBackspace(client: IMKTextInput) -> Bool {
-        IMKitDebugger.shared.log("handleBackspace() - useMarkedText=\(settings.useMarkedText) composing='\(composingText)'", category: "BACKSPACE")
+        IMKitDebugger.shared.log("handleBackspace() - useMarkedText=\(effectiveUseMarkedText) composing='\(composingText)'", category: "BACKSPACE")
 
         // For marked text mode, we need to handle backspace specially
         // to delete character-by-character instead of deleting entire marked text
-        if settings.useMarkedText && !composingText.isEmpty {
+        if effectiveUseMarkedText && !composingText.isEmpty {
             // Process backspace in engine
             _ = engine.processBackspace()
 
@@ -596,7 +698,7 @@ class XKeyIMController: IMKInputController {
         }
 
         // If engine doesn't handle, reset tracking and let it pass through
-        if settings.useMarkedText && !composingText.isEmpty {
+        if effectiveUseMarkedText && !composingText.isEmpty {
             // Clear any remaining marked text
             client.setMarkedText(
                 "",
@@ -618,7 +720,9 @@ class XKeyIMController: IMKInputController {
 
         if !composingText.isEmpty {
             // If using marked text, commit it
-            if settings.useMarkedText {
+            if effectiveUseMarkedText {
+                // Insert the final text - this replaces marked text with plain text
+                // Using NSNotFound for location tells the system to replace marked text
                 client.insertText(
                     composingText,
                     replacementRange: NSRange(location: NSNotFound, length: 0)
@@ -632,7 +736,7 @@ class XKeyIMController: IMKInputController {
     
     /// Cancel composition (private helper)
     private func cancelComposition(_ client: IMKTextInput) {
-        if settings.useMarkedText && !composingText.isEmpty {
+        if effectiveUseMarkedText && !composingText.isEmpty {
             // Clear marked text
             client.setMarkedText(
                 "",

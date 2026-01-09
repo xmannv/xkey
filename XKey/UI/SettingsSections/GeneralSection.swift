@@ -74,7 +74,7 @@ struct GeneralSection: View {
                                     .frame(width: 150)
                                 }
                                 
-                                Text("Mặc định: Esc. Hỗ trợ tổ hợp phím modifier như Ctrl+Shift")
+                                Text("Mặc định: Esc. Hỗ trợ tổ hợp phím modifier như Ctrl+Shift (không áp dụng cho XKeyIM)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
