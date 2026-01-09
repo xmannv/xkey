@@ -6,25 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260109.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.3</link>
-      <sparkle:version>20260109.3</sparkle:version>
+      <title>Version 1.2.18 (Build 20260109.4)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.4</link>
+      <sparkle:version>20260109.4</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Add Force Accessibility feature to DebugView</p>
+<p>Centralize injection method default delays</p>
 <ul>
-<li>Add AXManualAccessibility toggle for Electron/Chromium apps</li>
-<li>Add AXEnhancedUserInterface enable button</li>
-<li>Add accessibility status check function</li>
-<li>Display force accessibility status in Text Test tab</li>
-<li>Track last focused external app for targeting</li>
+<li>Add defaultDelays computed property to InjectionMethod enum</li>
+<li>Replace all hardcoded default delays with method.defaultDelays</li>
+<li>Single source of truth for:</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.3">Xem chi tiết trên GitHub</a></p>
+<p>  - .fast: (1000, 3000, 1500) - Low delays for responsive apps</p>
+<p>  - .slow: (3000, 6000, 3000) - High delays for terminals/IDEs</p>
+<p>  - .selection: (1000, 3000, 2000) - Medium for selection-based</p>
+<p>  - .autocomplete: (1000, 3000, 1000) - Fast for overlays</p>
+<p>  - .axDirect: (1000, 3000, 2000) - Medium for AX API</p>
+<p>Note: Custom per-app delays (JetBrains, MS Office, Terminals) are</p>
+<p>intentionally kept as hardcoded values since they are app-specific.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260109.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 09 Jan 2026 10:47:40 +0000</pubDate>
+      <pubDate>Fri, 09 Jan 2026 12:44:56 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260109.3/XKey.dmg" sparkle:version="20260109.3" sparkle:shortVersionString="1.2.18" length="9347024" type="application/octet-stream" sparkle:edSignature="S9IepBze5PCdYLhCIBR9wR2Q8Le838d+TS6dWBXWCUZKh09v4t9pOO30XJUaN7x7VIzn+w3abMnvciPb3uH/Cw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260109.4/XKey.dmg" sparkle:version="20260109.4" sparkle:shortVersionString="1.2.18" length="9398282" type="application/octet-stream" sparkle:edSignature="+Ne7Kw/Y7glB8FZ/F9vX1qaZ/uXCJJ8qzsvZ8FixRVD8mqMfsu1Sthg0Cy1RulLbGnj09CjhEj8xZbtLVfLKBg==" />
     </item>
   </channel>
 </rss>
