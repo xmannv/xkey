@@ -129,9 +129,10 @@ extension String {
         
         // ========================================
         // S-clusters - Vietnamese doesn't start with S + consonant
+        // NOTE: "sy" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "sỹ")
         // ========================================
         "sb", "sc", "sd", "sf", "sg", "sh", "sj", "sk", "sl", "sm",
-        "sn", "sp", "sq", "sr", "ss", "st", "sv", "sw", "sx", "sy", "sz",
+        "sn", "sp", "sq", "sr", "ss", "st", "sv", "sw", "sx", "sz",
         
         // ========================================
         // W-clusters - ALL w + letter (Vietnamese NEVER uses 'w')
@@ -187,33 +188,47 @@ extension String {
         // Other invalid consonant combinations
         // ========================================
         // B + consonant (except bl, br which are above)
-        "bc", "bd", "bf", "bg", "bh", "bj", "bk", "bm", "bn", "bp", "bq", "bs", "bt", "bv", "bx", "by", "bz",
+        // NOTE: "by" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "bc", "bd", "bf", "bg", "bh", "bj", "bk", "bm", "bn", "bp", "bq", "bs", "bt", "bv", "bx", "bz",
         // C + consonant (except ch, cl, cr - ch is valid Vietnamese, cl/cr are above)
-        "cb", "cd", "cf", "cg", "cj", "ck", "cm", "cn", "cp", "cq", "cs", "ct", "cv", "cx", "cy", "cz",
+        // NOTE: "cy" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "cb", "cd", "cf", "cg", "cj", "ck", "cm", "cn", "cp", "cq", "cs", "ct", "cv", "cx", "cz",
         // D + consonant (except dr, dw which are above)
-        "db", "dc", "df", "dg", "dh", "dj", "dk", "dm", "dn", "dp", "dq", "ds", "dt", "dv", "dx", "dy", "dz",
+        // NOTE: "dy" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "db", "dc", "df", "dg", "dh", "dj", "dk", "dm", "dn", "dp", "dq", "ds", "dt", "dv", "dx", "dz",
         // G + consonant (except gh, gi, gl, gr - gh/gi are valid Vietnamese, gl/gr are above)
-        "gb", "gc", "gd", "gf", "gj", "gk", "gm", "gp", "gq", "gs", "gt", "gv", "gx", "gy", "gz",
+        // NOTE: "gy" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "gb", "gc", "gd", "gf", "gj", "gk", "gm", "gp", "gq", "gs", "gt", "gv", "gx", "gz",
         // H + consonant
-        "hb", "hc", "hd", "hf", "hg", "hj", "hk", "hl", "hm", "hn", "hp", "hq", "hr", "hs", "ht", "hv", "hx", "hy", "hz",
+        // NOTE: "hy" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "hỷ")
+        "hb", "hc", "hd", "hf", "hg", "hj", "hk", "hl", "hm", "hn", "hp", "hq", "hr", "hs", "ht", "hv", "hx", "hz",
         // K + consonant (except kh - kh is valid Vietnamese)
-        "kb", "kc", "kd", "kf", "kg", "kj", "kk", "kl", "km", "kp", "kq", "ks", "kt", "kv", "kx", "ky", "kz",
+        // NOTE: "ky" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "ký")
+        "kb", "kc", "kd", "kf", "kg", "kj", "kk", "kl", "km", "kp", "kq", "ks", "kt", "kv", "kx", "kz",
         // L + consonant
-        "lb", "lc", "ld", "lf", "lg", "lh", "lj", "lk", "lm", "ln", "lp", "lq", "lr", "ls", "lt", "lv", "lx", "ly", "lz",
+        // NOTE: "ly" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "lý")
+        "lb", "lc", "ld", "lf", "lg", "lh", "lj", "lk", "lm", "ln", "lp", "lq", "lr", "ls", "lt", "lv", "lx", "lz",
         // M + consonant
-        "mb", "mc", "md", "mf", "mg", "mh", "mj", "mk", "ml", "mn", "mp", "mq", "mr", "ms", "mt", "mv", "mx", "my", "mz",
+        // NOTE: "my" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "mỹ")
+        "mb", "mc", "md", "mf", "mg", "mh", "mj", "mk", "ml", "mn", "mp", "mq", "mr", "ms", "mt", "mv", "mx", "mz",
         // N + consonant (except ng, nh - these are valid Vietnamese)
-        "nb", "nc", "nd", "nf", "nj", "nk", "nl", "nm", "np", "nq", "nr", "ns", "nt", "nv", "nx", "ny", "nz",
+        // NOTE: "ny" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "nb", "nc", "nd", "nf", "nj", "nk", "nl", "nm", "np", "nq", "nr", "ns", "nt", "nv", "nx", "nz",
         // P + consonant (except ph, pl, pr - ph is valid Vietnamese, pl/pr are above)
-        "pb", "pc", "pd", "pg", "pj", "pk", "pm", "pp", "pq", "pv", "px", "py", "pz",
+        // NOTE: "py" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "pb", "pc", "pd", "pg", "pj", "pk", "pm", "pp", "pq", "pv", "px", "pz",
         // R + consonant
-        "rb", "rc", "rd", "rf", "rg", "rh", "rj", "rk", "rl", "rm", "rn", "rp", "rq", "rs", "rt", "rv", "rx", "ry", "rz",
+        // NOTE: "ry" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "rb", "rc", "rd", "rf", "rg", "rh", "rj", "rk", "rl", "rm", "rn", "rp", "rq", "rs", "rt", "rv", "rx", "rz",
         // T + consonant (except th, tr - these are valid Vietnamese)
-        "tb", "tc", "td", "tf", "tg", "tj", "tk", "tl", "tm", "tn", "tp", "tq", "ts", "tv", "tx", "ty", "tz",
+        // NOTE: "ty" is EXCLUDED because 'y' is a vowel in Vietnamese (e.g., "tỷ")
+        "tb", "tc", "td", "tf", "tg", "tj", "tk", "tl", "tm", "tn", "tp", "tq", "ts", "tv", "tx", "tz",
         // V + consonant
-        "vb", "vc", "vd", "vf", "vg", "vh", "vj", "vk", "vl", "vm", "vn", "vp", "vq", "vs", "vt", "vv", "vx", "vy", "vz",
+        // NOTE: "vy" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "vb", "vc", "vd", "vf", "vg", "vh", "vj", "vk", "vl", "vm", "vn", "vp", "vq", "vs", "vt", "vv", "vx", "vz",
         // X + consonant
-        "xb", "xc", "xd", "xf", "xg", "xh", "xj", "xk", "xl", "xm", "xn", "xp", "xq", "xs", "xt", "xv", "xx", "xy", "xz",
+        // NOTE: "xy" is EXCLUDED because 'y' is a vowel in Vietnamese
+        "xb", "xc", "xd", "xf", "xg", "xh", "xj", "xk", "xl", "xm", "xn", "xp", "xq", "xs", "xt", "xv", "xx", "xz",
     ]
     
     /// Set of 3-letter initial clusters that are IMPOSSIBLE in Vietnamese
@@ -531,11 +546,16 @@ extension String {
         // ============================================
         // RULE 6: Double consonants
         // ============================================
-        // Vietnamese never has double consonants
+        // Vietnamese never has double consonants in FINAL output
+        // BUT: In Telex input, these are VALID input sequences:
+        // - dd → đ, cc → ch (Quick Telex), gg → gi, kk → kh, nn → ng, pp → ph, tt → th
+        // So we exclude Telex patterns from this check
         if word.count >= 3 {
             let doubleConsonants = [
-                "bb", "cc", "dd", "ff", "gg", "hh", "jj", "kk",
-                "ll", "mm", "nn", "pp", "rr", "ss", "tt", "vv", "zz"
+                // Only check non-Telex double consonants
+                "bb", "ff", "hh", "jj",
+                "ll", "mm", "rr", "ss", "vv", "zz"
+                // EXCLUDED: "cc", "dd", "gg", "kk", "nn", "pp", "tt" - valid Telex input
             ]
             for dc in doubleConsonants {
                 if word.contains(dc) {
@@ -548,6 +568,8 @@ extension String {
         // RULE 7: English suffixes (derivational)
         // ============================================
         // Common English word endings not found in Vietnamese
+        // NOTE: We're careful here because Telex mark keys (s/f/r/x/j) are at word end
+        // These suffixes are checked on the FINAL output, not during typing
         if word.count >= 4 {
             let englishSuffixes = [
                 // -tion, -sion (nation, vision)
@@ -556,8 +578,7 @@ extension String {
                 "ing",
                 // -ed past tense (walked, played)
                 "ed",
-                // -ly adverbs (quickly, slowly)
-                "ly",
+                // EXCLUDED: "ly" - could conflict with Vietnamese "lý" input during Telex typing
                 // -ness (happiness, sadness)
                 "ness",
                 // -ment (movement, government)
@@ -619,12 +640,14 @@ extension String {
         // RULE 10: English vowel combinations
         // ============================================
         // Not found in Vietnamese orthography
+        // NOTE: "oo" and "ee" are EXCLUDED because they are valid Telex input:
+        // - aa → â, ee → ê, oo → ô (Telex vowel transformation)
+        // - So "gooj" = "gộ", not English "oo"
         if word.count > 3 {
             let englishVowelCombos = [
                 // Long vowel digraphs
                 "ough", "eigh", "augh",
-                // Double vowels (Vietnamese has different ones)
-                "oo", "ee",
+                // EXCLUDED: "oo", "ee" - valid Telex input (oo→ô, ee→ê)
                 // Specific English patterns
                 "eau", "iew", "ow", "aw",
                 // ie in specific positions (Vietnamese có "iê" nhưng khác)
@@ -737,11 +760,16 @@ extension String {
         // ============================================
         // RULE 3: Double consonants in the word
         // ============================================
-        // Vietnamese never has double consonants
+        // Vietnamese never has double consonants in FINAL output
+        // BUT: In Telex input, these are VALID input sequences:
+        // - dd → đ, cc → ch (Quick Telex), gg → gi, kk → kh, nn → ng, pp → ph, tt → th
+        // So we exclude Telex patterns from this check
         if word.count >= 3 {
             let doubleConsonants = [
-                "bb", "cc", "dd", "ff", "gg", "hh", "jj", "kk",
-                "ll", "mm", "nn", "pp", "rr", "ss", "tt", "vv", "zz"
+                // Only check non-Telex double consonants
+                "bb", "ff", "hh", "jj",
+                "ll", "mm", "rr", "ss", "vv", "zz"
+                // EXCLUDED: "cc", "dd", "gg", "kk", "nn", "pp", "tt" - valid Telex input
             ]
             for dc in doubleConsonants {
                 if word.contains(dc) {
