@@ -6,25 +6,23 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260110.4)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.4</link>
-      <sparkle:version>20260110.4</sparkle:version>
+      <title>Version 1.2.18 (Build 20260110.5)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.5</link>
+      <sparkle:version>20260110.5</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: improve restore spelling logic for Vietnamese words</p>
+<p>Fix undo typing with W key for 'thuơ' case</p>
 <ul>
-<li>Remove unused handleSpace() function (Space handled by processWordBreak)</li>
-<li>Add hasVietnameseProcessing() to check for tone marks/diacritics</li>
-<li>Fix restore logic: use dictionary check for words with Vietnamese chars</li>
-<li>Skip saveWord when restore happens to preserve correct state</li>
-<li>This fixes restore not working for phonetically valid but invalid words like 'xỷ'</li>
+<li>Added restore condition for 'uơ → uo' case in insertW() function</li>
+<li>When typing 'thuow' → 'thuơ', pressing W again now correctly restores to 'thuow'</li>
+<li>The special 'thuơn' case was missing undo logic for when only v2 (ơ) has TONEW_MASK</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.4">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.5">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 10 Jan 2026 06:30:46 +0000</pubDate>
+      <pubDate>Sat, 10 Jan 2026 06:49:09 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260110.4/XKey.dmg" sparkle:version="20260110.4" sparkle:shortVersionString="1.2.18" length="9401182" type="application/octet-stream" sparkle:edSignature="z4qjARuWzPMsO2ds4KJjhkGOizBuZumpEgvXis/XDElc+ps5h3Jm4yo5gANMkP7LUdLxdA4Ngn+CLaOYzEM3Cg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260110.5/XKey.dmg" sparkle:version="20260110.5" sparkle:shortVersionString="1.2.18" length="9401371" type="application/octet-stream" sparkle:edSignature="4jP6XlH1IiCIs+JPZCLiZyL8QPB4tqy7Ri2lnyZzBP7sOLEO44md03CZmz2WzadfG0yEQpxApiRE83yXaCl+AA==" />
     </item>
   </channel>
 </rss>
