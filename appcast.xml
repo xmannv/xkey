@@ -6,34 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260110)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110</link>
-      <sparkle:version>20260110</sparkle:version>
+      <title>Version 1.2.18 (Build 20260110.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.1</link>
+      <sparkle:version>20260110.1</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(engine): Improve Vietnamese spelling check and English detection</p>
+<p>Fix Telex diacritic marks for words ending with 'y'</p>
 <ul>
-<li>Rewrite checkSpelling() in VNEngine with phonetic-based validation</li>
+<li>Remove 'y' from impossible consonant prefixes (e.g., dy, gy, hy, ky, ly, my, ny, py, ry, ty, vy, xy) since 'y' is a vowel in Vietnamese (e.g., sỹ, lỹ, mỹ, tỷ, ký, hỷ)</li>
+<li>Exclude Telex double consonant patterns (cc, dd, gg, kk, nn, pp, tt) from English detection since they are valid Telex transformations (dd→đ, cc→ch, gg→gi, etc.)</li>
+<li>Exclude Telex vowel patterns (oo, ee) from English vowel combinations check since they transform to ô, ê</li>
+<li>Remove 'ly' from English suffixes to avoid conflict with Vietnamese 'lý' input</li>
+<li>Add explanatory comments for all exclusions</li>
 </ul>
-<p>  using consonantTable and endConsonantTable for accurate spell checking</p>
-<ul>
-<li>Add comprehensive impossible Vietnamese prefix detection with O(1) Set lookup</li>
-</ul>
-<p>  (impossible2LetterPrefixes, impossible3LetterPrefixes, impossible4LetterPrefixes)</p>
-<ul>
-<li>Support vAllowConsonantZFWJ setting to properly allow Z, F, W, J consonants</li>
-<li>Add valid Telex/VNI input pattern recognition (dd, d9, cc, etc.)</li>
-<li>Handle special Vietnamese cases: "que't" (u after q), "gìn" (i after g)</li>
-<li>Add more English consonant clusters detection (chr, phr, wh, wr, etc.)</li>
-<li>Fix mask logic for CONSONANT<em>ALLOW</em>MASK and END<em>CONSONANT</em>MASK</li>
-</ul>
-<p>Build: 20260110</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110">Xem chi tiết trên GitHub</a></p>
+<p>This allows users to properly type Vietnamese words like 'sỹ' (syx), 'lỹ' (lyx), etc. using Telex input method</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260110.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 10 Jan 2026 04:19:28 +0000</pubDate>
+      <pubDate>Sat, 10 Jan 2026 05:09:06 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260110/XKey.dmg" sparkle:version="20260110" sparkle:shortVersionString="1.2.18" length="9402279" type="application/octet-stream" sparkle:edSignature="F4q5UoZuNdMPmuNxWM5tEEfa2+cgNfXVG4OkJia7lbIp5ofLmrhB6ySQFP8p67+Kk2V3mSLVyOnjHW8GQZOJBQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260110.1/XKey.dmg" sparkle:version="20260110.1" sparkle:shortVersionString="1.2.18" length="9402082" type="application/octet-stream" sparkle:edSignature="pe2ePIohrwC7sUZ1gCuOLPNkpJvtZXm+hvwgwGDojxC69Fz0rsJqRKfOLapz3t7UCQhcJkFAa0SJNF2aDa6PCw==" />
     </item>
   </channel>
 </rss>
