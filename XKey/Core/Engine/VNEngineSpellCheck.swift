@@ -69,6 +69,31 @@ extension VNEngine {
         return nlValid
     }
 
+    /// Check if the current word buffer contains Vietnamese-specific characters
+    /// Returns true if the word has tone marks, diacritics, or special Vietnamese letters
+    /// This is used to determine if dictionary validation should be applied
+    func hasVietnameseProcessing() -> Bool {
+        guard index > 0 else { return false }
+        
+        for i in 0..<Int(index) {
+            let data = typingWord[i]
+            // Check for tone marks (^, ă)
+            if (data & VNEngine.TONE_MASK) != 0 || (data & VNEngine.TONEW_MASK) != 0 {
+                return true
+            }
+            // Check for diacritics (sắc, huyền, hỏi, ngã, nặng)
+            if (data & VNEngine.MARK_MASK) != 0 {
+                return true
+            }
+            // Check for standalone special characters (ư, ơ) with STANDALONE_MASK
+            if (data & VNEngine.STANDALONE_MASK) != 0 {
+                return true
+            }
+        }
+        
+        return false
+    }
+
     /// Validate if a given word string is a valid Vietnamese word
     /// This is used for checking words from Accessibility API
     func checkWordSpelling(word: String) -> Bool {

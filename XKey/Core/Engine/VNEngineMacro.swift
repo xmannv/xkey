@@ -80,7 +80,7 @@ extension VNEngine {
     }
     
     /// Process macro on word break
-    /// Called from handleWordBreak and handleSpace
+    /// Called from handleWordBreak and processWordBreak
     func processMacroOnBreak() -> Bool {
         guard shouldUseMacro() else { return false }
         return findAndReplaceMacro()
