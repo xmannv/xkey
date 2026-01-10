@@ -176,11 +176,8 @@ class VNEngine {
             return hookState
         }
         
-        // Handle space
-        if keyCode == VietnameseData.KEY_SPACE {
-            handleSpace()
-            return hookState
-        }
+        // NOTE: Space is handled by processWordBreak() which is called directly by handlers
+        // Don't add handleSpace() here - it would be dead code since handlers call processWordBreak() for Space
         
         // Handle delete/backspace
         if keyCode == VietnameseData.KEY_DELETE {
@@ -302,62 +299,6 @@ class VNEngine {
         }
     }
     
-    // MARK: - Space Handling
-    
-    private func handleSpace() {
-        logCallback?("handleSpace: index=\(index), tempDisableKey=\(tempDisableKey)")
-        
-        if !tempDisableKey && vCheckSpelling == 1 {
-            checkSpelling(forceCheckVowel: true)
-        }
-        
-        // Check macro first - if found, return early
-        if shouldUseMacro() && !hasHandledMacro {
-            if findAndReplaceMacro() {
-                // Macro found and replaced - clear macro key and return
-                hookState.macroKey.removeAll()
-                spaceCount += 1
-                return
-            }
-        }
-        
-        if (vQuickStartConsonant == 1 || vQuickEndConsonant == 1) && !tempDisableKey {
-            checkQuickConsonant()
-            spaceCount += 1
-        } else if vRestoreIfWrongSpelling == 1 && vTempOffSpelling == 0 && tempDisableKey && !hasHandledMacro && !cursorMovedSinceReset {
-            // Skip restore if cursor was moved (editing mid-word)
-            if !checkRestoreIfWrongSpelling(handleCode: vRestore) {
-                hookState.code = UInt8(vDoNothing)
-            }
-            spaceCount += 1
-        } else {
-            if cursorMovedSinceReset {
-                logCallback?("handleSpace: Skip restore because cursor was moved (editing mid-word)")
-            }
-            hookState.code = UInt8(vDoNothing)
-            spaceCount += 1
-        }
-        
-        if vUseMacro == 1 {
-            hookState.macroKey.removeAll()
-        }
-        
-        if vUpperCaseFirstChar == 1 && upperCaseStatus == 1 {
-            upperCaseStatus = 2
-        }
-        
-        // Save word
-        if spaceCount == 1 {
-            if !specialChar.isEmpty {
-                saveSpecialChar()
-            } else {
-                saveWord()
-            }
-        }
-        
-        vCheckSpelling = useSpellCheckingBefore ? 1 : 0
-        willTempOffEngine = false
-    }
     
     // MARK: - Delete Handling
     
@@ -2514,7 +2455,11 @@ class VNEngine {
     // MARK: - State Management
     
     func saveWord() {
-        if hookState.code == UInt8(vReplaceMacro) {
+        // Skip saving when macro replacement or restore happens
+        // For restore: the typingWord buffer still contains old Vietnamese data,
+        // but the actual output has been restored to original keystrokes
+        if hookState.code == UInt8(vReplaceMacro) || hookState.code == UInt8(vRestore) {
+            logCallback?("saveWord: Skipping save because hookState.code=\(hookState.code) (macro or restore)")
             return
         }
         
@@ -3021,9 +2966,20 @@ extension VNEngine {
                         // but the full word on screen (e.g., "hiẻn") is invalid
                         tempDisableKey = true
                         logCallback?("processWordBreak: AX word invalid, forcing tempDisableKey=true for restore")
-                    } else if !tempDisableKey {
-                        // Not using AX - re-check spelling with full vowel check (updates tempDisableKey)
-                        checkSpelling(forceCheckVowel: true)
+                    } else {
+                        // Not using AX - check if word has Vietnamese processing
+                        // If word has tone marks/diacritics and is not in dictionary, restore it
+                        // This fixes the issue where phonetically valid but meaningless words
+                        // like "xỷ" weren't being restored because checkSpelling() only checks phonetic
+                        let hasVietnameseChars = hasVietnameseProcessing()
+                        if hasVietnameseChars {
+                            // Word has Vietnamese characters but is not valid - restore it
+                            tempDisableKey = true
+                            logCallback?("processWordBreak: Dictionary check failed for Vietnamese word '\(wordToCheck)', forcing restore")
+                        } else if !tempDisableKey {
+                            // Word doesn't have Vietnamese characters, use phonetic check
+                            checkSpelling(forceCheckVowel: true)
+                        }
                     }
 
                     if tempDisableKey {
