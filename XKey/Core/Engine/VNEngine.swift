@@ -2992,7 +2992,12 @@ extension VNEngine {
                         }
                     }
 
-                    if tempDisableKey {
+                    // IMPORTANT: Skip restore if word has no Vietnamese processing
+                    // This handles the case where user manually restored via toggle key (e.g., 'd' to revert 'đ' to 'd')
+                    // In this case, tempDisableKey=true but the word is now plain text - no need to restore again
+                    // Example: "ddi" -> user typed 'd' to restore 'đ' -> "did" (plain text) -> space should NOT restore to "ddi"
+                    let hasVNProcessing = hasVietnameseProcessing()
+                    if tempDisableKey && hasVNProcessing {
                         logCallback?("processWordBreak: Word invalid, attempting restore...")
                         if checkRestoreIfWrongSpelling(handleCode: vRestore) {
                             logCallback?("processWordBreak: Restore successful")
@@ -3038,6 +3043,10 @@ extension VNEngine {
                             spaceCount = 1
                             return result
                         }
+                    } else if tempDisableKey && !hasVNProcessing {
+                        // User manually restored via toggle key (e.g., 'd' to revert 'đ' to 'd')
+                        // Word is now plain text, no need to restore again
+                        logCallback?("processWordBreak: Skipping restore - word has no Vietnamese processing (manually restored)")
                     }
                 }
             }

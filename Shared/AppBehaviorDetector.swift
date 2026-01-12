@@ -56,6 +56,7 @@ enum InjectionMethod: String, Codable, CaseIterable {
     case selection      // Browser address bars: Shift+Left select + type replacement
     case autocomplete   // Spotlight: Forward Delete + backspace + text
     case axDirect       // Firefox content area: Use Accessibility API to set text directly
+    case passthrough    // Bypass Vietnamese processing - just pass keystrokes through
 
     var displayName: String {
         switch self {
@@ -64,6 +65,7 @@ enum InjectionMethod: String, Codable, CaseIterable {
         case .selection: return "Selection"
         case .autocomplete: return "Autocomplete"
         case .axDirect: return "AX Direct"
+        case .passthrough: return "Passthrough"
         }
     }
 
@@ -74,6 +76,7 @@ enum InjectionMethod: String, Codable, CaseIterable {
         case .selection: return "Shift+Left select + gõ thay thế (Browser address bar)"
         case .autocomplete: return "Forward Delete + backspace + text (Spotlight, Raycast)"
         case .axDirect: return "Dùng Accessibility API trực tiếp (Firefox content area)"
+        case .passthrough: return "Bỏ qua xử lý Tiếng Việt - chỉ truyền phím thẳng qua"
         }
     }
     
@@ -86,6 +89,7 @@ enum InjectionMethod: String, Codable, CaseIterable {
         case .selection:    return (1000, 3000, 2000)   // Medium delays for selection-based injection
         case .autocomplete: return (1000, 3000, 1000)   // Fast text, for overlays like Spotlight
         case .axDirect:     return (1000, 3000, 2000)   // Medium delays for AX API injection
+        case .passthrough:  return (0, 0, 0)            // No delays needed - passthrough doesn't inject
         }
     }
 }
@@ -191,11 +195,12 @@ struct MergedRuleResult {
     /// Text sending method (nil = use default/auto-detect)
     var textSendingMethod: TextSendingMethod?
     
-    /// Disable Vietnamese input for this context (nil = use default)
-    var disableVietnameseInput: Bool?
-    
     /// Enable AXManualAccessibility for Electron/Chromium apps
     var enableForceAccessibility: Bool?
+    
+    /// Target input source ID to switch to when rule matches (nil = use XKey/current)
+    /// When set, XKey will automatically switch to this input source when the rule matches
+    var targetInputSourceId: String?
     
     /// Combined description from all rules
     var description: String?
@@ -221,8 +226,8 @@ struct MergedRuleResult {
         if let value = rule.injectionMethod { injectionMethod = value }
         if let value = rule.injectionDelays { injectionDelays = value }
         if let value = rule.textSendingMethod { textSendingMethod = value }
-        if let value = rule.disableVietnameseInput { disableVietnameseInput = value }
         if let value = rule.enableForceAccessibility { enableForceAccessibility = value }
+        if let value = rule.targetInputSourceId { targetInputSourceId = value }
         if let value = rule.description { description = value }
     }
 }
@@ -268,14 +273,15 @@ struct WindowTitleRule: Codable, Identifiable {
     /// Override: Text sending method (nil = use default/auto-detect)
     let textSendingMethod: TextSendingMethod?
     
-    /// Override: Disable Vietnamese input for this context (nil = use default, true = disable, false = enable)
-    /// When enabled, XKey will automatically disable Vietnamese typing when this rule matches
-    let disableVietnameseInput: Bool?
-    
     /// Override: Enable AXManualAccessibility for Electron/Chromium apps
     /// When enabled, XKey will set AXManualAccessibility = true when this app is focused
     /// This helps retrieve more detailed text info from Electron apps (VS Code, Slack, etc.)
     let enableForceAccessibility: Bool?
+    
+    /// Override: Target input source to switch to when rule matches
+    /// When set, XKey will automatically switch to this input source when the rule matches
+    /// Example: "com.apple.keylayout.ABC" for US English, "com.apple.keylayout.French" for French
+    let targetInputSourceId: String?
     
     /// Description for debugging
     let description: String?
@@ -327,7 +333,7 @@ struct WindowTitleRule: Codable, Identifiable {
         case id, name, bundleIdPattern, titlePattern, matchMode, isEnabled
         case useMarkedText, hasMarkedTextIssues, commitDelay
         case injectionMethod, injectionDelays, textSendingMethod
-        case disableVietnameseInput, enableForceAccessibility, description
+        case enableForceAccessibility, targetInputSourceId, description
     }
     
     init(from decoder: Decoder) throws {
@@ -343,8 +349,8 @@ struct WindowTitleRule: Codable, Identifiable {
         commitDelay = try container.decodeIfPresent(UInt32.self, forKey: .commitDelay)
         injectionDelays = try container.decodeIfPresent([UInt32].self, forKey: .injectionDelays)
         textSendingMethod = try container.decodeIfPresent(TextSendingMethod.self, forKey: .textSendingMethod)
-        disableVietnameseInput = try container.decodeIfPresent(Bool.self, forKey: .disableVietnameseInput)
         enableForceAccessibility = try container.decodeIfPresent(Bool.self, forKey: .enableForceAccessibility)
+        targetInputSourceId = try container.decodeIfPresent(String.self, forKey: .targetInputSourceId)
         description = try container.decodeIfPresent(String.self, forKey: .description)
         
         // Decode injection method from string
@@ -354,6 +360,8 @@ struct WindowTitleRule: Codable, Identifiable {
             case "slow": injectionMethod = .slow
             case "selection": injectionMethod = .selection
             case "autocomplete": injectionMethod = .autocomplete
+            case "axdirect": injectionMethod = .axDirect
+            case "passthrough": injectionMethod = .passthrough
             default: injectionMethod = nil
             }
         } else {
@@ -374,8 +382,8 @@ struct WindowTitleRule: Codable, Identifiable {
         try container.encodeIfPresent(commitDelay, forKey: .commitDelay)
         try container.encodeIfPresent(injectionDelays, forKey: .injectionDelays)
         try container.encodeIfPresent(textSendingMethod, forKey: .textSendingMethod)
-        try container.encodeIfPresent(disableVietnameseInput, forKey: .disableVietnameseInput)
         try container.encodeIfPresent(enableForceAccessibility, forKey: .enableForceAccessibility)
+        try container.encodeIfPresent(targetInputSourceId, forKey: .targetInputSourceId)
         try container.encodeIfPresent(description, forKey: .description)
         
         // Encode injection method as string
@@ -387,6 +395,7 @@ struct WindowTitleRule: Codable, Identifiable {
             case .selection: methodString = "selection"
             case .autocomplete: methodString = "autocomplete"
             case .axDirect: methodString = "axDirect"
+            case .passthrough: methodString = "passthrough"
             }
             try container.encode(methodString, forKey: .injectionMethod)
         }
@@ -406,8 +415,8 @@ struct WindowTitleRule: Codable, Identifiable {
         injectionMethod: InjectionMethod? = nil,
         injectionDelays: [UInt32]? = nil,
         textSendingMethod: TextSendingMethod? = nil,
-        disableVietnameseInput: Bool? = nil,
         enableForceAccessibility: Bool? = nil,
+        targetInputSourceId: String? = nil,
         description: String? = nil
     ) {
         self.id = UUID()
@@ -422,8 +431,8 @@ struct WindowTitleRule: Codable, Identifiable {
         self.injectionMethod = injectionMethod
         self.injectionDelays = injectionDelays
         self.textSendingMethod = textSendingMethod
-        self.disableVietnameseInput = disableVietnameseInput
         self.enableForceAccessibility = enableForceAccessibility
+        self.targetInputSourceId = targetInputSourceId
         self.description = description
     }
 }
@@ -830,55 +839,74 @@ class AppBehaviorDetector {
         return NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     }
     
-    /// Get current focused element's role using Accessibility API
-    func getFocusedElementRole() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
+    // MARK: - Focused Element Info (Optimized - Single AX Query)
+    
+    /// Struct containing all relevant AX attributes of the focused element
+    /// Queried once to avoid multiple AXUIElementCreateSystemWide() calls
+    struct FocusedElementInfo {
+        let role: String?
+        let subrole: String?
+        let description: String?
+        let identifier: String?
+        let domClasses: [String]?
+        let textValue: String?
         
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            var roleVal: CFTypeRef?
-            AXUIElementCopyAttributeValue(axEl, kAXRoleAttribute as CFString, &roleVal)
-            return roleVal as? String
+        /// Check if this element is empty (no text or empty string)
+        var isEmpty: Bool {
+            guard let text = textValue else { return true }
+            return text.isEmpty
         }
         
-        return nil
-    }
-
-    /// Get current focused element's AX Description using Accessibility API
-    /// - Returns: The AX Description of the focused element, or nil if not available
-    func getFocusedElementDescription() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            var descVal: CFTypeRef?
-            AXUIElementCopyAttributeValue(axEl, kAXDescriptionAttribute as CFString, &descVal)
-            return descVal as? String
-        }
-        
-        return nil
+        static let empty = FocusedElementInfo(
+            role: nil, subrole: nil, description: nil,
+            identifier: nil, domClasses: nil, textValue: nil
+        )
     }
     
-    /// Get current focused element's AX Identifier (DOM ID) using Accessibility API
-    /// - Returns: The AX Identifier of the focused element, or nil if not available
-    func getFocusedElementIdentifier() -> String? {
+    /// Get all AX attributes of the focused element in a single query
+    /// This is more efficient than calling individual getFocused...() functions
+    /// - Returns: FocusedElementInfo containing all relevant attributes
+    func getFocusedElementInfo() -> FocusedElementInfo {
         let systemWide = AXUIElementCreateSystemWide()
         var focused: CFTypeRef?
         
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            var identifierVal: CFTypeRef?
-            AXUIElementCopyAttributeValue(axEl, kAXIdentifierAttribute as CFString, &identifierVal)
-            return identifierVal as? String
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let el = focused else {
+            return .empty
         }
         
-        return nil
+        let axEl = el as! AXUIElement
+        
+        // Query all attributes at once
+        var roleVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, kAXRoleAttribute as CFString, &roleVal)
+        
+        var subroleVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, kAXSubroleAttribute as CFString, &subroleVal)
+        
+        var descVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, kAXDescriptionAttribute as CFString, &descVal)
+        
+        var identifierVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, kAXIdentifierAttribute as CFString, &identifierVal)
+        
+        var domClassRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, "AXDOMClassList" as CFString, &domClassRef)
+        
+        var textVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &textVal)
+        
+        return FocusedElementInfo(
+            role: roleVal as? String,
+            subrole: subroleVal as? String,
+            description: descVal as? String,
+            identifier: identifierVal as? String,
+            domClasses: domClassRef as? [String],
+            textValue: textVal as? String
+        )
     }
+    
+    // MARK: - Address Bar Detection (Using Single AX Query)
     
     /// Check if focused element matches Zen-style address bar pattern
     /// Detection methods:
@@ -886,13 +914,15 @@ class AppBehaviorDetector {
     /// 2. AX Description Pattern: "Search with <search_engine> or enter address"
     /// - Returns: true if focused element is a Zen-style address bar
     func isFirefoxStyleAddressBar() -> Bool {
+        let info = getFocusedElementInfo()
+        
         // Check DOM ID first (most reliable for Firefox-based browsers)
-        if let identifier = getFocusedElementIdentifier(), identifier == "urlbar-input" {
+        if let identifier = info.identifier, identifier == "urlbar-input" {
             return true
         }
         
         // Fallback: Check AX Description pattern
-        guard let desc = getFocusedElementDescription() else { return false }
+        guard let desc = info.description else { return false }
         // Regex: "Search with <anything> or enter address"
         let pattern = "^Search with .+ or enter address$"
         return desc.range(of: pattern, options: .regularExpression) != nil
@@ -902,7 +932,7 @@ class AppBehaviorDetector {
     /// Detection via AX Identifier: "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
     /// - Returns: true if focused element is Safari's address bar
     func isSafariAddressBar() -> Bool {
-        guard let identifier = getFocusedElementIdentifier() else { return false }
+        guard let identifier = getFocusedElementInfo().identifier else { return false }
         return identifier == "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
     }
     
@@ -912,14 +942,16 @@ class AppBehaviorDetector {
     /// 2. AX DOM Classes: contains "OmniboxViewViews"
     /// - Returns: true if focused element is Chromium's address bar (Omnibox)
     func isChromiumAddressBar() -> Bool {
+        let info = getFocusedElementInfo()
+        
         // Check AX Description
-        if let desc = getFocusedElementDescription(), desc == "Address and search bar" {
+        if let desc = info.description, desc == "Address and search bar" {
             return true
         }
         
         // Check DOM Classes for OmniboxViewViews (Chrome, Edge, etc.)
         // or BraveOmniboxViewViews (Brave Browser)
-        if let domClasses = getFocusedElementDOMClasses() {
+        if let domClasses = info.domClasses {
             if domClasses.contains("OmniboxViewViews") || domClasses.contains("BraveOmniboxViewViews") {
                 return true
             }
@@ -928,59 +960,20 @@ class AppBehaviorDetector {
         return false
     }
     
+    /// Check if focused element is Dia Browser's address bar (Command Bar)
+    /// Detection via AX Identifier: "commandBarTextField"
+    /// - Returns: true if focused element is Dia's address bar
+    func isDiaAddressBar() -> Bool {
+        guard let identifier = getFocusedElementInfo().identifier else { return false }
+        return identifier == "commandBarTextField"
+    }
+    
     /// Check if focused element is a Terminal panel in VSCode/Cursor/etc
     /// Detection via AX Description: starts with "Terminal"
     /// - Returns: true if focused element is an integrated terminal panel
     func isInTerminalPanel() -> Bool {
-        guard let desc = getFocusedElementDescription() else { return false }
+        guard let desc = getFocusedElementInfo().description else { return false }
         return desc.hasPrefix("Terminal")
-    }
-    
-    /// Get current focused element's DOM Classes using Accessibility API
-    /// - Returns: Array of DOM class names, or nil if not available
-    func getFocusedElementDOMClasses() -> [String]? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            var domClassRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(axEl, "AXDOMClassList" as CFString, &domClassRef) == .success,
-               let classes = domClassRef as? [String] {
-                return classes
-            }
-        }
-        
-        return nil
-    }
-
-    /// Get current focused element's text value using Accessibility API
-    /// - Returns: The text value of the focused element, or nil if not available
-    func getFocusedElementTextValue() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-           let el = focused {
-            let axEl = el as! AXUIElement
-            var textVal: CFTypeRef?
-            if AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &textVal) == .success,
-               let text = textVal as? String {
-                return text
-            }
-        }
-
-        return nil
-    }
-
-    /// Check if focused element is empty (no text or empty string)
-    /// - Returns: true if focused element has no text or empty text
-    func isFocusedElementEmpty() -> Bool {
-        guard let text = getFocusedElementTextValue() else {
-            return true  // No text value = empty
-        }
-        return text.isEmpty
     }
 
     /// Clear cache (call when app changes)
@@ -1143,52 +1136,6 @@ class AppBehaviorDetector {
         return findMatchingRule() != nil
     }
     
-    /// Check if Vietnamese input is overridden by matching rules (merged cascade)
-    /// - Returns: A tuple (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?)
-    ///   - shouldOverride: true if any rule wants to override Vietnamese input state
-    ///   - disableVietnamese: true = disable Vietnamese, false = enable Vietnamese
-    ///   - ruleName: display name of all matched rules for logging
-    func getVietnameseInputOverride() -> (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?) {
-        let mergedResult = getMergedRuleResult()
-        guard let disableVN = mergedResult.disableVietnameseInput else {
-            return (false, false, nil)
-        }
-        return (true, disableVN, mergedResult.displayName)
-    }
-    
-    /// Check if Vietnamese input is overridden for a specific bundle ID
-    /// Used for overlay apps (Spotlight, Raycast, Alfred) where we need to check
-    /// the overlay's rule instead of the background app's rule
-    /// - Parameter bundleId: The bundle ID to check rules for
-    /// - Returns: A tuple (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?)
-    func getVietnameseInputOverrideForApp(bundleId: String) -> (shouldOverride: Bool, disableVietnamese: Bool, ruleName: String?) {
-        // Get all matching rules for this specific bundle ID
-        var mergedResult = MergedRuleResult()
-        
-        // FIRST: Built-in rules (lower priority)
-        let disabledBuiltInRules = SharedSettings.shared.getDisabledBuiltInRules()
-        for rule in Self.builtInWindowTitleRules {
-            if disabledBuiltInRules.contains(rule.name) {
-                continue
-            }
-            if rule.matches(bundleId: bundleId, windowTitle: "") {
-                mergedResult.merge(from: rule)
-            }
-        }
-        
-        // THEN: Custom rules (higher priority - can override)
-        for rule in customRules where rule.isEnabled {
-            if rule.matches(bundleId: bundleId, windowTitle: "") {
-                mergedResult.merge(from: rule)
-            }
-        }
-        
-        guard let disableVN = mergedResult.disableVietnameseInput else {
-            return (false, false, nil)
-        }
-        return (true, disableVN, mergedResult.displayName)
-    }
-    
     /// Check if Force Accessibility (AXManualAccessibility) is enabled by matching rules (merged cascade)
     /// - Returns: A tuple (shouldEnable: Bool, ruleName: String?, bundleId: String?)
     ///   - shouldEnable: true if any rule wants to enable AXManualAccessibility
@@ -1202,6 +1149,19 @@ class AppBehaviorDetector {
         
         let bundleId = getCurrentBundleId() ?? ""
         return (true, mergedResult.displayName, bundleId)
+    }
+    
+    /// Get target input source ID from matching rules (merged cascade)
+    /// - Returns: A tuple (hasTarget: Bool, inputSourceId: String?, ruleName: String?)
+    ///   - hasTarget: true if any rule has a target input source configured
+    ///   - inputSourceId: the input source ID to switch to (e.g., "com.apple.keylayout.ABC")
+    ///   - ruleName: display name of all matched rules for logging
+    func getTargetInputSourceOverride() -> (hasTarget: Bool, inputSourceId: String?, ruleName: String?) {
+        let mergedResult = getMergedRuleResult()
+        guard let targetId = mergedResult.targetInputSourceId, !targetId.isEmpty else {
+            return (false, nil, nil)
+        }
+        return (true, targetId, mergedResult.displayName)
     }
     
     /// Get current window title
@@ -1366,6 +1326,11 @@ class AppBehaviorDetector {
                 return .browserAddressBar
             }
             
+            // Dia Browser address bar (AX Identifier: commandBarTextField)
+            if bundleId == "company.thebrowser.dia" && isDiaAddressBar() {
+                return .browserAddressBar
+            }
+            
             // Browser content area - treat as standard
             return .standard
         }
@@ -1484,7 +1449,7 @@ class AppBehaviorDetector {
             return .defaultFast
         }
 
-        let currentRole = getFocusedElementRole()
+        let currentRole = getFocusedElementInfo().role
 
         // Priority 0.2: Terminal panels in VSCode/Cursor/etc
         // Check directly via AX Description - doesn't go through overlay detection if it's a terminal panel (VSCode/Cursor)
@@ -1539,6 +1504,16 @@ class AppBehaviorDetector {
                     delays: InjectionMethod.selection.defaultDelays,
                     textSendingMethod: .chunked,
                     description: "Chromium Address Bar"
+                )
+            }
+            
+            // Dia Browser address bar (AX Identifier: commandBarTextField)
+            if bundleId == "company.thebrowser.dia" && isDiaAddressBar() {
+                return InjectionMethodInfo(
+                    method: .axDirect,
+                    delays: InjectionMethod.axDirect.defaultDelays,
+                    textSendingMethod: .chunked,
+                    description: "Dia Address Bar"
                 )
             }
             
@@ -1769,7 +1744,7 @@ extension AppBehaviorDetector {
     func getDetectionDebugInfo() -> String {
         let bundleId = getCurrentBundleId() ?? "unknown"
         let windowTitle = getCachedWindowTitle()
-        let role = getFocusedElementRole() ?? "unknown"
+        let role = getFocusedElementInfo().role ?? "unknown"
         let mergedResult = getMergedRuleResult()
         let allMatchingRules = findAllMatchingRules()
         let imkitBehavior = detectIMKitBehavior()
@@ -1804,7 +1779,6 @@ extension AppBehaviorDetector {
                commitDelay: \(mergedResult.commitDelay.map { String($0) } ?? "nil")
                injectionMethod: \(mergedResult.injectionMethod?.rawValue ?? "nil")
                textSendingMethod: \(mergedResult.textSendingMethod?.rawValue ?? "nil")
-               disableVietnameseInput: \(mergedResult.disableVietnameseInput.map { String($0) } ?? "nil")
                enableForceAccessibility: \(mergedResult.enableForceAccessibility.map { String($0) } ?? "nil")
             
             """

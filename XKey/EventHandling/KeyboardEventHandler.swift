@@ -297,6 +297,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if isCurrentAppExcluded() {
             return false
         }
+        
+        // Check if injection method is passthrough - bypass all Vietnamese processing
+        // This is checked BEFORE Vietnamese mode check because passthrough applies regardless
+        let confirmedMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
+        if confirmedMethod.method == .passthrough {
+            return false
+        }
 
         // Check if we should process in English mode (for macro support)
         let shouldProcessInEnglishMode = !isVietnameseEnabled && macroEnabled && macroInEnglishMode

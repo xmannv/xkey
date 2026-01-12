@@ -864,6 +864,54 @@ class VNEngineTests: XCTestCase {
         let foundMacro = macroManager.findMacro(key: typedKey)
         XCTAssertNotNil(foundMacro, "Macro '!test' should be found with keycode input")
     }
+    
+    // MARK: - Restore Wrong Spelling Bug Tests
+    
+    func testRestore_DDI_D_ShouldNotRestoreOnSpace() {
+        // Bug: Typing "d+d+i+d" (where the last 'd' restores 'đ' to 'd')
+        // followed by space incorrectly restored back to "ddi"
+        // Expected: "did" should remain as "did" after space
+        engine.reset()
+        engine.vCheckSpelling = 1
+        engine.vRestoreIfWrongSpelling = 1
+        
+        // Enable logging for debugging
+        engine.logCallback = { message in
+            print("Engine: \(message)")
+        }
+        
+        // Type "d" - first d
+        var result = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "d")
+        
+        // Type "d" again - should become "đ"
+        result = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "đ")
+        
+        // Type "i"
+        result = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "đi")
+        
+        // Type "d" again - should restore "đ" back to "d" (toggle)
+        result = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        // After toggle, the word should be "did" (d + i + d)
+        XCTAssertEqual(engine.getCurrentWord(), "did")
+        
+        // Check tempDisableKey is true (because of the toggle restore)
+        XCTAssertTrue(engine.tempDisableKey, "tempDisableKey should be true after toggle restore")
+        
+        // Check hasVietnameseProcessing is false (word is now plain text)
+        XCTAssertFalse(engine.hasVietnameseProcessing(), "Word 'did' should have no Vietnamese processing")
+        
+        // Process space (word break)
+        // BUG: Before fix, this would restore to "ddi" because tempDisableKey=true
+        // EXPECTED: Should NOT restore because word has no Vietnamese processing
+        let spaceResult = engine.processWordBreak(character: " ")
+        
+        // Should NOT consume (no restore should happen)
+        XCTAssertFalse(spaceResult.shouldConsume, "Space should NOT trigger restore for plain text word 'did'")
+        XCTAssertEqual(spaceResult.backspaceCount, 0, "No backspaces should be needed")
+    }
 }
 
 

@@ -151,6 +151,12 @@ class CharacterInjector {
                     usleep(delays.wait)
                     debugCallback?("    → Post-backspace wait: \(delays.wait)µs")
                 }
+            
+            case .passthrough:
+                // Passthrough should never reach here - it's filtered at shouldProcessEvent level
+                // But if it does, just return without doing anything
+                debugCallback?("    → Passthrough mode - no injection needed")
+                return
             }
         }
         
@@ -355,6 +361,11 @@ class CharacterInjector {
             // Fast method: minimal delays, no Forward Delete
             debugCallback?("    → Fast method (normal)")
             injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
+        
+        case .passthrough:
+            // Passthrough should never reach here - no injection needed
+            debugCallback?("    → Passthrough mode - no backspaces needed")
+            return
         }
     }
     
