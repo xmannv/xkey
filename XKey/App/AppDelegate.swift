@@ -9,6 +9,26 @@ import Cocoa
 import SwiftUI
 import Sparkle
 
+// MARK: - AXObserver Callback (C function)
+
+/// C callback for AXObserver focus change notifications
+/// Must be outside class since AXObserver requires a C function pointer
+private func axFocusChangedCallback(
+    observer: AXObserver,
+    element: AXUIElement,
+    notificationName: CFString,
+    refcon: UnsafeMutableRawPointer?
+) {
+    // Get AppDelegate instance from refcon
+    guard let refcon = refcon else { return }
+    let appDelegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
+    
+    // Handle on main thread
+    DispatchQueue.main.async {
+        appDelegate.handleAXFocusChanged(element)
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Shared Instance
@@ -41,6 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var tempOffToolbarHotkeyMonitor: Any?
     private var tempOffToolbarGlobalHotkeyMonitor: Any?
     private var focusObserver: AXObserver?
+    private var focusObserverPID: pid_t = 0
     private var lastFocusedElement: AXUIElement?
     private var updaterController: SPUStandardUpdaterController?
     private var sparkleUpdateDelegate: SparkleUpdateDelegate?
@@ -183,14 +204,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop focus observer and timer
         focusCheckTimer?.invalidate()
         focusCheckTimer = nil
-        if let observer = focusObserver {
-            CFRunLoopRemoveSource(
-                CFRunLoopGetCurrent(),
-                AXObserverGetRunLoopSource(observer),
-                .defaultMode
-            )
-            focusObserver = nil
-        }
+        removeAXObserver()
 
         // Remove app switch observer
         if let observer = appSwitchObserver {
@@ -974,6 +988,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
                 self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
+                
+                // Setup AXObserver for the new app to monitor focus changes (CMD+T, etc.)
+                if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+                    self.setupAXObserverForApp(app)
+                }
             }
             
             // Reset intra-app focus tracking (new app = new baseline)
@@ -1771,18 +1790,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Also monitor mouse clicks to detect focus changes within same app
         // This is already handled by mouseClickMonitor, we just need to hook into it
-        // We'll use a timer to periodically check focus (more reliable)
+        // We'll use a timer to periodically check focus (more reliable backup)
         setupFocusCheckTimer()
+        
+        // Setup AXObserver for the current frontmost app on launch
+        // This ensures focus changes are monitored immediately
+        if let frontApp = NSWorkspace.shared.frontmostApplication {
+            setupAXObserverForApp(frontApp)
+        }
 
-        debugWindowController?.logEvent("Focus change monitoring enabled")
+        debugWindowController?.logEvent("Focus change monitoring enabled (AXObserver + timer backup)")
     }
 
     private var focusCheckTimer: Timer?
 
     private func setupFocusCheckTimer() {
         focusCheckTimer?.invalidate()
-        // Use 0.3s interval for responsive focus change detection
-        focusCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+        // Use 1s interval as backup - AXObserver handles real-time detection
+        // Timer is kept for edge cases where AXObserver might miss events
+        focusCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.handleFocusCheck()
         }
     }
@@ -1830,20 +1856,131 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let injectionInfo = detector.detectInjectionMethod()
             let previousMethod = detector.getConfirmedInjectionMethod()
             
-            // Only update if method actually changed
+            // Always log focus change for debugging (even if method doesn't change)
+            debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
+            
+            // Only update injection method if it actually changed
             if previousMethod.method != injectionInfo.method {
                 detector.setConfirmedInjectionMethod(injectionInfo)
                 
                 // Reset engine for new context
                 keyboardHandler?.resetWithCursorMoved()
                 
-                debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
                 debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) ✓ confirmed")
+            } else {
+                // Method same but focus changed - still reset engine for safety
+                keyboardHandler?.resetWithCursorMoved()
+                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) (unchanged, engine reset)")
             }
         }
         
         // Update last signature
         lastFocusedElementSignature = currentSignature
+    }
+    
+    // MARK: - AXObserver for Focus Changes
+    
+    /// Setup AXObserver for the given app to receive focus change notifications
+    /// This is called when app switches to monitor focus changes within that app (e.g., Cmd+T in browser)
+    private func setupAXObserverForApp(_ app: NSRunningApplication) {
+        // Skip if it's XKey itself
+        guard app.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+        
+        let pid = app.processIdentifier
+        
+        // Skip if already observing this app
+        guard pid != focusObserverPID else { return }
+        
+        // Remove existing observer if any
+        removeAXObserver()
+        
+        // Create new observer for this app
+        var observer: AXObserver?
+        let result = AXObserverCreate(pid, axFocusChangedCallback, &observer)
+        
+        guard result == .success, let newObserver = observer else {
+            debugWindowController?.logEvent("AXObserver: Failed to create for PID \(pid) (error: \(result.rawValue))")
+            return
+        }
+        
+        // Get the app's AXUIElement
+        let appElement = AXUIElementCreateApplication(pid)
+        
+        // Register for focused UI element changed notification
+        let addResult = AXObserverAddNotification(
+            newObserver,
+            appElement,
+            kAXFocusedUIElementChangedNotification as CFString,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
+        
+        guard addResult == .success else {
+            debugWindowController?.logEvent("AXObserver: Failed to add notification for PID \(pid) (error: \(addResult.rawValue))")
+            return
+        }
+        
+        // Add observer to run loop
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(newObserver),
+            .defaultMode
+        )
+        
+        // Save observer and PID
+        focusObserver = newObserver
+        focusObserverPID = pid
+        
+        debugWindowController?.logEvent("AXObserver: Monitoring '\(app.localizedName ?? "Unknown")' (PID: \(pid))")
+    }
+    
+    /// Remove current AXObserver
+    private func removeAXObserver() {
+        guard let observer = focusObserver else { return }
+        
+        // Remove from run loop
+        CFRunLoopRemoveSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .defaultMode
+        )
+        
+        focusObserver = nil
+        focusObserverPID = 0
+    }
+    
+    /// Handle focus changed notification from AXObserver
+    /// This is called by the C callback function
+    func handleAXFocusChanged(_ element: AXUIElement) {
+        // Get current signature
+        let currentSignature = getElementSignature(element)
+        
+        // Only process if signature actually changed
+        if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
+            // Re-detect injection method
+            let detector = AppBehaviorDetector.shared
+            let injectionInfo = detector.detectInjectionMethod()
+            let previousMethod = detector.getConfirmedInjectionMethod()
+            
+            // Log focus change
+            debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
+            
+            if previousMethod.method != injectionInfo.method {
+                // Injection method changed - update and reset engine
+                detector.setConfirmedInjectionMethod(injectionInfo)
+                keyboardHandler?.resetWithCursorMoved()
+                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) ✓ confirmed")
+            } else {
+                // Method same but focus changed - still reset engine for safety
+                keyboardHandler?.resetWithCursorMoved()
+                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) (unchanged, engine reset)")
+            }
+        }
+        
+        // Update last signature
+        lastFocusedElementSignature = currentSignature
+        
+        // Also update lastFocusedElement for toolbar tracking
+        lastFocusedElement = element
     }
     
     /// Get a signature string for an AX element (used to detect focus changes)
