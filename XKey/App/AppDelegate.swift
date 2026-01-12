@@ -66,9 +66,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var updaterController: SPUStandardUpdaterController?
     private var sparkleUpdateDelegate: SparkleUpdateDelegate?
     
-    /// Store Vietnamese state BEFORE Window Rule was applied
-    /// Used to restore state when overlay opens
-    private var preRuleVietnameseState: Bool? = nil
+    /// Store the input source ID BEFORE a Window Title Rule switched it
+    /// Used to restore when leaving the rule-controlled context
+    private var preRuleInputSourceId: String? = nil
     
     /// Track the last focused element's signature for injection detection
     /// Used to detect when user switches from web content to address bar, etc.
@@ -987,7 +987,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 detector.setConfirmedInjectionMethod(injectionInfo)
 
                 self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
                 
                 // Setup AXObserver for the new app to monitor focus changes (CMD+T, etc.)
                 if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
@@ -1020,7 +1021,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // 2. Enable Vietnamese for overlay unless overlay has its own disable rule
                 // 3. Reset mid-sentence flag (overlay apps start with empty/fresh input)
                 self.debugWindowController?.logEvent("Overlay opened - checking overlay rules")
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
                 self.enableVietnameseForOverlay()
                 
                 // CRITICAL FIX: When overlay opens (e.g., CMD+Space for Spotlight),
@@ -1036,7 +1038,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // 2. Restore language for current app
                 // 3. Set mid-sentence flag (protect text in underlying app)
                 self.debugWindowController?.logEvent("Overlay closed - restoring language for current app")
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
                 self.restoreLanguageForCurrentApp()
                 
                 // When overlay closes, user returns to previous app where cursor position is unknown.
@@ -1052,7 +1055,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Enable Vietnamese when overlay opens (Spotlight/Raycast/Alfred)
     /// This ensures user can type Vietnamese in overlay, regardless of previous app's rule
     private func enableVietnameseForOverlay() {
-        guard let handler = keyboardHandler else { return }
+        guard keyboardHandler != nil else { return }
         
         // Check Input Source config first - it takes priority
         if let currentSource = InputSourceManager.getCurrentInputSource() {
@@ -1063,23 +1066,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() ?? "Unknown"
-        
-        // Restore to pre-rule state if available
-        // This was saved before Window Rule was applied
-        if let savedState = preRuleVietnameseState {
-            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
-            
-            if savedState != currentlyEnabled {
-                statusBarManager?.viewModel.isVietnameseEnabled = savedState
-                handler.setVietnamese(savedState)
-                debugWindowController?.logEvent("Overlay '\(overlayName)' opened - restored pre-rule state: \(savedState ? "Vietnamese ON" : "Vietnamese OFF")")
-            } else {
-                debugWindowController?.logEvent("Overlay '\(overlayName)' opened - already in pre-rule state: \(savedState ? "ON" : "OFF")")
-            }
-        } else {
-            // No saved state - keep current state
-            debugWindowController?.logEvent("Overlay '\(overlayName)' opened - no pre-rule state saved, keeping current")
-        }
+        debugWindowController?.logEvent("Overlay '\(overlayName)' opened - keeping current state")
     }
 
     /// Restore language for the current frontmost app from Smart Switch
@@ -1102,33 +1089,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get current frontmost app
         guard let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return }
 
-        // PRIORITY 1: Check Window Title Rule for Vietnamese input override
-        // This takes priority over Smart Switch
-        let detector = AppBehaviorDetector.shared
-        let vnOverride = detector.getVietnameseInputOverride()
-        
-        if vnOverride.shouldOverride {
-            let shouldDisable = vnOverride.disableVietnamese
-            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
-            
-            // Only update if state needs to change
-            if shouldDisable && currentlyEnabled {
-                // Rule says disable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = false
-                handler.setVietnamese(false)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (overlay closed)")
-            } else if !shouldDisable && !currentlyEnabled {
-                // Rule says enable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = true
-                handler.setVietnamese(true)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (overlay closed)")
-            }
-            
-            // Don't proceed to Smart Switch - rule takes priority
-            return
-        }
-        
-        // PRIORITY 2: Smart Switch (if enabled)
+        // Smart Switch (if enabled)
         guard handler.smartSwitchEnabled else { return }
 
         // Get current language state
@@ -1178,36 +1139,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let bundleId = app.bundleIdentifier else { return }
         
-        // PRIORITY 1: Check Window Title Rule for Vietnamese input override
-        // This takes priority over Smart Switch
+        // PRIORITY 1: Check for target input source in Window Title Rules
         let detector = AppBehaviorDetector.shared
-        let vnOverride = detector.getVietnameseInputOverride()
+        let inputSourceOverride = detector.getTargetInputSourceOverride()
         
-        if vnOverride.shouldOverride {
-            let shouldDisable = vnOverride.disableVietnamese
-            let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
-            
-            // Save current state BEFORE applying rule (for overlay restore)
-            preRuleVietnameseState = currentlyEnabled
-            
-            // Only update if state needs to change
-            if shouldDisable && currentlyEnabled {
-                // Rule says disable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = false
-                handler.setVietnamese(false)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (saved pre-rule: ON)")
-            } else if !shouldDisable && !currentlyEnabled {
-                // Rule says enable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = true
-                handler.setVietnamese(true)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (saved pre-rule: OFF)")
+        if inputSourceOverride.hasTarget, let targetId = inputSourceOverride.inputSourceId {
+            // Save current input source BEFORE switching (for restore later)
+            if preRuleInputSourceId == nil {
+                preRuleInputSourceId = InputSourceSwitcher.shared.getCurrentInputSourceId()
+                debugWindowController?.logEvent("Saved pre-rule input source: \(preRuleInputSourceId ?? "nil")")
             }
             
+            // Only switch if not already using the target
+            let currentId = InputSourceSwitcher.shared.getCurrentInputSourceId()
+            if currentId != targetId {
+                let success = InputSourceSwitcher.shared.selectInputSource(bundleId: targetId)
+                if success {
+                    debugWindowController?.logEvent("Rule '\(inputSourceOverride.ruleName ?? "Unknown")': Switched to \(targetId)")
+                } else {
+                    debugWindowController?.logEvent("Rule '\(inputSourceOverride.ruleName ?? "Unknown")': Failed to switch to \(targetId)")
+                }
+            }
             // Don't proceed to Smart Switch - rule takes priority
             return
         } else {
-            // No rule override - clear the saved state
-            preRuleVietnameseState = nil
+            // No rule matches - restore pre-rule input source if we have one
+            if let savedInputSourceId = preRuleInputSourceId {
+                let currentId = InputSourceSwitcher.shared.getCurrentInputSourceId()
+                if currentId != savedInputSourceId {
+                    let success = InputSourceSwitcher.shared.selectInputSource(bundleId: savedInputSourceId)
+                    if success {
+                        debugWindowController?.logEvent("No rule match: Restored input source to \(savedInputSourceId)")
+                    } else {
+                        debugWindowController?.logEvent("No rule match: Failed to restore input source \(savedInputSourceId)")
+                    }
+                }
+                preRuleInputSourceId = nil
+            }
         }
         
         // PRIORITY 2: Smart Switch (if enabled)
@@ -1232,59 +1200,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// Apply Vietnamese input rule if a matching Window Title Rule exists
-    /// This is called on mouse click to ensure rules are applied immediately
-    /// Also restores Vietnamese state when moving OUT of a rule-controlled context
-    private func applyVietnameseInputRule() {
-        guard let handler = keyboardHandler else { return }
-
-        // Check Input Source config first - it takes priority
-        if let currentSource = InputSourceManager.getCurrentInputSource() {
-            let inputSourceEnabled = InputSourceManager.shared.isEnabled(for: currentSource.id)
-            if !inputSourceEnabled {
-                return
-            }
-        }
-
-        // Check Window Title Rule for Vietnamese input override
-        let detector = AppBehaviorDetector.shared
-        let vnOverride = detector.getVietnameseInputOverride()
-
-        let currentlyEnabled = statusBarManager?.viewModel.isVietnameseEnabled ?? false
-
-        if vnOverride.shouldOverride {
-            let shouldDisable = vnOverride.disableVietnamese
-
-            // Save current state BEFORE applying rule (for later restore)
-            if preRuleVietnameseState == nil {
-                preRuleVietnameseState = currentlyEnabled
-            }
-
-            // Only update if state needs to change
-            if shouldDisable && currentlyEnabled {
-                // Rule says disable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = false
-                handler.setVietnamese(false)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese OFF (click)")
-            } else if !shouldDisable && !currentlyEnabled {
-                // Rule says enable Vietnamese
-                statusBarManager?.viewModel.isVietnameseEnabled = true
-                handler.setVietnamese(true)
-                debugWindowController?.logEvent("Rule '\(vnOverride.ruleName ?? "Unknown")': Vietnamese ON (click)")
-            }
-        } else {
-            // No rule matches - restore pre-rule state if we had one
-            if let savedState = preRuleVietnameseState {
-                if savedState != currentlyEnabled {
-                    statusBarManager?.viewModel.isVietnameseEnabled = savedState
-                    handler.setVietnamese(savedState)
-                    debugWindowController?.logEvent("Rule ended: Vietnamese \(savedState ? "ON" : "OFF") (restored)")
-                }
-                preRuleVietnameseState = nil
-            }
-        }
-    }
-    
     private func setupMouseClickMonitor() {
         // Monitor mouse clicks to detect focus changes
         // When user clicks, they might be switching between input fields or moving cursor
@@ -1304,14 +1219,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 if let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() {
                     let detector = AppBehaviorDetector.shared
-                    if detector.isFocusedElementEmpty() {
+                    if detector.getFocusedElementInfo().isEmpty {
                         self?.keyboardHandler?.resetMidSentenceFlag()
                         self?.debugWindowController?.logEvent("'\(overlayName)' with empty input → reset mid-sentence flag")
                     }
                 }
-
-                // Check Window Title Rule for Vietnamese input override on click
-                self?.applyVietnameseInputRule()
 
                 // Log detailed input detection info
                 self?.logMouseClickInputDetection()
@@ -1400,9 +1312,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appName = app.localizedName ?? "Unknown"
 
-        // Get focused element role from Accessibility API
+        // Get focused element info from Accessibility API (single query for all attributes)
         let detector = AppBehaviorDetector.shared
-        let elementRole = detector.getFocusedElementRole() ?? "Unknown"
+        let elementInfo = detector.getFocusedElementInfo()
+        let elementRole = elementInfo.role ?? "Unknown"
+        let elementSubrole = elementInfo.subrole
+        let axDescription = elementInfo.description
+        let axIdentifier = elementInfo.identifier
+        let domClasses = elementInfo.domClasses
         
         // Get window title
         let windowTitle = detector.getCachedWindowTitle()
@@ -1436,15 +1353,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         debugWindowController?.logEvent("   App: \(appName) (\(bundleId))")
         debugWindowController?.logEvent("   Window: \(windowTitle.isEmpty ? "(no title)" : windowTitle)")
-        debugWindowController?.logEvent("   Input Type: \(elementRole)")
+        
+        // Log AX element info (similar to Text Test tab)
+        var inputTypeStr = elementRole
+        if let subrole = elementSubrole, !subrole.isEmpty {
+            inputTypeStr += " / \(subrole)"
+        }
+        debugWindowController?.logEvent("   AXRole: \(inputTypeStr)")
+        
+        if let desc = axDescription, !desc.isEmpty {
+            debugWindowController?.logEvent("   AXDescription: \(desc)")
+        }
+        if let identifier = axIdentifier, !identifier.isEmpty {
+            debugWindowController?.logEvent("   AXIdentifier: \(identifier)")
+        }
+        if let classes = domClasses, !classes.isEmpty {
+            debugWindowController?.logEvent("   AXDOMClassList: \(classes.joined(separator: ", "))")
+        }
+        
         debugWindowController?.logEvent("   Behavior: \(behaviorName)")
-        debugWindowController?.logEvent("   Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] ✓ confirmed")
+        let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+        debugWindowController?.logEvent("   Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] [\(textMethodName)] ✓ confirmed")
         debugWindowController?.logEvent("   IMKit: markedText=\(imkitBehavior.useMarkedText), issues=\(imkitBehavior.hasMarkedTextIssues), delay=\(imkitBehavior.commitDelay)µs")
         debugWindowController?.logEvent("   Input Source: \(inputSourceName)")
         
         // Log matched rule if any
         if let rule = matchedRule {
-            debugWindowController?.logEvent(" Rule: \(rule.name) (pattern: \"\(rule.titlePattern)\")")
+            debugWindowController?.logEvent("   Rule: \(rule.name) (pattern: \"\(rule.titlePattern)\")")
         }
         
         debugWindowController?.logEvent("   → Engine reset, mid-sentence mode")
@@ -1482,6 +1417,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case .selection: return "Selection"
         case .autocomplete: return "Autocomplete"
         case .axDirect: return "AX Direct"
+        case .passthrough: return "Passthrough"
         }
     }
 
@@ -1877,11 +1813,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if previousMethod.method != injectionInfo.method {
                 detector.setConfirmedInjectionMethod(injectionInfo)
                 resetEngineForFocusChange()
-                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) ✓ confirmed")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) [\(textMethodName)] ✓ confirmed")
             } else {
                 // Method same but focus changed - still reset engine for safety
                 resetEngineForFocusChange()
-                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) (unchanged, engine reset)")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged, engine reset)")
             }
         }
         
@@ -1979,11 +1917,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Injection method changed - update and reset engine
                 detector.setConfirmedInjectionMethod(injectionInfo)
                 resetEngineForFocusChange()
-                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) ✓ confirmed")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) [\(textMethodName)] ✓ confirmed")
             } else {
                 // Method same but focus changed - still reset engine for safety
                 resetEngineForFocusChange()
-                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) (unchanged, engine reset)")
+                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged, engine reset)")
             }
         }
         

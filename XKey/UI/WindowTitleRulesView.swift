@@ -290,8 +290,8 @@ struct WindowTitleRulesView: View {
                     injectionMethod: rule.injectionMethod,
                     injectionDelays: rule.injectionDelays,
                     textSendingMethod: rule.textSendingMethod,
-                    disableVietnameseInput: rule.disableVietnameseInput,
                     enableForceAccessibility: rule.enableForceAccessibility,
+                    targetInputSourceId: rule.targetInputSourceId,
                     description: rule.description
                 )
                 viewModel.addRule(newRule)
@@ -489,10 +489,6 @@ struct RuleRowView: View {
             
             // Behavior badges - use fixedSize to prevent compression
             HStack(spacing: 4) {
-                // Vietnamese input control badge
-                if let disableVN = rule.disableVietnameseInput {
-                    BehaviorBadge(text: disableVN ? "VN OFF" : "VN ON", color: disableVN ? .red : .green)
-                }
                 // Force Accessibility badge
                 if rule.enableForceAccessibility == true {
                     BehaviorBadge(text: "AX", color: .indigo)
@@ -501,10 +497,14 @@ struct RuleRowView: View {
                     BehaviorBadge(text: "NoMark", color: .orange)
                 }
                 if let method = rule.injectionMethod {
-                    BehaviorBadge(text: methodString(method), color: .purple)
+                    BehaviorBadge(text: methodString(method), color: method == .passthrough ? .red : .purple)
                 }
                 if let textMethod = rule.textSendingMethod {
                     BehaviorBadge(text: textMethod == .oneByOne ? "1x1" : "Chunk", color: .cyan)
+                }
+                // Input source badge - show abbreviated name
+                if let inputSourceId = rule.targetInputSourceId, !inputSourceId.isEmpty {
+                    BehaviorBadge(text: "→\(inputSourceShortName(inputSourceId))", color: .teal)
                 }
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -572,7 +572,35 @@ struct RuleRowView: View {
         case .selection: return "Select"
         case .autocomplete: return "Auto"
         case .axDirect: return "AX"
+        case .passthrough: return "Pass"
         }
+    }
+    
+    /// Get short display name for input source badge
+    private func inputSourceShortName(_ bundleId: String) -> String {
+        // Common input sources - show abbreviated names
+        let lowerId = bundleId.lowercased()
+        if lowerId.contains("abc") || lowerId.contains("us") {
+            return "ABC"
+        } else if lowerId.contains("vietnamese") || lowerId.contains("viet") {
+            return "VN"
+        } else if lowerId.contains("french") {
+            return "FR"
+        } else if lowerId.contains("german") {
+            return "DE"
+        } else if lowerId.contains("japanese") {
+            return "JP"
+        } else if lowerId.contains("chinese") || lowerId.contains("pinyin") {
+            return "CN"
+        } else if lowerId.contains("korean") {
+            return "KR"
+        }
+        // Fallback: extract last component
+        let parts = bundleId.components(separatedBy: ".")
+        if let last = parts.last, last.count <= 10 {
+            return last
+        }
+        return "IM"
     }
     
     private func copyRuleJSON() {
@@ -646,8 +674,10 @@ struct AddRuleSheet: View {
     @State private var waitDelay: String = "3000"
     @State private var textDelay: String = "1500"
     @State private var textSendingMethod: TextSendingMethod = .chunked
-    @State private var disableVietnameseInput: Bool = false
     @State private var enableForceAccessibility: Bool = false
+    @State private var overrideInputSource: Bool = false
+    @State private var targetInputSourceId: String = ""
+    @State private var availableInputSources: [(id: String, name: String)] = []
     @State private var description: String = ""
     
     @State private var showError = false
@@ -730,19 +760,39 @@ struct AddRuleSheet: View {
                         .padding(.vertical, 4)
                     }
                     
-                    // Vietnamese Input Control
-                    Toggle("Tắt bộ gõ Tiếng Việt", isOn: $disableVietnameseInput)
-                    
-                    Text("Khi bật, bộ gõ Tiếng Việt sẽ tự động TẮT khi ứng dụng này được focus")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    
                     // Force Accessibility for Electron/Chromium apps
                     Toggle("Bật Force Accessibility (AXManualAccessibility)", isOn: $enableForceAccessibility)
                     
-                    Text("Bật AXManualAccessibility cho ứng dụng Electron/Chromium (VS Code, Slack, Discord...) để lấy thông tin text chi tiết hơn")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    // Input Source Switching
+                    GroupBox(label: Label("Chuyển Input Source", systemImage: "keyboard")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle("Tự động chuyển Input Source", isOn: $overrideInputSource)
+                            
+                            if overrideInputSource {
+                                if availableInputSources.isEmpty {
+                                    Text("Đang tải danh sách Input Sources...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 20)
+                                } else {
+                                    Picker("Input Source:", selection: $targetInputSourceId) {
+                                        Text("Không chuyển (giữ nguyên)").tag("")
+                                        Divider()
+                                        ForEach(availableInputSources, id: \.id) { source in
+                                            Text(source.name).tag(source.id)
+                                        }
+                                    }
+                                    .padding(.leading, 20)
+                                    
+                                    Text("XKey sẽ tự động chuyển sang Input Source đã chọn.")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 20)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                     
                     // Behavior Overrides
                     GroupBox(label: Label("Ghi đè behavior", systemImage: "slider.horizontal.3")) {
@@ -900,8 +950,11 @@ struct AddRuleSheet: View {
             }
         }
         .padding()
-        .frame(width: 520, height: 720)
+        .frame(width: 520, height: 780)
         .onAppear {
+            // Load available input sources for the picker
+            loadAvailableInputSources()
+            
             if let rule = existingRule {
                 loadExistingRule(rule)
             } else if let prefill = prefillInfo {
@@ -954,8 +1007,13 @@ struct AddRuleSheet: View {
             textSendingMethod = textMethod
         }
         // Simple toggles: just load the values (default false if nil)
-        disableVietnameseInput = rule.disableVietnameseInput ?? false
         enableForceAccessibility = rule.enableForceAccessibility ?? false
+        
+        // Input source override
+        if let inputSourceId = rule.targetInputSourceId, !inputSourceId.isEmpty {
+            overrideInputSource = true
+            targetInputSourceId = inputSourceId
+        }
     }
     
     private func saveRule() {
@@ -986,8 +1044,8 @@ struct AddRuleSheet: View {
             injectionMethod: overrideInjection ? injectionMethod : nil,
             injectionDelays: injectionDelaysArray,
             textSendingMethod: overrideInjection ? textSendingMethod : nil,
-            disableVietnameseInput: disableVietnameseInput ? true : nil,
             enableForceAccessibility: enableForceAccessibility ? true : nil,
+            targetInputSourceId: overrideInputSource && !targetInputSourceId.isEmpty ? targetInputSourceId : nil,
             description: description.isEmpty ? nil : description
         )
         
@@ -1026,6 +1084,22 @@ struct AddRuleSheet: View {
         case .exact: return "Title cửa sổ khớp chính xác với pattern"
         case .regex: return "Pattern là biểu thức Regular Expression"
         }
+    }
+    
+    /// Load all available input sources for the picker
+    private func loadAvailableInputSources() {
+        // Use InputSourceManager which properly deduplicates sources
+        var sources = InputSourceManager.getAllInputSources()
+        
+        // Add XKey at the beginning (it's filtered out by getAllInputSources)
+        let xkeySource = InputSourceInfo(
+            id: InputSourceSwitcher.xkeyIMBundleId,
+            name: "XKey"
+        )
+        sources.insert(xkeySource, at: 0)
+        
+        // Map to our tuple format
+        availableInputSources = sources.map { (id: $0.id, name: $0.displayName) }
     }
 }
 

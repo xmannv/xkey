@@ -550,35 +550,36 @@ class DebugViewModel: ObservableObject {
     
     /// Detect currently focused app using Accessibility API
     private func detectFocusedApp() {
+        // Get frontmost app info
+        let frontmostApp = NSWorkspace.shared.frontmostApplication
+        let appName = frontmostApp?.localizedName ?? "Unknown"
+        let bundleID = frontmostApp?.bundleIdentifier ?? "Unknown"
+        
         // Priority 1: Check for overlay apps via OverlayAppDetector (uses AX attributes)
         // This is more accurate since overlay apps don't become frontmost application
         if let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() {
             // Map overlay name to bundle ID for display
-            let bundleID: String
+            let overlayBundleID: String
             switch overlayName {
             case "Spotlight":
-                bundleID = "com.apple.Spotlight"
+                overlayBundleID = "com.apple.Spotlight"
             case "Raycast":
-                bundleID = "com.raycast.macos"
+                overlayBundleID = "com.raycast.macos"
             case "Alfred":
-                bundleID = "com.runningwithcrayons.Alfred"
+                overlayBundleID = "com.runningwithcrayons.Alfred"
             default:
-                bundleID = "unknown.overlay"
+                overlayBundleID = "unknown.overlay"
             }
             
             detectedAppName = overlayName
-            detectedAppBundleID = bundleID
+            detectedAppBundleID = overlayBundleID
             
-            addAppDetectorLog("[Detection] App: \(overlayName) (\(bundleID))")
+            addAppDetectorLog("[Detection] App: \(overlayName) (\(overlayBundleID)) [OVERLAY]")
         } else {
-            // Priority 2: Fallback to frontmost app (for non-overlay apps)
-            guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            guard frontmostApp != nil else {
                 addAppDetectorLog("[Detection] No frontmost app found")
                 return
             }
-            
-            let appName = frontmostApp.localizedName ?? "Unknown"
-            let bundleID = frontmostApp.bundleIdentifier ?? "Unknown"
             
             detectedAppName = appName
             detectedAppBundleID = bundleID
@@ -594,145 +595,85 @@ class DebugViewModel: ObservableObject {
             addAppDetectorLog(logLine)
         }
         
-        // Get focused element info via AX API
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-
-        let axError = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef)
-
-        guard axError == .success, let focusedElement = focusedRef else {
-            // Log detailed error info for debugging
-            let (errorName, errorDesc): (String, String)
-            switch axError {
-            case .success:
-                (errorName, errorDesc) = ("success", "Success")
-            case .failure:
-                (errorName, errorDesc) = ("failure", "General failure - app may not support AX")
-            case .illegalArgument:
-                (errorName, errorDesc) = ("illegalArgument", "Invalid argument")
-            case .invalidUIElement:
-                (errorName, errorDesc) = ("invalidUIElement", "Element no longer exists")
-            case .invalidUIElementObserver:
-                (errorName, errorDesc) = ("invalidUIElementObserver", "Invalid observer")
-            case .cannotComplete:
-                (errorName, errorDesc) = ("cannotComplete", "App is busy or not responding - try again later")
-            case .attributeUnsupported:
-                (errorName, errorDesc) = ("attributeUnsupported", "App does not support this attribute")
-            case .actionUnsupported:
-                (errorName, errorDesc) = ("actionUnsupported", "App does not support this action")
-            case .notificationUnsupported:
-                (errorName, errorDesc) = ("notificationUnsupported", "App does not support notifications")
-            case .notImplemented:
-                (errorName, errorDesc) = ("notImplemented", "Feature not implemented")
-            case .notificationAlreadyRegistered:
-                (errorName, errorDesc) = ("notificationAlreadyRegistered", "Notification already registered")
-            case .notificationNotRegistered:
-                (errorName, errorDesc) = ("notificationNotRegistered", "Notification not registered")
-            case .apiDisabled:
-                (errorName, errorDesc) = ("apiDisabled", "⚠️ Accessibility API disabled - grant permission in System Settings")
-            case .noValue:
-                (errorName, errorDesc) = ("noValue", "No element is focused (normal if not clicking on a text field)")
-            case .parameterizedAttributeUnsupported:
-                (errorName, errorDesc) = ("parameterizedAttributeUnsupported", "Parameterized attribute not supported")
-            case .notEnoughPrecision:
-                (errorName, errorDesc) = ("notEnoughPrecision", "Not enough precision")
-            @unknown default:
-                (errorName, errorDesc) = ("unknown(\(axError.rawValue))", "Unknown error")
-            }
-
-            // Also check AXIsProcessTrusted
-            let isTrusted = AXIsProcessTrusted()
-            let trustDesc = isTrusted
-                ? "✅ Accessibility permission granted"
-                : "❌ No permission - go to System Settings → Privacy & Security → Accessibility"
-
-            addAppDetectorLog("  → Focused Element: (none)")
-            addAppDetectorLog("  → AXError: \(errorName)")
-            addAppDetectorLog("  → Description: \(errorDesc)")
-            addAppDetectorLog("  → AXIsProcessTrusted: \(isTrusted) - \(trustDesc)")
-            return
+        // Get AppBehaviorDetector info
+        let detector = AppBehaviorDetector.shared
+        let windowTitle = detector.getCachedWindowTitle()
+        addAppDetectorLog("  → Window: \(windowTitle.isEmpty ? "(no title)" : windowTitle)")
+        
+        // Get focused element info via optimized single query
+        let elementInfo = detector.getFocusedElementInfo()
+        
+        // Log AX element info
+        let role = elementInfo.role ?? "(unknown)"
+        let subrole = elementInfo.subrole ?? "(none)"
+        addAppDetectorLog("  → AXRole: \(role)")
+        if subrole != "(none)" {
+            addAppDetectorLog("  → AXSubrole: \(subrole)")
         }
         
-        let axElement = focusedElement as! AXUIElement
-        
-        // Get AX Role
-        var roleRef: CFTypeRef?
-        var role = "(unknown)"
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let roleStr = roleRef as? String {
-            role = roleStr
+        if let desc = elementInfo.description, !desc.isEmpty {
+            addAppDetectorLog("  → AXDescription: \(desc)")
         }
         
-        // Get AX Subrole
-        var subroleRef: CFTypeRef?
-        var subrole = "(none)"
-        if AXUIElementCopyAttributeValue(axElement, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-           let subroleStr = subroleRef as? String {
-            subrole = subroleStr
+        if let identifier = elementInfo.identifier, !identifier.isEmpty {
+            addAppDetectorLog("  → AXIdentifier: \(identifier)")
         }
         
-        // Get AX RoleDescription (human-readable)
-        var roleDescRef: CFTypeRef?
-        var roleDescription = "(none)"
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleDescriptionAttribute as CFString, &roleDescRef) == .success,
-           let roleDescStr = roleDescRef as? String {
-            roleDescription = roleDescStr
+        if let classes = elementInfo.domClasses, !classes.isEmpty {
+            addAppDetectorLog("  → AXDOMClassList: \(classes.joined(separator: ", "))")
         }
         
-        // Get AX Description
-        var descRef: CFTypeRef?
-        var axDescription = "(none)"
-        if AXUIElementCopyAttributeValue(axElement, kAXDescriptionAttribute as CFString, &descRef) == .success,
-           let descStr = descRef as? String {
-            axDescription = descStr
-        }
-        
-        // Get AX Placeholder
-        var placeholderRef: CFTypeRef?
-        var placeholder = "(none)"
-        if AXUIElementCopyAttributeValue(axElement, kAXPlaceholderValueAttribute as CFString, &placeholderRef) == .success,
-           let placeholderStr = placeholderRef as? String {
-            placeholder = placeholderStr
-        }
-        
-        // Get AX Title
-        var titleRef: CFTypeRef?
-        var title = "(none)"
-        if AXUIElementCopyAttributeValue(axElement, kAXTitleAttribute as CFString, &titleRef) == .success,
-           let titleStr = titleRef as? String {
-            title = titleStr
-        }
-        
-        // Get AX Value (text content)
-        var valueRef: CFTypeRef?
-        var textValue = "(not readable)"
-        if AXUIElementCopyAttributeValue(axElement, kAXValueAttribute as CFString, &valueRef) == .success,
-           let valueStr = valueRef as? String {
-            textValue = valueStr.isEmpty ? "(empty)" : "\"\(valueStr)\""
-            detectedFocusedText = valueStr
+        // Get text value and caret
+        if let textValue = elementInfo.textValue {
+            let displayText = textValue.isEmpty ? "(empty)" : "\"\(textValue.prefix(50))\(textValue.count > 50 ? "..." : "")\""
+            addAppDetectorLog("  → AX Value (Text): \(displayText)")
+            detectedFocusedText = textValue
         } else {
+            addAppDetectorLog("  → AX Value (Text): (not readable)")
             detectedFocusedText = ""
         }
         
-        // Get selected text range (caret position)
-        var rangeRef: CFTypeRef?
-        var caretInfo = "(unknown)"
-        if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success {
-            var range = CFRange(location: 0, length: 0)
-            if AXValueGetValue(rangeRef as! AXValue, .cfRange, &range) {
-                caretInfo = "pos=\(range.location), len=\(range.length)"
-            }
+        // Get behavior type
+        let behavior = detector.detect()
+        let behaviorName: String
+        switch behavior {
+        case .standard: behaviorName = "Standard"
+        case .terminal: behaviorName = "Terminal"
+        case .browserAddressBar: behaviorName = "Browser Address Bar"
+        case .jetbrainsIDE: behaviorName = "JetBrains IDE"
+        case .microsoftOffice: behaviorName = "Microsoft Office"
+        case .spotlight: behaviorName = "Spotlight"
+        case .overlayLauncher: behaviorName = "Overlay Launcher"
+        case .electronApp: behaviorName = "Electron App"
+        case .codeEditor: behaviorName = "Code Editor"
         }
+        addAppDetectorLog("  → Behavior: \(behaviorName)")
         
-        // Log all AX info
-        addAppDetectorLog("  → AX Role: \(role)")
-        addAppDetectorLog("  → AX Subrole: \(subrole)")
-        addAppDetectorLog("  → AX RoleDescription: \(roleDescription)")
-        addAppDetectorLog("  → AX Description: \(axDescription)")
-        addAppDetectorLog("  → AX Placeholder: \(placeholder)")
-        addAppDetectorLog("  → AX Title: \(title)")
-        addAppDetectorLog("  → AX Value (Text): \(textValue)")
-        addAppDetectorLog("  → Caret: \(caretInfo)")
+        // Get injection method info
+        let injectionInfo = detector.detectInjectionMethod()
+        let injectionMethodName: String
+
+        switch injectionInfo.method {
+            case .fast: injectionMethodName = "Fast"
+            case .slow: injectionMethodName = "Slow"
+            case .selection: injectionMethodName = "Selection"
+            case .autocomplete: injectionMethodName = "Autocomplete"
+            case .axDirect: injectionMethodName = "AX Direct"
+            case .passthrough: injectionMethodName = "Passthrough"
+        }
+
+        let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+        addAppDetectorLog("  → Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] [\(textMethodName)]")
+        addAppDetectorLog("  → Injection Reason: \(injectionInfo.description)")
+        
+        // Get IMKit behavior
+        let imkitBehavior = detector.detectIMKitBehavior()
+        addAppDetectorLog("  → IMKit: markedText=\(imkitBehavior.useMarkedText), issues=\(imkitBehavior.hasMarkedTextIssues), delay=\(imkitBehavior.commitDelay)µs")
+        
+        // Get matched Window Title Rule (if any)
+        if let rule = detector.findMatchingRule() {
+            addAppDetectorLog("  → Rule: \(rule.name) (pattern: \"\(rule.titlePattern)\")")
+        }
     }
     
     /// Check if bundle ID is a known launcher app
