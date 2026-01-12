@@ -6,9 +6,9 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260112.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.2</link>
-      <sparkle:version>20260112.2</sparkle:version>
+      <title>Version 1.2.19 (Build 20260112.3)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.3</link>
+      <sparkle:version>20260112.3</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -21,11 +21,11 @@
 <li>Add unit tests for restore spelling edge cases</li>
 <li>Update CharacterInjector and KeyboardEventHandler</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.2">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.3">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 12 Jan 2026 10:58:12 +0000</pubDate>
+      <pubDate>Mon, 12 Jan 2026 11:40:58 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260112.2/XKey.dmg" sparkle:version="20260112.2" sparkle:shortVersionString="1.2.19" length="9409803" type="application/octet-stream" sparkle:edSignature="OUWNTjmfhC79LbDnWtPsiiYjIfB7KUGKE3naXXCng9LBWszA/eO1WaZHVgH6X19iYG9/YxeuZu+bNNV2yqR3AQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260112.3/XKey.dmg" sparkle:version="20260112.3" sparkle:shortVersionString="1.2.19" length="9409203" type="application/octet-stream" sparkle:edSignature="lv1blDZFOZS+oQLRUp0VmgbYulxwuQ4eeHBfVlHvlqo6WfMl+H9fi/VczI1zzaHGDDuQrftn2HZUttuClo5yAw==" />
     </item>
   </channel>
 </rss>
