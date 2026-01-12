@@ -6,24 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260111)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260111</link>
-      <sparkle:version>20260111</sparkle:version>
+      <title>Version 1.2.18 (Build 20260112)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112</link>
+      <sparkle:version>20260112</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Improve English detection and Brave browser support</p>
+<p>Implement AXObserver for real-time focus change detection</p>
 <ul>
-<li>Add vowel patterns (yo, ya, yi, yu, ou, ea) to impossible Vietnamese prefixes</li>
-<li>Add 3-letter pattern 'yea' and 4-letter pattern 'thei' for English detection</li>
-<li>Add BraveOmniboxViewViews detection for Brave browser address bar</li>
-<li>Remove redundant browser address bar injection method block</li>
+<li>Add AXObserver to monitor kAXFocusedUIElementChangedNotification</li>
+<li>Enables real-time focus detection for browser Cmd+T, new tabs, etc.</li>
+<li>Setup observer on app switch and at launch for frontmost app</li>
+<li>Reduce timer polling interval to 1s (backup for edge cases)</li>
+<li>Always reset engine on focus change for consistent behavior</li>
+<li>Improve focus change logging with source indicator (keyboard/AXObserver)</li>
+<li>Update build version to 20260112</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260111">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 11 Jan 2026 05:01:34 +0000</pubDate>
+      <pubDate>Mon, 12 Jan 2026 02:54:11 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260111/XKey.dmg" sparkle:version="20260111" sparkle:shortVersionString="1.2.18" length="9400814" type="application/octet-stream" sparkle:edSignature="RSQcDDENHxXvrowNzOaDIn/i1nEzU0wJAyi2jl8GE2gOUyB4Q6yAWigqYbHPHYbu+mV/yoEmiiKkM7nrHZ4wAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260112/XKey.dmg" sparkle:version="20260112" sparkle:shortVersionString="1.2.18" length="9407910" type="application/octet-stream" sparkle:edSignature="0HTqfPr08CB7EEGzrls5sAR2NzK2g+kUrMcsOLJFgdg5jHduT5OIgD3FOWAtaSUqX1nwBca4aY8MdcwIaFD5Dg==" />
     </item>
   </channel>
 </rss>
