@@ -6,27 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260112.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112.1</link>
-      <sparkle:version>20260112.1</sparkle:version>
-      <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
+      <title>Version 1.2.19 (Build 20260112.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.2</link>
+      <sparkle:version>20260112.2</sparkle:version>
+      <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Implement AXObserver for real-time focus change detection</p>
+<p>feat: Add Input Source switching in Window Title Rules & fix restore spelling bug</p>
 <ul>
-<li>Add AXObserver to monitor kAXFocusedUIElementChangedNotification</li>
-<li>Enables real-time focus detection for browser Cmd+T, new tabs, etc.</li>
-<li>Setup observer on app switch and at launch for frontmost app</li>
-<li>Reduce timer polling interval to 1s (backup for edge cases)</li>
-<li>Always reset engine on focus change for consistent behavior</li>
-<li>Improve focus change logging with source indicator (keyboard/AXObserver)</li>
-<li>Update build version to 20260112</li>
+<li>Add automatic Input Source switching when window rule matches</li>
+<li>Add InputSourceManager integration in WindowTitleRulesView</li>
+<li>Fix restore wrong spelling bug (d+d+i+d space should keep 'did')</li>
+<li>Refactor AppBehaviorDetector and DebugViewModel for cleaner code</li>
+<li>Add unit tests for restore spelling edge cases</li>
+<li>Update CharacterInjector and KeyboardEventHandler</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260112.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 12 Jan 2026 03:16:12 +0000</pubDate>
+      <pubDate>Mon, 12 Jan 2026 10:58:12 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260112.1/XKey.dmg" sparkle:version="20260112.1" sparkle:shortVersionString="1.2.18" length="9407860" type="application/octet-stream" sparkle:edSignature="C9XTC1YX4RPORYQVcKrh4ouqpEO8f7DtTUaBP8p+pf/Ym7tqsa18Z3HsO9bzKhm+xtSB08JM5vVPIM45zD2HCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260112.2/XKey.dmg" sparkle:version="20260112.2" sparkle:shortVersionString="1.2.19" length="9409803" type="application/octet-stream" sparkle:edSignature="OUWNTjmfhC79LbDnWtPsiiYjIfB7KUGKE3naXXCng9LBWszA/eO1WaZHVgH6X19iYG9/YxeuZu+bNNV2yqR3AQ==" />
     </item>
   </channel>
 </rss>
