@@ -6,9 +6,9 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.18 (Build 20260112)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112</link>
-      <sparkle:version>20260112</sparkle:version>
+      <title>Version 1.2.18 (Build 20260112.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112.1</link>
+      <sparkle:version>20260112.1</sparkle:version>
       <sparkle:shortVersionString>1.2.18</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -22,11 +22,11 @@
 <li>Improve focus change logging with source indicator (keyboard/AXObserver)</li>
 <li>Update build version to 20260112</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.18-20260112.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 12 Jan 2026 02:54:11 +0000</pubDate>
+      <pubDate>Mon, 12 Jan 2026 03:16:12 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260112/XKey.dmg" sparkle:version="20260112" sparkle:shortVersionString="1.2.18" length="9407910" type="application/octet-stream" sparkle:edSignature="0HTqfPr08CB7EEGzrls5sAR2NzK2g+kUrMcsOLJFgdg5jHduT5OIgD3FOWAtaSUqX1nwBca4aY8MdcwIaFD5Dg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.18-20260112.1/XKey.dmg" sparkle:version="20260112.1" sparkle:shortVersionString="1.2.18" length="9407860" type="application/octet-stream" sparkle:edSignature="C9XTC1YX4RPORYQVcKrh4ouqpEO8f7DtTUaBP8p+pf/Ym7tqsa18Z3HsO9bzKhm+xtSB08JM5vVPIM45zD2HCQ==" />
     </item>
   </channel>
 </rss>
