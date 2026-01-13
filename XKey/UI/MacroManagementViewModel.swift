@@ -186,7 +186,9 @@ class MacroManagementViewModel: ObservableObject {
                 guard !text.isEmpty, !macroContent.isEmpty,
                       !macros.contains(where: { $0.text == text }) else { continue }
                 
-                macros.append(MacroItem(text: text, content: macroContent))
+                // Decode escaped newlines (\n -> actual newline) for multi-line support
+                let decodedContent = macroContent.replacingOccurrences(of: "\\n", with: "\n")
+                macros.append(MacroItem(text: text, content: decodedContent))
                 importedCount += 1
             }
             
@@ -227,8 +229,12 @@ class MacroManagementViewModel: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         
         do {
-            var lines = ["# XKey Macros", "# Format: shortcut=replacement", ""]
-            lines.append(contentsOf: macros.map { "\($0.text)=\($0.content)" })
+            var lines = ["# XKey Macros", "# Format: shortcut=replacement (use \\n for newlines)", ""]
+            // Encode newlines in content as \n for multi-line support
+            lines.append(contentsOf: macros.map { 
+                let escapedContent = $0.content.replacingOccurrences(of: "\n", with: "\\n")
+                return "\($0.text)=\(escapedContent)"
+            })
             try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
             showAlert(title: "Thành công", message: "Đã export \(macros.count) macro")
         } catch {

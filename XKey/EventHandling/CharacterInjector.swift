@@ -229,58 +229,133 @@ class CharacterInjector {
     }
     
     /// Internal: Send text chunked (no semaphore)
+    /// Special handling for newline/tab: splits text and sends as key events
     private func sendTextChunkedInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
         
-        let utf16 = Array(text.utf16)
-        var offset = 0
-        let chunkSize = 20
+        debugCallback?("    → Sending text chunked: '\(text)' (handling special chars), direct=\(useDirectPost)")
         
-        debugCallback?("    → Sending text chunked: '\(text)' (\(utf16.count) UTF-16 units), direct=\(useDirectPost)")
+        // Split text into segments by newline and tab
+        // Each segment is either: normal text, newline, or tab
+        var segments: [(type: SegmentType, content: String)] = []
+        var currentSegment = ""
         
-        while offset < utf16.count {
-            let end = min(offset + chunkSize, utf16.count)
-            var chunk = Array(utf16[offset..<end])
-            
-            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
-                break
-            }
-            
-            keyDown.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
-            keyUp.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
-            
-            // Mark as XKey-injected event to prevent re-processing by event tap
-            keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            
-            // For slow method (terminals), post directly to session event tap
-            if useDirectPost {
-                keyDown.post(tap: .cgSessionEventTap)
-                keyUp.post(tap: .cgSessionEventTap)
+        for char in text {
+            if char == "\n" || char == "\r" {
+                if !currentSegment.isEmpty {
+                    segments.append((.text, currentSegment))
+                    currentSegment = ""
+                }
+                segments.append((.newline, ""))
+            } else if char == "\t" {
+                if !currentSegment.isEmpty {
+                    segments.append((.text, currentSegment))
+                    currentSegment = ""
+                }
+                segments.append((.tab, ""))
             } else {
-                keyDown.tapPostEvent(proxy)
-                keyUp.tapPostEvent(proxy)
+                currentSegment.append(char)
+            }
+        }
+        if !currentSegment.isEmpty {
+            segments.append((.text, currentSegment))
+        }
+        
+        // Send each segment
+        for (segmentIndex, segment) in segments.enumerated() {
+            switch segment.type {
+            case .newline:
+                debugCallback?("    → Sending newline (Return key)")
+                sendReturnKeyInternal(proxy: proxy, useDirectPost: useDirectPost)
+                
+            case .tab:
+                debugCallback?("    → Sending tab (Tab key)")
+                sendTabKeyInternal(proxy: proxy, useDirectPost: useDirectPost)
+                
+            case .text:
+                // Send text in chunks
+                let utf16 = Array(segment.content.utf16)
+                var offset = 0
+                let chunkSize = 20
+                
+                while offset < utf16.count {
+                    let end = min(offset + chunkSize, utf16.count)
+                    var chunk = Array(utf16[offset..<end])
+                    
+                    guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+                          let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
+                        break
+                    }
+                    
+                    keyDown.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+                    keyUp.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+                    
+                    // Mark as XKey-injected event to prevent re-processing by event tap
+                    keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+                    keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+                    
+                    // For slow method (terminals), post directly to session event tap
+                    if useDirectPost {
+                        keyDown.post(tap: .cgSessionEventTap)
+                        keyUp.post(tap: .cgSessionEventTap)
+                    } else {
+                        keyDown.tapPostEvent(proxy)
+                        keyUp.tapPostEvent(proxy)
+                    }
+                    
+                    debugCallback?("    → Sent chunk [\(offset)..<\(end)]: \(chunk.count) chars")
+                    
+                    if delay > 0 && end < utf16.count {
+                        usleep(delay)
+                    }
+                    
+                    offset = end
+                }
             }
             
-            debugCallback?("    → Sent chunk [\(offset)..<\(end)]: \(chunk.count) chars")
-            
-            if delay > 0 && end < utf16.count {
+            // Add delay between segments
+            if delay > 0 && segmentIndex < segments.count - 1 {
                 usleep(delay)
             }
-            
-            offset = end
         }
+    }
+    
+    /// Segment type for chunked text sending
+    private enum SegmentType {
+        case text
+        case newline
+        case tab
     }
     
     /// Internal: Send text one character at a time (for Safari/Google Docs compatibility)
     /// Some apps don't handle multiple Unicode characters in a single CGEvent properly
+    /// Special handling for newline: sends Return key (0x24) instead of Unicode \n
     private func sendTextOneByOneInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
         
         debugCallback?("    → Sending text one-by-one: '\(text)' (\(text.count) chars), direct=\(useDirectPost)")
         
         for (index, char) in text.enumerated() {
+            // Special handling for newline - send Return key instead
+            if char == "\n" || char == "\r" {
+                debugCallback?("    → Sent char [\(index)]: newline (Return key)")
+                sendReturnKeyInternal(proxy: proxy, useDirectPost: useDirectPost)
+                if delay > 0 && index < text.count - 1 {
+                    usleep(delay)
+                }
+                continue
+            }
+            
+            // Special handling for tab - send Tab key instead
+            if char == "\t" {
+                debugCallback?("    → Sent char [\(index)]: tab (Tab key)")
+                sendTabKeyInternal(proxy: proxy, useDirectPost: useDirectPost)
+                if delay > 0 && index < text.count - 1 {
+                    usleep(delay)
+                }
+                continue
+            }
+            
             var utf16 = Array(String(char).utf16)
             
             guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
@@ -310,6 +385,54 @@ class CharacterInjector {
             if delay > 0 && index < text.count - 1 {
                 usleep(delay)
             }
+        }
+    }
+    
+    /// Internal: Send Return key (for newline in macros)
+    private func sendReturnKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+        guard let source = eventSource else { return }
+        
+        let returnKeyCode: CGKeyCode = 0x24  // Return key
+        
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false) else {
+            return
+        }
+        
+        // Mark as XKey-injected event to prevent re-processing by event tap
+        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+        
+        if useDirectPost {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        } else {
+            keyDown.tapPostEvent(proxy)
+            keyUp.tapPostEvent(proxy)
+        }
+    }
+    
+    /// Internal: Send Tab key (for tab in macros)
+    private func sendTabKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+        guard let source = eventSource else { return }
+        
+        let tabKeyCode: CGKeyCode = 0x30  // Tab key
+        
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: tabKeyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: tabKeyCode, keyDown: false) else {
+            return
+        }
+        
+        // Mark as XKey-injected event to prevent re-processing by event tap
+        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+        
+        if useDirectPost {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        } else {
+            keyDown.tapPostEvent(proxy)
+            keyUp.tapPostEvent(proxy)
         }
     }
     
@@ -620,76 +743,18 @@ class CharacterInjector {
     
     /// Send text in chunks (up to 20 chars per CGEvent) for better performance
     /// CGEvent has a 20-character limit per keyboardSetUnicodeString call
+    /// Special handling for newline/tab: splits text and sends as key events
     private func sendTextChunked(_ text: String, delay: UInt32, proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-        
-        let utf16 = Array(text.utf16)
-        var offset = 0
-        let chunkSize = 20  // CGEvent limit
-        
-        debugCallback?("    → Sending text chunked: '\(text)' (\(utf16.count) UTF-16 units)")
-        
-        while offset < utf16.count {
-            let end = min(offset + chunkSize, utf16.count)
-            var chunk = Array(utf16[offset..<end])
-            
-            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
-                break
-            }
-            
-            keyDown.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
-            keyUp.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
-            
-            // Mark as XKey-injected event to prevent re-processing by event tap
-            keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-            
-            debugCallback?("    → Sent chunk [\(offset)..<\(end)]: \(chunk.count) chars")
-            
-            if delay > 0 && end < utf16.count {
-                usleep(delay)
-            }
-            
-            offset = end
-        }
+        // Use the internal version with useDirectPost = false
+        sendTextChunkedInternal(text, delay: delay, proxy: proxy, useDirectPost: false)
     }
     
     /// Send text one character at a time (for Safari/Google Docs compatibility)
     /// Some apps don't handle multiple Unicode characters in a single CGEvent properly
+    /// Special handling for newline/tab: sends key events instead of Unicode
     private func sendTextOneByOne(_ text: String, delay: UInt32, proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-        
-        debugCallback?("    → Sending text one-by-one: '\(text)' (\(text.count) chars)")
-        
-        for (index, char) in text.enumerated() {
-            var utf16 = Array(String(char).utf16)
-            
-            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
-                break
-            }
-            
-            keyDown.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
-            keyUp.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
-            
-            // Mark as XKey-injected event to prevent re-processing by event tap
-            keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-            
-            debugCallback?("    → Sent char [\(index)]: '\(char)'")
-            
-            // Add delay between characters (except after last one)
-            if delay > 0 && index < text.count - 1 {
-                usleep(delay)
-            }
-        }
+        // Use the internal version with useDirectPost = false
+        sendTextOneByOneInternal(text, delay: delay, proxy: proxy, useDirectPost: false)
     }
     
     // MARK: - Private Methods

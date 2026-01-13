@@ -7,6 +7,24 @@
 
 import SwiftUI
 
+// MARK: - macOS Backward Compatibility for TextEditor Background
+extension View {
+    /// Applies proper background styling for TextEditor across macOS versions
+    /// On macOS 13+, hides the scroll content background
+    /// On older versions, just applies the background color
+    @ViewBuilder
+    func textEditorBackgroundCompat() -> some View {
+        if #available(macOS 13.0, *) {
+            self
+                .scrollContentBackground(.hidden)
+                .background(Color(NSColor.textBackgroundColor))
+        } else {
+            self
+                .background(Color(NSColor.textBackgroundColor))
+        }
+    }
+}
+
 struct MacroSection: View {
     @StateObject private var viewModel = MacroManagementViewModel()
     @ObservedObject var prefsViewModel: PreferencesViewModel
@@ -34,60 +52,86 @@ struct MacroSection: View {
                         }
                     }
                 }
-                
                 // Add new macro
                 SettingsGroup(title: "Thêm macro mới") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .bottom, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Từ viết tắt")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                TextField("vd: btw", text: $newMacroText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 120)
-                                    .onChange(of: newMacroText) { newValue in
-                                        // Filter out Vietnamese diacritics and spaces
-                                        let filtered = filterMacroAbbreviation(newValue)
-                                        if filtered != newValue {
-                                            newMacroText = filtered
-                                        }
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Abbreviation field with inline label
+                        HStack(alignment: .center, spacing: 8) {
+                            Text("Từ viết tắt:")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            TextField("vd: btw", text: $newMacroText)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 120)
+                                .onChange(of: newMacroText) { newValue in
+                                    let filtered = filterMacroAbbreviation(newValue)
+                                    if filtered != newValue {
+                                        newMacroText = filtered
                                     }
-                                Text("Không hỗ trợ dấu tiếng Việt và khoảng cách")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Nội dung thay thế")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                TextField("vd: by the way", text: $newMacroContent)
-                                    .textFieldStyle(.roundedBorder)
-                                Text(" ")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.clear)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(" ")
-                                    .font(.caption)
-                                    .foregroundColor(.clear)
-                                Button("Thêm") {
-                                    addMacro()
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
-                                Text(" ")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.clear)
-                            }
+                            Text("(không dấu, không cách)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
                         }
                         
+                        // Content field (auto-expanding)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nội dung thay thế:")
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            
+                            ZStack(alignment: .topLeading) {
+                                // Hidden text to measure height
+                                Text(newMacroContent.isEmpty ? " " : newMacroContent)
+                                    .font(.body)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 8)
+                                    .opacity(0)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                // Placeholder
+                                if newMacroContent.isEmpty {
+                                    Text("Nhập nội dung (Enter để xuống dòng)")
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                        .font(.body)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 8)
+                                }
+                                
+                                // TextEditor
+                                TextEditor(text: $newMacroContent)
+                                    .font(.body)
+                                    .textEditorBackgroundCompat()
+                            }
+                            .frame(minHeight: 36, maxHeight: 150)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            )
+                            .background(Color(NSColor.textBackgroundColor))
+                            .cornerRadius(6)
+                        }
+                        
+                        // Error message
                         if showError {
                             Text(errorMessage)
                                 .foregroundColor(.red)
                                 .font(.caption)
+                        }
+                        
+                        // Add button - right aligned
+                        HStack {
+                            Spacer()
+                            Button {
+                                addMacro()
+                            } label: {
+                                Text("Thêm macro")
+                                    .fontWeight(.medium)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
                         }
                     }
                 }
@@ -254,11 +298,28 @@ struct MacroRowView: View {
                 .foregroundColor(.secondary)
                 .font(.system(size: 12, weight: .medium))
             
-            // Content
-            Text(macro.content)
-                .foregroundColor(.primary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Content with multiline indicator
+            VStack(alignment: .leading, spacing: 4) {
+                // Show multiline badge if content has newlines
+                if macro.content.contains("\n") {
+                    HStack(spacing: 4) {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: 9))
+                        Text("Nhiều dòng")
+                            .font(.system(size: 9))
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(4)
+                }
+                
+                Text(macro.content)
+                    .foregroundColor(.primary)
+                    .lineLimit(3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             // Action buttons
             HStack(spacing: 8) {
@@ -360,9 +421,36 @@ struct EditMacroSheet: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    TextField("vd: by the way", text: $editedContent)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.body)
+                    ZStack(alignment: .topLeading) {
+                        // Hidden text to measure height
+                        Text(editedContent.isEmpty ? " " : editedContent)
+                            .font(.body)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 8)
+                            .opacity(0)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        // Placeholder
+                        if editedContent.isEmpty {
+                            Text("Nhập nội dung thay thế (hỗ trợ nhiều dòng)")
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .font(.body)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 8)
+                        }
+                        
+                        // TextEditor
+                        TextEditor(text: $editedContent)
+                            .font(.body)
+                            .textEditorBackgroundCompat()
+                    }
+                    .frame(minHeight: 60, maxHeight: 200)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                    .background(Color(NSColor.textBackgroundColor))
+                    .cornerRadius(6)
                 }
                 
                 if showError {
