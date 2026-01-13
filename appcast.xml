@@ -6,32 +6,38 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260113)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260113</link>
-      <sparkle:version>20260113</sparkle:version>
+      <title>Version 1.2.19 (Build 20260113.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260113.1</link>
+      <sparkle:version>20260113.1</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: Vietnamese vowel transformation and English detection improvements</p>
+<p>feat: Add multi-line macro content support</p>
 <ul>
-<li>Fix insertAOE() to correctly update ALL vowels when TONEW_MASK is removed</li>
+<li>CharacterInjector: Handle newline/tab characters specially</li>
 </ul>
-<p>  (e.g., 'cươi' + 'o' now correctly becomes 'cuôi' instead of 'cưôi')</p>
+<p>  - Send Return key (0x24) for newline instead of Unicode \n</p>
+<p>  - Send Tab key (0x30) for tab instead of Unicode \t</p>
+<p>  - Add sendReturnKeyInternal() and sendTabKeyInternal() helper methods</p>
+<p>  - Update sendTextChunkedInternal() to split text by special chars</p>
+<p>  - Update sendTextOneByOneInternal() with special char handling</p>
 <ul>
-<li>Allow consonant+w patterns in Telex/Simple Telex 2 input types</li>
+<li>MacroSection: Redesign add macro form UI</li>
 </ul>
-<p>  (e.g., 'hw' → 'hư', 'bw' → 'bư' are valid Vietnamese transformations)</p>
+<p>  - Replace TextField with auto-expanding TextEditor for content</p>
+<p>  - Add textEditorBackgroundCompat() for macOS 12 compatibility</p>
+<p>  - Clean layout with abbreviation field and Add button</p>
+<p>  - Update EditMacroSheet with same improvements</p>
 <ul>
-<li>Only treat consonant+w as English patterns in VNI and Simple Telex 1</li>
-<li>Refactor VNEngineTests to validate engine buffer state instead of output</li>
-<li>Update README.md with current feature documentation</li>
-<li>Bump version in Info.plist</li>
+<li>MacroManagementViewModel: Support multi-line in import/export</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260113">Xem chi tiết trên GitHub</a></p>
+<p>  - Escape newlines as \\n when exporting</p>
+<p>  - Unescape \\n to actual newlines when importing</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260113.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 13 Jan 2026 06:07:14 +0000</pubDate>
+      <pubDate>Tue, 13 Jan 2026 09:01:07 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260113/XKey.dmg" sparkle:version="20260113" sparkle:shortVersionString="1.2.19" length="10473071" type="application/octet-stream" sparkle:edSignature="oFP5K4Zec6yMVwX/1U66vezdqxXh7PP0hFU5uezlxhf1cytxIlkeJS1Iz1EdBiOIJLkXJZgR9wKuAtNPmmY4Bg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260113.1/XKey.dmg" sparkle:version="20260113.1" sparkle:shortVersionString="1.2.19" length="10518681" type="application/octet-stream" sparkle:edSignature="kLSjU0YmEHlF2kHZWvO8HgVPRJJ9EkKB8YUPlqakHezelYhWJkS/jvu/KFRCzfJDLP8AH2zXpop9AbB1YlvJBQ==" />
     </item>
   </channel>
 </rss>
