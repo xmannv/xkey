@@ -6,22 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260114.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.1</link>
-      <sparkle:version>20260114.1</sparkle:version>
+      <title>Version 1.2.19 (Build 20260114.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.2</link>
+      <sparkle:version>20260114.2</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix tone mark position when adding vowels after mark (Free Mark ON)</p>
+<p>refactor: Centralize Vietnamese special key and word break logic</p>
 <ul>
-<li>Fix checkMarkPosition not being called when a new vowel is added to a word that already has a tone mark</li>
-<li>Preserve engine buffer when focus temporarily moves to menu/popup elements (e.g., Facebook tag suggestion dropdown)</li>
+<li>Add VNEngine.isVietnameseSpecialKey() to determine which characters</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.1">Xem chi tiết trên GitHub</a></p>
+<p>  should be processed by Vietnamese engine based on input method</p>
+<ul>
+<li>Add VNEngine.isWordBreak() to centralize word break detection logic</li>
+<li>Fix standalone 'w' → 'ư' conversion in Telex/Simple Telex 2 modes</li>
+<li>Refactor KeyboardEventHandler to use centralized isWordBreak()</li>
+<li>Refactor XKeyIMController to use centralized isVietnameseSpecialKey()</li>
+<li>This ensures consistent behavior between XKey app and XKeyIM</li>
+</ul>
+<p>Bump version to 20260114.2</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 14 Jan 2026 01:29:45 +0000</pubDate>
+      <pubDate>Wed, 14 Jan 2026 10:25:18 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.1/XKey.dmg" sparkle:version="20260114.1" sparkle:shortVersionString="1.2.19" length="10521828" type="application/octet-stream" sparkle:edSignature="/9O32br49bhYNmE/UoqPhVtdBDnUfsyIBWno6hZfT6CDB+YQTvrqGsvu7E2eK/8LgfYCBG8YDyQWSdnOErVTDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.2/XKey.dmg" sparkle:version="20260114.2" sparkle:shortVersionString="1.2.19" length="10523173" type="application/octet-stream" sparkle:edSignature="nOy/pg9/Cfb5I96Sic2HPbRsF/ACanCtBgIeuI8rLObbjcccaNx8C7V0o6fg9KbQUY1hxg4f043unWICZQvpCw==" />
     </item>
   </channel>
 </rss>
