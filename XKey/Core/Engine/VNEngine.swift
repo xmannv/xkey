@@ -1170,6 +1170,72 @@ class VNEngine {
         return isBracketKey(keyCode: keyCode)
     }
     
+    // MARK: - Public Key Classification
+    
+    /// Check if a character is a Vietnamese special key that needs engine processing
+    /// This centralizes the logic for determining which non-letter characters should be processed
+    /// - Parameters:
+    ///   - character: The character to check
+    ///   - inputMethod: The current input method (Telex, VNI, Simple Telex 1, Simple Telex 2)
+    /// - Returns: true if this character should be processed by Vietnamese engine
+    ///
+    /// Special keys by input method:
+    /// - Telex: w, a, e, o, s, f, r, x, j, z, d, [, ]
+    /// - VNI: 0-9
+    /// - Simple Telex 1: w, a, e, o, s, f, r, x, j, z, d (NO [ ])
+    /// - Simple Telex 2: w, a, e, o, s, f, r, x, j, z, d (NO [ ])
+    static func isVietnameseSpecialKey(character: Character, inputMethod: InputMethod) -> Bool {
+        // Letters are always processed (Vietnamese engine handles them)
+        if character.isLetter {
+            return true
+        }
+        
+        // Numbers: only in VNI mode (0-9 are tone marks)
+        if character.isNumber {
+            return inputMethod == .vni
+        }
+        
+        // Bracket keys: only in Telex mode ([ → ơ, ] → ư)
+        if character == "[" || character == "]" {
+            return inputMethod == .telex
+        }
+        
+        // Other characters are not Vietnamese special keys
+        return false
+    }
+    
+    /// Check if a character is a word break in the context of Vietnamese typing
+    /// Word breaks reset the engine buffer
+    /// - Parameters:
+    ///   - character: The character to check
+    ///   - inputMethod: The current input method
+    /// - Returns: true if this character is a word break
+    ///
+    /// Note: In Telex mode, [ and ] are NOT word breaks (they produce ơ and ư)
+    static func isWordBreak(character: Character, inputMethod: InputMethod) -> Bool {
+        // Whitespace and common punctuation
+        let baseWordBreaks: Set<Character> = [
+            " ", ",", ".", "!", "?", ";", ":",
+            "\n", "\r", "\t",
+            "(", ")", "{", "}", "<", ">",
+            "/", "\\", "|",
+            "@", "#", "$", "%", "^", "&", "*",
+            "~", "`", "-", "_", "=", "+",
+            "'", "\""
+        ]
+        
+        if baseWordBreaks.contains(character) {
+            return true
+        }
+        
+        // Bracket keys: word break in all modes EXCEPT Telex
+        if character == "[" || character == "]" {
+            return inputMethod != .telex
+        }
+        
+        return false
+    }
+    
     // MARK: - Insert Functions
     
     func insertKey(keyCode: UInt16, isCaps: Bool, isCheckSpelling: Bool = true) {

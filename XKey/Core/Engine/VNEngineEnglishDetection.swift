@@ -437,17 +437,26 @@ extension String {
         
         let word = self.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // For Telex (0) and Simple Telex 2 (3), skip consonant + W patterns
-        // because 'w' is a vowel modifier that can create valid "Xư" patterns
-        // like "hw" → "hư", "bw" → "bư", "thw" → "thư", etc.
+        // For Telex (0) and Simple Telex 2 (3), 'w' is a vowel modifier
+        // that can create valid Vietnamese patterns:
+        // - Standalone "w" → "ư" (at word start)
+        // - Consonant + "w" → "Xư" (e.g., "hw" → "hư", "bw" → "bư")
         // For VNI (1) and Simple Telex 1 (2), 'w' has no special meaning, so these patterns indicate English
         let supportsStandaloneW = (inputType == 0 || inputType == 3)
         
-        if supportsStandaloneW && word.count >= 2 {
-            let prefix2 = String(word.prefix(2))
-            if Self.consonantWClusters.contains(prefix2) {
-                // This is a valid Telex pattern (consonant + w → Xư), not English
+        if supportsStandaloneW {
+            // Allow standalone 'w' at word start (w → ư)
+            if word == "w" {
                 return false
+            }
+            
+            // Allow consonant + w patterns (hw → hư, bw → bư, etc.)
+            if word.count >= 2 {
+                let prefix2 = String(word.prefix(2))
+                if Self.consonantWClusters.contains(prefix2) {
+                    // This is a valid Telex pattern (consonant + w → Xư), not English
+                    return false
+                }
             }
         }
         

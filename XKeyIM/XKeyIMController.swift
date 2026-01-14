@@ -458,18 +458,11 @@ class XKeyIMController: IMKInputController {
         }
 
         // Determine if this character should be processed by Vietnamese engine
-        let shouldProcessVietnamese: Bool
-        if baseChar.isLetter {
-            // Always process letters
-            shouldProcessVietnamese = true
-        } else if character.isNumber {
-            // Process numbers ONLY if in VNI mode (which uses 0-9 for tone marks)
-            // For other input methods (Telex, Simple Telex), numbers are just numbers
-            shouldProcessVietnamese = (settings.inputMethod == .vni)
-        } else {
-            // Punctuation - commit current composition and let it pass through
-            shouldProcessVietnamese = false
-        }
+        // Use centralized logic from VNEngine to ensure consistency with XKey main app
+        let shouldProcessVietnamese = VNEngine.isVietnameseSpecialKey(
+            character: baseChar,
+            inputMethod: settings.inputMethod
+        )
 
         // If not processing Vietnamese, commit composition and let it pass through
         if !shouldProcessVietnamese {

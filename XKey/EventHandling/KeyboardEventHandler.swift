@@ -584,33 +584,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     private func isWordBreakKey(_ character: Character) -> Bool {
-        // Base word break characters
-        // IMPORTANT: All special characters that can be part of macros must be included here
-        // so they go through processWordBreak which correctly handles CAPS_MASK for macro matching.
-        // This includes shifted number keys (@, #, $, etc.) and other punctuation.
-        var wordBreaks: Set<Character> = [
-            // Whitespace and basic punctuation
-            " ", ",", ".", "!", "?", ";", ":",
-            "\n", "\r", "\t",
-            // Brackets and parentheses
-            "(", ")", "{", "}", "<", ">",
-            // Slashes
-            "/", "\\", "|",
-            // Shifted number keys - commonly used in macros
-            "@", "#", "$", "%", "^", "&", "*",
-            // Other special characters
-            "~", "`", "-", "_", "=", "+",
-            "'", "\""
-        ]
-        
-        // For Telex input method, [ and ] are special keys (ơ and ư), not word breaks
-        // For Simple Telex 1 & 2, [ and ] are word breaks
-        if inputMethod != .telex {
-            wordBreaks.insert("[")
-            wordBreaks.insert("]")
-        }
-        
-        return wordBreaks.contains(character)
+        // Use centralized logic from VNEngine to ensure consistency with XKeyIM
+        return VNEngine.isWordBreak(character: character, inputMethod: inputMethod)
     }
     
     // MARK: - Settings Update
