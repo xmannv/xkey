@@ -6,33 +6,22 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260114)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114</link>
-      <sparkle:version>20260114</sparkle:version>
+      <title>Version 1.2.19 (Build 20260114.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.1</link>
+      <sparkle:version>20260114.1</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
 <p>Fix tone mark position when adding vowels after mark (Free Mark ON)</p>
-<p>When Free Mark is enabled, adding vowels after a tone mark was placed</p>
-<p>would not re-evaluate the mark position. For example:</p>
 <ul>
-<li>'ngof' → 'ngò' (correct, single vowel)</li>
-<li>'ngofa' → 'ngòa' (wrong, mark should move to 'a')</li>
-<li>'ngofai' → 'ngòai' (wrong, should be 'ngoài')</li>
+<li>Fix checkMarkPosition not being called when a new vowel is added to a word that already has a tone mark</li>
+<li>Preserve engine buffer when focus temporarily moves to menu/popup elements (e.g., Facebook tag suggestion dropdown)</li>
 </ul>
-<p>The fix adds a check to call checkMarkPosition() when a new vowel is</p>
-<p>added to a word that already has a tone mark, ensuring the mark is</p>
-<p>repositioned according to Vietnamese spelling rules.</p>
-<p>Added test cases:</p>
-<ul>
-<li>testTonePlacement<em>NGOAI</em>MarkBeforeVowel</li>
-<li>testTonePlacement<em>HOA</em>MarkBeforeVowel</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 14 Jan 2026 01:10:14 +0000</pubDate>
+      <pubDate>Wed, 14 Jan 2026 01:29:45 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114/XKey.dmg" sparkle:version="20260114" sparkle:shortVersionString="1.2.19" length="10520027" type="application/octet-stream" sparkle:edSignature="q7WxEWg5zL29cuB25gnHSJbUyXJVxCqhBFoe8gcgktgWBi5HwUlBdapHzkExbnQTwmGzxRCzgB31TW08M9PyAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.1/XKey.dmg" sparkle:version="20260114.1" sparkle:shortVersionString="1.2.19" length="10521828" type="application/octet-stream" sparkle:edSignature="/9O32br49bhYNmE/UoqPhVtdBDnUfsyIBWno6hZfT6CDB+YQTvrqGsvu7E2eK/8LgfYCBG8YDyQWSdnOErVTDg==" />
     </item>
   </channel>
 </rss>
