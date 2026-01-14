@@ -428,19 +428,34 @@ class VNEngine {
             checkVowelAutoFix(deltaBackSpace: deltaBS)
         }
         
-        // Check mark position - ALWAYS check when typing end consonant
+        // Check mark position - ALWAYS check when typing end consonant or adding vowel to marked word
         // Vietnamese spelling rule: with end consonant, tone must be on the vowel closest to it
         // Example: "hoạt" - tone on 'a', not 'o'; "hiện" - tone on 'ê', not 'i'
+        // Additional rule: when adding vowels after a mark, position may need adjustment
+        // Example: "ngò" + "a" → "ngoà" (mark moves from 'o' to 'a')
         // This rule applies regardless of vFreeMark setting
         // Skip if instant restore has occurred (extCode == 5) - word is being discarded
         if !isKeyD(keyCode: keyCode, inputType: vInputType) && hookState.extCode != 5 {
             // Check if this key is an end consonant
             let isEndConsonant = vietnameseData.isConsonant(keyCode) && index > 1
             
+            // Check if this key is a vowel and the word already has a mark
+            var isVowelWithExistingMark = false
+            if !vietnameseData.isConsonant(keyCode) && index > 1 {
+                // Check if any existing vowel has a mark
+                for i in 0..<Int(index) - 1 {
+                    if (typingWord[i] & VNEngine.MARK_MASK) != 0 {
+                        isVowelWithExistingMark = true
+                        break
+                    }
+                }
+            }
+            
             // Always check mark position if:
             // 1. vFreeMark is disabled, OR
-            // 2. This is an end consonant (Vietnamese spelling rule)
-            if vFreeMark == 0 || isEndConsonant {
+            // 2. This is an end consonant (Vietnamese spelling rule), OR
+            // 3. This is a vowel added to a word with existing mark (mark position may need adjustment)
+            if vFreeMark == 0 || isEndConsonant || isVowelWithExistingMark {
                 // IMPORTANT: Determine deltaBackSpace correctly
                 // If checkVowelAutoFix has run (extCode=4), the last character hasn't been
                 // sent to screen yet, so we need deltaBackSpace=-1 even if hookState.code != vDoNothing

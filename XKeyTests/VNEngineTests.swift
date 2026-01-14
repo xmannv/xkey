@@ -797,6 +797,40 @@ class VNEngineTests: XCTestCase {
     // - testTelex_UOW_ThenO_ShouldRemoveHornFromU: Tests simpler horn removal case
     //
     // These can be re-added once engine behavior is verified.
+    
+    // MARK: - Mark Position Adjustment Tests
+    
+    /// Test that adding vowels after a mark causes mark position to be re-evaluated
+    /// Bug: "ngof" → "ngò", then "a" → "ngòa" (wrong), should be "ngoà"
+    /// Then "i" → "ngoài" (correct mark on 'a')
+    func testTonePlacement_NGOAI_MarkBeforeVowel() {
+        engine.reset()
+        engine.vFreeMark = 1  // Free Mark ON (as in user's config)
+        
+        // n-g-o-f-a-i → ngoài (Telex)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // grave mark on 'o' → ngò
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)  // mark should move to 'a'
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ngoài", "Mark should move from 'o' to 'a' when vowels are added after the mark")
+    }
+    
+    /// Test similar case with "hoà" → mark on 'a' not 'o'
+    func testTonePlacement_HOA_MarkBeforeVowel() {
+        engine.reset()
+        engine.vFreeMark = 1  // Free Mark ON
+        
+        // h-o-f-a → hoà (not hòa)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // grave mark on 'o' → hò
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)  // adding 'a' should move mark
+        
+        XCTAssertEqual(engine.getCurrentWord(), "hoà", "Mark should move from 'o' to 'a' in 'hoà'")
+    }
 
 }
 
