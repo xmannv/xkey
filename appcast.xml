@@ -6,38 +6,39 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260114.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.3</link>
-      <sparkle:version>20260114.3</sparkle:version>
+      <title>Version 1.2.19 (Build 20260114.4)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.4</link>
+      <sparkle:version>20260114.4</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Add keystroke protection window to prevent buffer reset on focus refinement</p>
+<p>Refactor focus change handling: remove engine reset from focus detection</p>
+<p>Focus change detection now ONLY re-detects injection method.</p>
+<p>Engine reset is handled ONLY by explicit user actions:</p>
 <ul>
-<li>Add lastKeystrokeTime tracking in KeyboardEventHandler to record when</li>
+<li>Mouse click</li>
+<li>Arrow/Home/End/PageUp/PageDown keys</li>
+<li>Tab key</li>
+<li>App switch</li>
+<li>Modifier key combos (Cmd/Ctrl/Alt + key, or 2+ modifiers)</li>
 </ul>
-<p>  the last keystroke was processed</p>
+<p>This fixes issues where apps 'refine' focus after user starts typing</p>
+<p>(e.g., VSCode: AXWindow → AXTextArea, Facebook: dropdown menus),</p>
+<p>which previously caused the engine buffer to be cleared mid-typing.</p>
+<p>Removed:</p>
 <ul>
-<li>Add isWithinKeystrokeProtectionWindow() method to check if within 150ms</li>
+<li>resetEngineForFocusChange()</li>
+<li>isMenuOrPopupSignature()</li>
+<li>Mouse click timing protection (shouldSkipResetAfterMouseClick, etc.)</li>
+<li>Keystroke timing protection</li>
 </ul>
-<p>  protection window</p>
-<ul>
-<li>Add keystroke protection checks in AppDelegate for both keyboard timer</li>
-</ul>
-<p>  and AXObserver focus change paths</p>
-<ul>
-<li>If focus changes within 150ms of a keystroke, preserve engine buffer</li>
-</ul>
-<p>  instead of resetting (likely app-initiated focus refinement, not user click)</p>
-<p>Fixes: Typing 'bajn' instead of 'bạn' in VSCode Copilot Chat where focus</p>
-<p>switches from AXWindow to AXTextArea immediately after user starts typing,</p>
-<p>previously causing buffer to reset mid-word.</p>
-<p>Bump build version to 20260114.3</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.3">Xem chi tiết trên GitHub</a></p>
+<p>Simplified modifier key handling to reset on any key combination</p>
+<p>(Cmd/Ctrl/Alt + key, or 2+ modifiers like Ctrl+Shift).</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 14 Jan 2026 11:04:24 +0000</pubDate>
+      <pubDate>Wed, 14 Jan 2026 13:01:56 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.3/XKey.dmg" sparkle:version="20260114.3" sparkle:shortVersionString="1.2.19" length="10525866" type="application/octet-stream" sparkle:edSignature="F0vHkGEeCb5HA/exzUmtVxhrWr4vHbpXFQ/oBZIaERTNVCQZregtJdiBswau2R+qItEx1r+ExNld1X+FHf+TBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.4/XKey.dmg" sparkle:version="20260114.4" sparkle:shortVersionString="1.2.19" length="10520409" type="application/octet-stream" sparkle:edSignature="FEFdwrwvScIzGHhD7b9BpOHiwrlDET2Rb42EUPG4AW/5Ncy0CAXAw1nKOJiUf0XSerM2iR/Bgvg73+kxueqGCg==" />
     </item>
   </channel>
 </rss>
