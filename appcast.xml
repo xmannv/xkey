@@ -6,39 +6,35 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260114.5)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.5</link>
-      <sparkle:version>20260114.5</sparkle:version>
+      <title>Version 1.2.19 (Build 20260114.6)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.6</link>
+      <sparkle:version>20260114.6</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Refactor focus change handling: remove engine reset from focus detection</p>
-<p>Focus change detection now ONLY re-detects injection method.</p>
-<p>Engine reset is handled ONLY by explicit user actions:</p>
+<p>Fix XKeyIM: standalone 'w' (ư) not accepting tone marks or undo</p>
+<p>Problem: In XKeyIM with Telex/Simple Telex 2, typing 'w' produces 'ư'</p>
+<p>(standalone), but then:</p>
 <ul>
-<li>Mouse click</li>
-<li>Arrow/Home/End/PageUp/PageDown keys</li>
-<li>Tab key</li>
-<li>App switch</li>
-<li>Modifier key combos (Cmd/Ctrl/Alt + key, or 2+ modifiers)</li>
+<li>Adding tone marks (s/f/r/x/j) was blocked because 'ws', 'wf', etc.</li>
 </ul>
-<p>This fixes issues where apps 'refine' focus after user starts typing</p>
-<p>(e.g., VSCode: AXWindow → AXTextArea, Facebook: dropdown menus),</p>
-<p>which previously caused the engine buffer to be cleared mid-typing.</p>
-<p>Removed:</p>
+<p>  were detected as English patterns</p>
 <ul>
-<li>resetEngineForFocusChange()</li>
-<li>isMenuOrPopupSignature()</li>
-<li>Mouse click timing protection (shouldSkipResetAfterMouseClick, etc.)</li>
-<li>Keystroke timing protection</li>
+<li>Typing 'ww' to undo back to 'w' was also blocked</li>
 </ul>
-<p>Simplified modifier key handling to reset on any key combination</p>
-<p>(Cmd/Ctrl/Alt + key, or 2+ modifiers like Ctrl+Shift).</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.5">Xem chi tiết trên GitHub</a></p>
+<p>Note: XKey main app was not affected by this issue.</p>
+<p>Solution: Added logic in startsWithImpossiblePatternForRawInput() to</p>
+<p>allow these patterns in Telex (0) and Simple Telex 2 (3) modes:</p>
+<ul>
+<li>ws → ứ, wf → ừ, wr → ử, wx → ữ, wj → ự (standalone ư + tone)</li>
+<li>ww → w (undo: ư back to w)</li>
+</ul>
+<p>Also bumped build version to 20260114.6</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.6">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 14 Jan 2026 13:16:43 +0000</pubDate>
+      <pubDate>Wed, 14 Jan 2026 14:20:45 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.5/XKey.dmg" sparkle:version="20260114.5" sparkle:shortVersionString="1.2.19" length="10520304" type="application/octet-stream" sparkle:edSignature="6Z7+aTW3m5UeKBi4uawQWIAJggkdhc0Sbz+EN4XPK0nBPmv/sIdxsVKsdWw9wl4gCI99YzA2l52+v2d5wS76Ag==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.6/XKey.dmg" sparkle:version="20260114.6" sparkle:shortVersionString="1.2.19" length="10522306" type="application/octet-stream" sparkle:edSignature="v0/tWH0nW9sSREmpNIECSlwTkKOqfmoozw5Jc6LZniIMHyFJ+LAhjjfgY4xxo0Jf5o8ySCnXNrOOKgSz/k5uBQ==" />
     </item>
   </channel>
 </rss>
