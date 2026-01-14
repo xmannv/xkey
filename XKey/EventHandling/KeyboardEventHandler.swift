@@ -23,6 +23,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// Only turn on for debugging specific issues
     var verboseEngineLogging: Bool = false
     
+
     // Settings
     @Published var inputMethod: InputMethod = .telex {
         didSet { updateEngineSettings() }
@@ -318,34 +319,43 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // For flagsChanged (modifier-only hotkeys like Ctrl+Shift for undo), we don't want
         // to reset the engine because that would clear the undo buffer
         if type == .keyDown {
-            // Don't process if Command is pressed
-            if event.isCommandPressed {
+            // Count active modifiers (excluding Shift for letter uppercase)
+            let hasCommand = event.isCommandPressed
+            let hasControl = event.isControlPressed
+            let hasOption = event.isOptionPressed
+            let hasShift = event.flags.contains(.maskShift)
+            
+            // Calculate number of modifiers pressed
+            let modifierCount = (hasCommand ? 1 : 0) + (hasControl ? 1 : 0) + 
+                               (hasOption ? 1 : 0) + (hasShift ? 1 : 0)
+            
+            // Reset engine if there's a key combination:
+            // 1. Cmd/Ctrl/Alt + any key (common shortcuts like Cmd+Z, Ctrl+K, Alt+Arrow)
+            // 2. 2+ modifiers pressed (like Ctrl+Shift, Cmd+Shift+Z, etc.)
+            //
+            // This handles all hotkey patterns consistently:
+            // - Cmd+C/V/X (copy/paste/cut)
+            // - Cmd+Z (undo) - text changes
+            // - Cmd+Arrow (word/line navigation)
+            // - Ctrl+K (delete line in some editors)
+            // - Alt+Arrow (word navigation)
+            // - Ctrl+Shift+* (various custom hotkeys)
+            //
+            // Shift alone with letter is NOT reset (for uppercase typing)
+            let hasModifierCombo = hasCommand || hasControl || hasOption || modifierCount >= 2
+            
+            if hasModifierCombo {
                 engine.reset()
-                // Cmd + Arrow keys move cursor, so mark as mid-sentence
-                // For other Cmd shortcuts, Forward Delete protection is handled by
-                // CharacterInjector.shouldSendForwardDelete() which uses AX API to
-                // check if there's text after cursor before sending Forward Delete
+                
+                // Cmd + Arrow keys move cursor, so mark as cursor moved
                 let keyCode = event.keyCode
                 let cursorMovementKeys: [CGKeyCode] = [0x7B, 0x7C, 0x7D, 0x7E, 0x73, 0x77, 0x74, 0x79] // Arrow keys, Home, End, Page Up/Down
                 let isCursorMovement = cursorMovementKeys.contains(keyCode)
                 injector.markNewSession(cursorMoved: isCursorMovement)
                 return false
             }
-
-            // Don't process if Option is pressed (used for special characters like ø, å, etc.)
-            if event.isOptionPressed {
-                engine.reset()
-                injector.markNewSession(preserveMidSentence: true)
-                return false
-            }
-
-            // Don't process if Ctrl is pressed (used for control shortcuts)
-            if event.isControlPressed {
-                engine.reset()
-                injector.markNewSession(preserveMidSentence: true)
-                return false
-            }
         }
+
 
         return true
     }
