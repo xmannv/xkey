@@ -23,6 +23,37 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// Only turn on for debugging specific issues
     var verboseEngineLogging: Bool = false
     
+    // MARK: - Keystroke Timing for Focus Change Protection
+    
+    /// Timestamp of the last keystroke processed by the engine.
+    /// Used to implement "keystroke protection window" - a short period (150ms) after
+    /// a keystroke during which focus changes should NOT reset the engine buffer.
+    ///
+    /// **Problem:**
+    /// Some apps (like VSCode with Copilot Chat) change focus IMMEDIATELY after the user
+    /// starts typing. For example:
+    /// 1. User clicks on "Message input" field (focus on AXWindow initially)
+    /// 2. User types "ba" → engine buffer = "ba"
+    /// 3. VSCode "refines" focus from AXWindow → AXTextArea (focus change!)
+    /// 4. Focus change triggers engine reset → buffer cleared!
+    /// 5. User types "j" (for tone mark) → but buffer is empty → "j" inserted as-is
+    /// Result: "bajn" instead of "bạn"
+    ///
+    /// **Solution:**
+    /// Track when the last keystroke occurred. If a focus change happens within 150ms
+    /// of that keystroke, it's likely an app-initiated "focus refinement" (not a user
+    /// action like clicking a new field), so we preserve the engine buffer.
+    ///
+    /// **Why 150ms?**
+    /// - Focus "refinement" by apps typically happens within 50-100ms of keystroke
+    /// - User clicking a new field has much larger delay (300ms+ for mouse movement)
+    /// - 150ms gives enough margin for slow systems while still distinguishing from clicks
+    private(set) var lastKeystrokeTime: CFAbsoluteTime = 0
+    
+    /// Protection window duration in seconds (150ms)
+    /// Focus changes within this window after a keystroke will NOT reset engine buffer
+    private let keystrokeProtectionWindowSeconds: Double = 0.15
+    
     // Settings
     @Published var inputMethod: InputMethod = .telex {
         didSet { updateEngineSettings() }
@@ -526,6 +557,11 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Wait for any pending injection to complete before processing next keystroke
         // Uses semaphore synchronization to prevent race conditions
         injector.waitForInjectionComplete()
+        
+        // Record keystroke timestamp BEFORE engine processing
+        // This is used to detect "focus refinement" by apps like VSCode
+        // (see lastKeystrokeTime documentation for details)
+        lastKeystrokeTime = CFAbsoluteTimeGetCurrent()
 
         // Process through engine (Vietnamese mode)
         let result = engine.processKey(
@@ -696,6 +732,37 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// Check if a specific bundle identifier is excluded
     func isAppExcluded(bundleIdentifier: String) -> Bool {
         return excludedApps.contains { $0.bundleIdentifier == bundleIdentifier }
+    }
+    
+    // MARK: - Keystroke Protection Window
+    
+    /// Check if we're within the "keystroke protection window" - the short period
+    /// immediately after a keystroke during which focus changes should NOT reset
+    /// the engine buffer.
+    ///
+    /// This is called by AppDelegate when a focus change is detected. If this returns
+    /// true, the focus change is likely caused by the app "refining" focus (e.g.,
+    /// VSCode switching from AXWindow to AXTextArea after user starts typing), not
+    /// by the user clicking a different field. In this case, we preserve the buffer.
+    ///
+    /// **Thread Safety:** This method is called from main thread (focus change handler)
+    /// while lastKeystrokeTime is written from event tap thread. However, CFAbsoluteTime
+    /// is a Double which has atomic reads on 64-bit systems, so this is safe.
+    ///
+    /// - Returns: `true` if a keystroke occurred within the last 150ms (buffer should
+    ///            be preserved), `false` otherwise (buffer can be reset)
+    func isWithinKeystrokeProtectionWindow() -> Bool {
+        guard lastKeystrokeTime > 0 else { return false }
+        
+        let elapsed = CFAbsoluteTimeGetCurrent() - lastKeystrokeTime
+        return elapsed < keystrokeProtectionWindowSeconds
+    }
+    
+    /// Get time elapsed since last keystroke (for debugging)
+    /// - Returns: Time in milliseconds since last keystroke, or -1 if no keystroke recorded
+    func timeSinceLastKeystroke() -> Double {
+        guard lastKeystrokeTime > 0 else { return -1 }
+        return (CFAbsoluteTimeGetCurrent() - lastKeystrokeTime) * 1000  // Convert to ms
     }
 }
 

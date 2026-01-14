@@ -1854,6 +1854,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             
+            // KEYSTROKE PROTECTION WINDOW CHECK
+            // If user was just typing (within last 150ms), this focus change is likely
+            // caused by the app "refining" focus (e.g., VSCode switching from AXWindow
+            // to AXTextArea after user starts typing in Copilot Chat), NOT by user
+            // clicking a different field. In this case, preserve the engine buffer.
+            //
+            // This fixes the bug where typing "bajn" instead of "bạn" because:
+            // 1. User types "ba" → buffer = "ba"
+            // 2. VSCode refines focus (AXWindow → AXTextArea) → normally resets buffer!
+            // 3. User types "j" → with empty buffer, "j" is inserted as-is
+            // Result: "bajn" instead of "bạn"
+            //
+            // With keystroke protection: focus change within 150ms preserves buffer
+            if let handler = keyboardHandler, handler.isWithinKeystrokeProtectionWindow() {
+                let elapsedMs = handler.timeSinceLastKeystroke()
+                debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
+                debugWindowController?.logEvent("   → Within keystroke protection window (\(String(format: "%.1f", elapsedMs))ms), preserving engine buffer")
+                // Update signature and return early - don't reset engine
+                lastFocusedElementSignature = currentSignature
+                return
+            }
+            
             // Focus changed within same app (different element type)
             // Re-detect injection method
             let detector = AppBehaviorDetector.shared
@@ -1971,6 +1993,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
                 debugWindowController?.logEvent("   → Menu/popup element detected, preserving engine buffer")
                 // Update signature and element, then return early
+                lastFocusedElementSignature = currentSignature
+                lastFocusedElement = element
+                return
+            }
+            
+            // KEYSTROKE PROTECTION WINDOW CHECK (AXObserver path)
+            // Same logic as checkIntraAppFocusChange - if user was just typing (within
+            // last 150ms), this focus change is likely caused by the app "refining"
+            // focus, NOT by user clicking a different field.
+            //
+            // The AXObserver fires in real-time when the focused element changes within
+            // an app. This is more reliable than timer-based checks, but we still need
+            // to protect against app-initiated focus refinements.
+            if let handler = keyboardHandler, handler.isWithinKeystrokeProtectionWindow() {
+                let elapsedMs = handler.timeSinceLastKeystroke()
+                debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
+                debugWindowController?.logEvent("   → Within keystroke protection window (\(String(format: "%.1f", elapsedMs))ms), preserving engine buffer")
+                // Update signature and element, then return early - don't reset engine
                 lastFocusedElementSignature = currentSignature
                 lastFocusedElement = element
                 return
