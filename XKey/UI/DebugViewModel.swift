@@ -158,7 +158,12 @@ class DebugViewModel: ObservableObject {
     private func initializeLogFile() {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
         let versionString = "XKey v\(AppVersion.current) (\(AppVersion.build))"
-        let header = "=== XKey Debug Log ===\n\(versionString)\nStarted: \(timestamp)\nLog file: \(logFileURL.path)\n\n"
+        
+        // Get macOS version info
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let osVersionString = "macOS \(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
+        
+        let header = "=== XKey Debug Log ===\n\(versionString)\n\(osVersionString)\nStarted: \(timestamp)\nLog file: \(logFileURL.path)\n\n"
 
         // Create/overwrite file with header
         try? header.write(to: logFileURL, atomically: true, encoding: .utf8)
@@ -319,7 +324,8 @@ class DebugViewModel: ObservableObject {
         switch settings.inputMethod {
         case 0: inputMethodName = "Telex"
         case 1: inputMethodName = "VNI"
-        case 2: inputMethodName = "Simple Telex"
+        case 2: inputMethodName = "Simple Telex 1"
+        case 3: inputMethodName = "Simple Telex 2"
         default: inputMethodName = "Unknown (\(settings.inputMethod))"
         }
         lines.append("Input Method: \(inputMethodName)")
@@ -1257,8 +1263,11 @@ class DebugViewModel: ObservableObject {
     /// Result message after test
     @Published var injectionTestResult = ""
     
-    /// Whether the test passed
+    /// Whether any test passed
     @Published var injectionTestPassed = false
+    
+    /// Track results for each method combination (method+textMode, passed)
+    @Published var injectionTestResults: [(method: InjectionMethod, textMode: TextSendingMethod, passed: Bool)] = []
     
     /// Log messages for injection test
     @Published var injectionTestLog: [String] = []
@@ -1332,8 +1341,9 @@ class DebugViewModel: ObservableObject {
             injectionTestCurrentMethod = injectionMethodsToTest[0]
         }
         
-        // Clear log for new test
+        // Clear log and results for new test
         injectionTestLog.removeAll()
+        injectionTestResults.removeAll()
         injectionTestPassed = false
         injectionTestResult = ""
         
@@ -1541,23 +1551,24 @@ class DebugViewModel: ObservableObject {
             
             // Strict comparison: actual must equal expected
             if normalizedActual == normalizedExpected {
+                // Record pass result
+                injectionTestResults.append((method: injectionTestCurrentMethod, textMode: injectionTestTextSendingMethod, passed: true))
                 injectionTestPassed = true
-                injectionTestState = .passed
-                injectionTestResult = "PASSED with method: \(injectionTestCurrentMethod.displayName)"
-                addInjectionTestLog("")
-                addInjectionTestLog("[OK] TEST PASSED!")
-                addInjectionTestLog("Injection method '\(injectionTestCurrentMethod.displayName)' + '\(injectionTestTextSendingMethod.rawValue)' works correctly.")
-                addInjectionTestLog("")
-                
-                // Clear force override since test is complete
-                setForceOverride(enabled: false)
-                
-                // Log detailed AX info for development purposes
-                logDetailedAXInfo()
                 
                 addInjectionTestLog("")
-                addInjectionTestLog("=== TEST COMPLETE ===")
+                addInjectionTestLog("[OK] \(injectionTestCurrentMethod.displayName) + \(injectionTestTextSendingMethod.rawValue) PASSED!")
+                
+                // Auto-clear text before next test
+                if injectionTestAutoClear {
+                    clearTypedText(count: normalizedActual.count)
+                }
+                
+                // Continue to next method (don't stop on pass)
+                tryNextTextSendingMethod()
             } else {
+                // Record fail result
+                injectionTestResults.append((method: injectionTestCurrentMethod, textMode: injectionTestTextSendingMethod, passed: false))
+                
                 // Show clear diff information
                 addInjectionTestLog("")
                 addInjectionTestLog("[FAIL] \(injectionTestCurrentMethod.displayName) + \(injectionTestTextSendingMethod.rawValue)")
@@ -1586,6 +1597,9 @@ class DebugViewModel: ObservableObject {
                 tryNextTextSendingMethod()
             }
         } else {
+            // Record fail result (could not read)
+            injectionTestResults.append((method: injectionTestCurrentMethod, textMode: injectionTestTextSendingMethod, passed: false))
+            
             addInjectionTestLog("")
             addInjectionTestLog("[FAIL] Could not read text from target app")
             addInjectionTestLog("Make sure the app supports Accessibility API.")
@@ -1595,28 +1609,40 @@ class DebugViewModel: ObservableObject {
         }
     }
     
-    /// Clear typed text by sending backspaces
+    /// Clear typed text using Select All (Cmd+A) + Delete
+    /// This is more reliable than backspaces because XKey engine won't process
+    /// the remaining characters and add diacritics to them
     private func clearTypedText(count: Int) {
         guard count > 0 else { return }
         
-        addInjectionTestLog("  Clearing \(count) characters...")
+        addInjectionTestLog("  Clearing text (Select All + Delete)...")
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             guard let source = CGEventSource(stateID: .hidSystemState) else { return }
             
-            // Send backspaces to clear text
-            for _ in 0..<count {
-                // Backspace keycode is 0x33
-                guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
-                      let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) else {
-                    continue
-                }
+            // Step 1: Send Cmd+A (Select All)
+            // 'A' keycode is 0x00
+            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: true),
+               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: false) {
+                // Set Command modifier
+                keyDown.flags = .maskCommand
+                keyUp.flags = .maskCommand
                 
                 keyDown.post(tap: .cghidEventTap)
                 usleep(1000)  // 1ms delay
                 keyUp.post(tap: .cghidEventTap)
-                usleep(5000)  // 5ms between backspaces
+            }
+            
+            usleep(10000)  // 10ms delay before delete
+            
+            // Step 2: Send Delete/Backspace to remove selected text
+            // Backspace keycode is 0x33
+            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
+               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
+                keyDown.post(tap: .cghidEventTap)
+                usleep(1000)  // 1ms delay
+                keyUp.post(tap: .cghidEventTap)
             }
             
             DispatchQueue.main.async {
@@ -1630,17 +1656,60 @@ class DebugViewModel: ObservableObject {
         injectionTestMethodIndex += 1
         
         if injectionTestMethodIndex >= injectionMethodsToTest.count {
-            // All methods exhausted
-            injectionTestPassed = false
+            // All methods tested - show summary
             injectionTestState = .completed
-            injectionTestResult = "All combinations failed. Expected '\(injectionTestExpected)'"
-            addInjectionTestLog("")
-            addInjectionTestLog("=== ALL COMBINATIONS TESTED ===")
-            addInjectionTestLog("No injection method + text sending combination produced the expected result.")
-            addInjectionTestLog("This may indicate an issue with the target app.")
             
             // Clear force override since test is complete
             setForceOverride(enabled: false)
+            
+            // Generate summary
+            addInjectionTestLog("")
+            addInjectionTestLog("═══════════════════════════════════════")
+            addInjectionTestLog("         TEST SUMMARY")
+            addInjectionTestLog("═══════════════════════════════════════")
+            addInjectionTestLog("")
+            
+            let passedResults = injectionTestResults.filter { $0.passed }
+            let failedResults = injectionTestResults.filter { !$0.passed }
+            
+            addInjectionTestLog("Total combinations tested: \(injectionTestResults.count)")
+            addInjectionTestLog("Passed: \(passedResults.count) | Failed: \(failedResults.count)")
+            addInjectionTestLog("")
+            
+            // List passed methods
+            if passedResults.isEmpty {
+                addInjectionTestLog("✗ No method passed the test")
+                injectionTestResult = "All \(injectionTestResults.count) combinations failed"
+            } else {
+                addInjectionTestLog("✓ PASSED METHODS:")
+                for result in passedResults {
+                    addInjectionTestLog("  • \(result.method.displayName) + \(result.textMode.rawValue)")
+                }
+                
+                // Recommend the first passing method
+                let recommended = passedResults[0]
+                injectionTestResult = "\(passedResults.count)/\(injectionTestResults.count) passed. Recommended: \(recommended.method.displayName) + \(recommended.textMode.rawValue)"
+            }
+            
+            addInjectionTestLog("")
+            
+            // List failed methods
+            if !failedResults.isEmpty {
+                addInjectionTestLog("✗ FAILED METHODS:")
+                for result in failedResults {
+                    addInjectionTestLog("  • \(result.method.displayName) + \(result.textMode.rawValue)")
+                }
+            }
+            
+            addInjectionTestLog("")
+            
+            // Log detailed AX info for development purposes
+            logDetailedAXInfo()
+            
+            addInjectionTestLog("")
+            addInjectionTestLog("═══════════════════════════════════════")
+            addInjectionTestLog("         TEST COMPLETE")
+            addInjectionTestLog("═══════════════════════════════════════")
             
             return
         }

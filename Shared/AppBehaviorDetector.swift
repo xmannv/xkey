@@ -628,21 +628,9 @@ class AppBehaviorDetector {
         // ============================================
         // Electron apps
         // ============================================
-    
-        // Notion - needs higher delays for Monaco editor
-        WindowTitleRule(
-            name: "Notion",
-            bundleIdPattern: "notion.id",
-            titlePattern: "",
-            matchMode: .contains,
-            useMarkedText: true,
-            hasMarkedTextIssues: false,
-            commitDelay: 5000,
-            injectionMethod: .slow,
-            injectionDelays: [12000, 25000, 12000],
-            textSendingMethod: .chunked,
-            description: "Notion - Monaco editor needs higher delays"
-        )
+        
+        // Note: Notion Code Block is detected via AXDOMClassList in detectInjectionMethod()
+        // Regular Notion text areas use default injection (no rule needed)
     ]
     
     // MARK: - Static App Lists (Single Source of Truth)
@@ -975,6 +963,15 @@ class AppBehaviorDetector {
         guard let desc = getFocusedElementInfo().description else { return false }
         return desc.hasPrefix("Terminal")
     }
+    
+    /// Check if focused element is a Notion Code Block
+    /// Detection via AX DOM Class List containing "notranslate"
+    /// Code blocks in Notion have class: "content-editable-leaf-rtl, notranslate"
+    /// - Returns: true if focused element is a Notion code block
+    func isNotionCodeBlock() -> Bool {
+        guard let domClasses = getFocusedElementInfo().domClasses else { return false }
+        return domClasses.contains("notranslate")
+    }
 
     /// Clear cache (call when app changes)
     func clearCache() {
@@ -1094,7 +1091,8 @@ class AppBehaviorDetector {
             if disabledBuiltInRules.contains(rule.name) {
                 continue
             }
-            if rule.matches(bundleId: bundleId, windowTitle: windowTitle) {
+            let matches = rule.matches(bundleId: bundleId, windowTitle: windowTitle)
+            if matches {
                 matchingRules.append(rule)
             }
         }
@@ -1460,6 +1458,23 @@ class AppBehaviorDetector {
                 textSendingMethod: .chunked,
                 description: "Terminal (VSCode/Cursor)"
             )
+        }
+        
+        // Priority 0.25: Notion Code Blocks or Unknown Role elements
+        // Code blocks need higher delays and oneByOne text mode to prevent race conditions
+        // Also applies to AXRole: Unknown as fallback - these are often problematic input areas
+        if bundleId == "notion.id" {
+            let isCodeBlock = isNotionCodeBlock()
+            let isUnknownRole = currentRole == "AXUnknown" || currentRole == nil
+            
+            if isCodeBlock || isUnknownRole {
+                return InjectionMethodInfo(
+                    method: .slow,
+                    delays: (20000, 50000, 15000),  // bs: 20ms, wait: 50ms, text: 15ms
+                    textSendingMethod: .oneByOne,
+                    description: isCodeBlock ? "Notion Code Block" : "Notion (Unknown Role Fallback)"
+                )
+            }
         }
 
         // Priority 0.3: Overlay launchers (Spotlight/Raycast/Alfred)
