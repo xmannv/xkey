@@ -6,9 +6,9 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260115.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.1</link>
-      <sparkle:version>20260115.1</sparkle:version>
+      <title>Version 1.2.19 (Build 20260115.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.2</link>
+      <sparkle:version>20260115.2</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -20,11 +20,11 @@
 <li>Fix input method labels: rename Simple Telex to Simple Telex 1, add Simple Telex 2</li>
 <li>Bump build version to 20260115.1</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 15 Jan 2026 05:56:12 +0000</pubDate>
+      <pubDate>Thu, 15 Jan 2026 11:22:46 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260115.1/XKey.dmg" sparkle:version="20260115.1" sparkle:shortVersionString="1.2.19" length="10523808" type="application/octet-stream" sparkle:edSignature="wSK8XA02GUjq5tD4k79bP1wKWja7dL5azA5T0oPN3svgc0at/FbHqnXkVXdDcH8UIqn9QbKtJiJWbSIPmfAkDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260115.2/XKey.dmg" sparkle:version="20260115.2" sparkle:shortVersionString="1.2.19" length="10523633" type="application/octet-stream" sparkle:edSignature="dzy7gpaXATVL+RxPxRThQreSvISGjbH79SN7vmCMn/nRZkfQyXk7aQCP2xtlbccmi18UUUU+CTQHVDZ2vJ+SCw==" />
     </item>
   </channel>
 </rss>
