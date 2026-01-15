@@ -6,30 +6,25 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260115)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115</link>
-      <sparkle:version>20260115</sparkle:version>
+      <title>Version 1.2.19 (Build 20260115.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.1</link>
+      <sparkle:version>20260115.1</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix: Allow digraph + w patterns (thw, chw, khw, etc.) in Telex modes</p>
+<p>Improve Notion Code Block handling and debug logging</p>
 <ul>
-<li>Add digraphWClusters Set for valid Vietnamese consonant digraph + w patterns:</li>
+<li>Detect Notion Code Blocks via AXDOMClassList (notranslate class) instead of Window Title Rule</li>
+<li>Use higher injection delays (20ms, 50ms, 15ms) and oneByOne text mode for code blocks</li>
+<li>Add macOS version info to debug log header</li>
+<li>Fix input method labels: rename Simple Telex to Simple Telex 1, add Simple Telex 2</li>
+<li>Bump build version to 20260115.1</li>
 </ul>
-<p>  thw→thư, chw→chư, khw→khư, phw→phư, trw→trư, nhw→như, ngw→ngư</p>
-<ul>
-<li>Remove 'thw' from impossible3LetterPrefixes (valid in Telex/Simple Telex 2)</li>
-<li>Add 3-letter prefix check in startsWithImpossiblePatternForRawInput</li>
-</ul>
-<p>Note: 'ghw' and 'nghw' are excluded because 'gh' and 'ngh' only appear</p>
-<p>before i, e, ê vowels in Vietnamese (not ư).</p>
-<p>Fixes issue where typing 'thw' in Telex or Simple Telex 2 mode</p>
-<p>incorrectly kept 'thw' instead of converting to 'thư'.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 15 Jan 2026 04:00:18 +0000</pubDate>
+      <pubDate>Thu, 15 Jan 2026 05:56:12 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260115/XKey.dmg" sparkle:version="20260115" sparkle:shortVersionString="1.2.19" length="10523417" type="application/octet-stream" sparkle:edSignature="CLwoIRKlD4kIK5hDRb0eD604uke62xVZHuee86Hrea8xRO+F69qwOmXWNlmAjmP+Pdf/gX4rEEHneKHyZDufCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260115.1/XKey.dmg" sparkle:version="20260115.1" sparkle:shortVersionString="1.2.19" length="10523808" type="application/octet-stream" sparkle:edSignature="wSK8XA02GUjq5tD4k79bP1wKWja7dL5azA5T0oPN3svgc0at/FbHqnXkVXdDcH8UIqn9QbKtJiJWbSIPmfAkDQ==" />
     </item>
   </channel>
 </rss>
