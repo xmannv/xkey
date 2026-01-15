@@ -158,7 +158,12 @@ class DebugViewModel: ObservableObject {
     private func initializeLogFile() {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)
         let versionString = "XKey v\(AppVersion.current) (\(AppVersion.build))"
-        let header = "=== XKey Debug Log ===\n\(versionString)\nStarted: \(timestamp)\nLog file: \(logFileURL.path)\n\n"
+        
+        // Get macOS version info
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let osVersionString = "macOS \(osVersion.majorVersion).\(osVersion.minorVersion).\(osVersion.patchVersion)"
+        
+        let header = "=== XKey Debug Log ===\n\(versionString)\n\(osVersionString)\nStarted: \(timestamp)\nLog file: \(logFileURL.path)\n\n"
 
         // Create/overwrite file with header
         try? header.write(to: logFileURL, atomically: true, encoding: .utf8)
@@ -319,7 +324,8 @@ class DebugViewModel: ObservableObject {
         switch settings.inputMethod {
         case 0: inputMethodName = "Telex"
         case 1: inputMethodName = "VNI"
-        case 2: inputMethodName = "Simple Telex"
+        case 2: inputMethodName = "Simple Telex 1"
+        case 3: inputMethodName = "Simple Telex 2"
         default: inputMethodName = "Unknown (\(settings.inputMethod))"
         }
         lines.append("Input Method: \(inputMethodName)")
