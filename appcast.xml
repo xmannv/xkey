@@ -6,35 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260114.6)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.6</link>
-      <sparkle:version>20260114.6</sparkle:version>
+      <title>Version 1.2.19 (Build 20260115)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115</link>
+      <sparkle:version>20260115</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix XKeyIM: standalone 'w' (ư) not accepting tone marks or undo</p>
-<p>Problem: In XKeyIM with Telex/Simple Telex 2, typing 'w' produces 'ư'</p>
-<p>(standalone), but then:</p>
+<p>Fix: Allow digraph + w patterns (thw, chw, khw, etc.) in Telex modes</p>
 <ul>
-<li>Adding tone marks (s/f/r/x/j) was blocked because 'ws', 'wf', etc.</li>
+<li>Add digraphWClusters Set for valid Vietnamese consonant digraph + w patterns:</li>
 </ul>
-<p>  were detected as English patterns</p>
+<p>  thw→thư, chw→chư, khw→khư, phw→phư, trw→trư, nhw→như, ngw→ngư</p>
 <ul>
-<li>Typing 'ww' to undo back to 'w' was also blocked</li>
+<li>Remove 'thw' from impossible3LetterPrefixes (valid in Telex/Simple Telex 2)</li>
+<li>Add 3-letter prefix check in startsWithImpossiblePatternForRawInput</li>
 </ul>
-<p>Note: XKey main app was not affected by this issue.</p>
-<p>Solution: Added logic in startsWithImpossiblePatternForRawInput() to</p>
-<p>allow these patterns in Telex (0) and Simple Telex 2 (3) modes:</p>
-<ul>
-<li>ws → ứ, wf → ừ, wr → ử, wx → ữ, wj → ự (standalone ư + tone)</li>
-<li>ww → w (undo: ư back to w)</li>
-</ul>
-<p>Also bumped build version to 20260114.6</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260114.6">Xem chi tiết trên GitHub</a></p>
+<p>Note: 'ghw' and 'nghw' are excluded because 'gh' and 'ngh' only appear</p>
+<p>before i, e, ê vowels in Vietnamese (not ư).</p>
+<p>Fixes issue where typing 'thw' in Telex or Simple Telex 2 mode</p>
+<p>incorrectly kept 'thw' instead of converting to 'thư'.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260115">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 14 Jan 2026 14:20:45 +0000</pubDate>
+      <pubDate>Thu, 15 Jan 2026 04:00:18 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260114.6/XKey.dmg" sparkle:version="20260114.6" sparkle:shortVersionString="1.2.19" length="10522306" type="application/octet-stream" sparkle:edSignature="v0/tWH0nW9sSREmpNIECSlwTkKOqfmoozw5Jc6LZniIMHyFJ+LAhjjfgY4xxo0Jf5o8ySCnXNrOOKgSz/k5uBQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260115/XKey.dmg" sparkle:version="20260115" sparkle:shortVersionString="1.2.19" length="10523417" type="application/octet-stream" sparkle:edSignature="CLwoIRKlD4kIK5hDRb0eD604uke62xVZHuee86Hrea8xRO+F69qwOmXWNlmAjmP+Pdf/gX4rEEHneKHyZDufCg==" />
     </item>
   </channel>
 </rss>
