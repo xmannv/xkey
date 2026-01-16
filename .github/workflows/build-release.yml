@@ -1,0 +1,562 @@
+name: Build and Release XKey
+
+on:
+  workflow_dispatch:
+    inputs:
+      enable_notarize:
+        description: 'Enable Apple Notarization'
+        required: true
+        default: true
+        type: boolean
+      enable_github_release:
+        description: 'Create GitHub Release'
+        required: true
+        default: true
+        type: boolean
+      release_notes:
+        description: 'Release Notes (optional, uses latest commit if empty)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  BUNDLE_ID: com.codetay.XKey
+  XKEYIM_BUNDLE_ID: com.codetay.inputmethod.XKey
+  APP_NAME: XKey
+  DMG_NAME: XKey.dmg
+  DMG_VOLUME_NAME: XKey
+  SPARKLE_VERSION: "2.8.1"
+
+jobs:
+  build:
+    runs-on: macos-latest  # Apple Silicon runner with Xcode 16
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        run: |
+          echo "🚀 Building XKey (Release configuration)"
+          echo "📦 Build Mode: Full Release"
+          echo "   ✅ Code signing"
+          echo "   ✅ Notarization: ${{ inputs.enable_notarize }}"
+          echo "   ✅ Sparkle signing"
+          echo "   ✅ DMG creation"
+          echo "   ✅ GitHub Release: ${{ inputs.enable_github_release }}"
+
+      # ============================================
+      # Import Apple Developer Certificate
+      # ============================================
+      - name: Import Code Signing Certificate
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "🔐 Importing Apple Developer ID certificate..."
+          
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          # Import certificate
+          echo "$CERTIFICATE_P12_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          # Add keychain to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          
+          # Find and verify certificate
+          DEVELOPER_ID=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')
+          
+          if [ -z "$DEVELOPER_ID" ]; then
+            echo "❌ No Developer ID Application certificate found"
+            exit 1
+          fi
+          
+          echo "✅ Found: $DEVELOPER_ID"
+          
+          # Extract Team ID
+          TEAM_ID=$(echo "$DEVELOPER_ID" | sed -E 's/.*\(([A-Z0-9]+)\).*/\1/')
+          echo "✅ Team ID: $TEAM_ID"
+          
+          # Save for later steps
+          echo "DEVELOPER_ID=$DEVELOPER_ID" >> $GITHUB_ENV
+          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+          
+          # Cleanup temp file
+          rm -f $RUNNER_TEMP/certificate.p12
+
+      # ============================================
+      # Build XKey (Universal Binary)
+      # ============================================
+      - name: Build XKey (Universal Binary)
+        run: |
+          echo "🔨 Building Universal Binary (Intel + Apple Silicon)..."
+          
+          # Clean previous build
+          xcodebuild -project XKey.xcodeproj -scheme XKey -configuration Release -derivedDataPath ./build clean
+          
+          # Build with code signing (Manual style for Developer ID)
+          xcodebuild -project XKey.xcodeproj \
+            -scheme XKey \
+            -configuration Release \
+            -derivedDataPath ./build \
+            -arch x86_64 -arch arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$DEVELOPER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
+            build
+          
+          echo "✅ XKey built successfully"
+
+      # ============================================
+      # Build XKeyIM (Input Method Kit)
+      # ============================================
+      - name: Build XKeyIM (Universal Binary)
+        run: |
+          echo "🔨 Building XKeyIM (Input Method)..."
+          
+          if xcodebuild -project XKey.xcodeproj -list 2>/dev/null | grep -q "XKeyIM"; then
+            xcodebuild -project XKey.xcodeproj \
+              -scheme XKeyIM \
+              -configuration Release \
+              -derivedDataPath ./build \
+              -arch x86_64 -arch arm64 \
+              ONLY_ACTIVE_ARCH=NO \
+              PRODUCT_BUNDLE_IDENTIFIER="$XKEYIM_BUNDLE_ID" \
+              CODE_SIGN_STYLE=Manual \
+              CODE_SIGN_IDENTITY="$DEVELOPER_ID" \
+              DEVELOPMENT_TEAM="$TEAM_ID" \
+              CODE_SIGNING_REQUIRED=YES \
+              CODE_SIGNING_ALLOWED=YES \
+              OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
+              build
+            
+            echo "✅ XKeyIM built successfully"
+          else
+            echo "⚠️ XKeyIM target not found in Xcode project, skipping..."
+          fi
+
+      # ============================================
+      # Prepare Release Directory
+      # ============================================
+      - name: Prepare Release Directory
+        run: |
+          mkdir -p Release
+          
+          # Copy XKey.app
+          echo "📦 Copying XKey.app to Release..."
+          rm -rf Release/XKey.app
+          cp -R "./build/Build/Products/Release/XKey.app" Release/
+          
+          # Copy XKeyIM.app
+          if [ -d "./build/Build/Products/Release/XKeyIM.app" ]; then
+            echo "📦 Copying XKeyIM.app to Release..."
+            rm -rf Release/XKeyIM.app
+            cp -R "./build/Build/Products/Release/XKeyIM.app" Release/
+            
+            # Ensure menu icon is present
+            if [ -f "XKeyIM/MenuIcon.pdf" ]; then
+              echo "📎 Adding MenuIcon.pdf to XKeyIM..."
+              cp "XKeyIM/MenuIcon.pdf" "Release/XKeyIM.app/Contents/Resources/"
+            fi
+            
+            # Update display name
+            /usr/libexec/PlistBuddy -c "Set :CFBundleName XKey" "Release/XKeyIM.app/Contents/Info.plist" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName XKey" "Release/XKeyIM.app/Contents/Info.plist" 2>/dev/null || true
+          fi
+          
+          echo "✅ Release directory prepared"
+
+      # ============================================
+      # Sign Sparkle Framework & Apps
+      # ============================================
+      - name: Sign Frameworks and Apps
+        run: |
+          echo "🔐 Signing Sparkle framework components..."
+          
+          SPARKLE_FW="Release/XKey.app/Contents/Frameworks/Sparkle.framework/Versions/B"
+          
+          # Sign XPC Services first (deepest level)
+          if [ -d "$SPARKLE_FW/XPCServices/Installer.xpc" ]; then
+            echo "   Signing Installer.xpc..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime "$SPARKLE_FW/XPCServices/Installer.xpc"
+          fi
+          
+          if [ -d "$SPARKLE_FW/XPCServices/Downloader.xpc" ]; then
+            echo "   Signing Downloader.xpc..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime "$SPARKLE_FW/XPCServices/Downloader.xpc"
+          fi
+          
+          # Sign Updater.app
+          if [ -d "$SPARKLE_FW/Updater.app" ]; then
+            echo "   Signing Updater.app..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime "$SPARKLE_FW/Updater.app"
+          fi
+          
+          # Sign Autoupdate binary
+          if [ -f "$SPARKLE_FW/Autoupdate" ]; then
+            echo "   Signing Autoupdate binary..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime "$SPARKLE_FW/Autoupdate"
+          fi
+          
+          # Sign Sparkle.framework
+          if [ -d "Release/XKey.app/Contents/Frameworks/Sparkle.framework" ]; then
+            echo "   Signing Sparkle.framework..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime "Release/XKey.app/Contents/Frameworks/Sparkle.framework"
+          fi
+          
+          echo "✅ Sparkle framework components signed"
+          
+          # Re-sign XKeyIM after Info.plist update
+          if [ -d "Release/XKeyIM.app" ]; then
+            echo "🔐 Signing XKeyIM.app..."
+            codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime \
+              --entitlements "XKeyIM/XKeyIMRelease.entitlements" "Release/XKeyIM.app"
+            echo "✅ XKeyIM.app signed"
+          fi
+          
+          # Embed XKeyIM inside XKey.app
+          if [ -d "Release/XKeyIM.app" ]; then
+            echo "📦 Embedding XKeyIM.app inside XKey.app/Contents/Resources..."
+            mkdir -p "Release/XKey.app/Contents/Resources"
+            rm -rf "Release/XKey.app/Contents/Resources/XKeyIM.app"
+            cp -R "Release/XKeyIM.app" "Release/XKey.app/Contents/Resources/"
+            echo "✅ XKeyIM embedded in XKey.app"
+          fi
+          
+          # Re-sign XKey.app after embedding
+          echo "🔐 Signing XKey.app..."
+          codesign --force --sign "$DEVELOPER_ID" --timestamp --options=runtime \
+            --entitlements "XKey/XKeyRelease.entitlements" "Release/XKey.app"
+          
+          # Verify signature
+          codesign -vvv --strict Release/XKey.app
+          echo "✅ XKey.app signed and verified"
+
+      # ============================================
+      # Create DMG
+      # ============================================
+      - name: Create DMG
+        run: |
+          echo "💿 Creating DMG installer..."
+          
+          # Create temporary directory for DMG contents
+          DMG_TEMP_DIR=$(mktemp -d)
+          DMG_SOURCE_DIR="$DMG_TEMP_DIR/$DMG_VOLUME_NAME"
+          mkdir -p "$DMG_SOURCE_DIR"
+          
+          # Copy app to temp directory
+          cp -R "Release/XKey.app" "$DMG_SOURCE_DIR/"
+          
+          # Create symbolic link to Applications folder
+          ln -s /Applications "$DMG_SOURCE_DIR/Applications"
+          
+          # Remove old DMG if exists
+          rm -f "Release/$DMG_NAME"
+          
+          # Create DMG
+          hdiutil create \
+            -volname "$DMG_VOLUME_NAME" \
+            -srcfolder "$DMG_SOURCE_DIR" \
+            -ov \
+            -format UDZO \
+            "Release/$DMG_NAME"
+          
+          # Sign DMG
+          echo "🔐 Signing DMG..."
+          codesign --sign "$DEVELOPER_ID" --timestamp "Release/$DMG_NAME"
+          
+          # Cleanup temp directory
+          rm -rf "$DMG_TEMP_DIR"
+          
+          echo "✅ DMG created and signed"
+
+      # ============================================
+      # Notarization
+      # ============================================
+      - name: Notarize App
+        if: ${{ inputs.enable_notarize }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "📤 Starting notarization process..."
+          
+          NOTARIZE_TARGET="Release/$DMG_NAME"
+          echo "📦 Notarizing DMG: $NOTARIZE_TARGET"
+          
+          # Submit for notarization
+          echo "⏳ Submitting to Apple for notarization (this may take several minutes)..."
+          NOTARIZE_OUTPUT=$(xcrun notarytool submit "$NOTARIZE_TARGET" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait 2>&1)
+          
+          echo "$NOTARIZE_OUTPUT"
+          
+          # Check if notarization was successful
+          if echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
+            echo "✅ Notarization accepted!"
+            
+            # Staple the notarization ticket
+            echo "📎 Stapling notarization ticket..."
+            xcrun stapler staple "Release/$DMG_NAME"
+            echo "✅ DMG notarized and stapled"
+            
+            xcrun stapler staple "Release/XKey.app"
+            echo "✅ App notarized and stapled"
+            
+            # Verify notarization
+            echo "🔍 Verifying notarization..."
+            spctl -a -vvv -t install "Release/XKey.app"
+            spctl -a -vvv -t install "Release/$DMG_NAME"
+            echo "✅ Notarization verified"
+          else
+            echo "❌ Notarization failed!"
+            echo "$NOTARIZE_OUTPUT"
+            exit 1
+          fi
+
+      # ============================================
+      # Sparkle Signing
+      # ============================================
+      - name: Sparkle Sign DMG
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          echo "🔐 Sparkle Signing for Auto-Update..."
+          
+          SPARKLE_BIN="/tmp/Sparkle-$SPARKLE_VERSION/bin"
+          DMG_PATH="$GITHUB_WORKSPACE/Release/$DMG_NAME"
+          
+          # Download Sparkle tools if not exists (in subshell to preserve cwd)
+          if [ ! -d "$SPARKLE_BIN" ]; then
+            echo "📥 Downloading Sparkle tools (v$SPARKLE_VERSION)..."
+            (
+              cd /tmp
+              curl -L https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz -o Sparkle-$SPARKLE_VERSION.tar.xz
+              rm -rf Sparkle-$SPARKLE_VERSION
+              mkdir Sparkle-$SPARKLE_VERSION
+              cd Sparkle-$SPARKLE_VERSION
+              tar -xf ../Sparkle-$SPARKLE_VERSION.tar.xz
+            )
+            echo "✅ Sparkle tools downloaded"
+          fi
+          
+          # Verify DMG exists
+          echo "📋 Looking for DMG at: $DMG_PATH"
+          if [ ! -f "$DMG_PATH" ]; then
+            echo "❌ Error: DMG not found at $DMG_PATH"
+            echo "📋 Contents of Release directory:"
+            ls -la "$GITHUB_WORKSPACE/Release/" || echo "Release directory not found"
+            exit 1
+          fi
+          
+          # Write key to temp file (process substitution doesn't work reliably in GHA)
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle_key.pem"
+          echo "$SPARKLE_PRIVATE_KEY" > "$SPARKLE_KEY_FILE"
+          chmod 600 "$SPARKLE_KEY_FILE"
+          
+          # Sign DMG with EdDSA signature
+          echo "🔏 Signing DMG with EdDSA key..."
+          set +e
+          SPARKLE_OUTPUT=$("$SPARKLE_BIN/sign_update" "$DMG_PATH" --ed-key-file "$SPARKLE_KEY_FILE" 2>&1)
+          SIGN_EXIT_CODE=$?
+          set -e
+          
+          # Cleanup key file immediately
+          rm -f "$SPARKLE_KEY_FILE"
+          
+          if [ $SIGN_EXIT_CODE -ne 0 ]; then
+            echo "❌ Error: sign_update failed with exit code $SIGN_EXIT_CODE"
+            echo "$SPARKLE_OUTPUT"
+            exit 1
+          fi
+          
+          echo "📋 sign_update output:"
+          echo "$SPARKLE_OUTPUT"
+          
+          # Extract signature
+          if echo "$SPARKLE_OUTPUT" | grep -q 'sparkle:edSignature='; then
+            SPARKLE_SIGNATURE=$(echo "$SPARKLE_OUTPUT" | grep 'sparkle:edSignature=' | sed -E 's/.*sparkle:edSignature="([^"]+)".*/\1/' | tail -1)
+          else
+            SPARKLE_SIGNATURE=$(echo "$SPARKLE_OUTPUT" | grep -v "^$" | tail -1)
+          fi
+          
+          if [ -z "$SPARKLE_SIGNATURE" ]; then
+            echo "❌ Error: Failed to extract Sparkle signature from output"
+            exit 1
+          fi
+          
+          echo "✅ DMG signed with Sparkle EdDSA signature"
+          echo "   Signature: ${SPARKLE_SIGNATURE:0:50}..."
+          
+          # Save signature to file
+          echo "$SPARKLE_SIGNATURE" > "Release/signature.txt"
+          echo "✅ Signature saved to: Release/signature.txt"
+
+      # ============================================
+      # Get Version Info
+      # ============================================
+      - name: Get Version Info
+        id: version
+        run: |
+          CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" XKey/Info.plist)
+          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" XKey/Info.plist)
+          RELEASE_TAG="v$CURRENT_VERSION-$BUILD_NUMBER"
+          
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "build=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          
+          echo "📋 Version: $CURRENT_VERSION"
+          echo "📋 Build: $BUILD_NUMBER"
+          echo "📋 Tag: $RELEASE_TAG"
+          
+          # Create version.json
+          cat > "Release/version.json" << EOF
+          {
+            "version": "$CURRENT_VERSION",
+            "build": "$BUILD_NUMBER",
+            "tag": "$RELEASE_TAG"
+          }
+          EOF
+          echo "✅ version.json created"
+
+      # ============================================
+      # Cleanup XKeyIM.app (already bundled)
+      # ============================================
+      - name: Cleanup
+        run: |
+          # Remove standalone XKeyIM.app (already bundled in XKey.app)
+          if [ -d "Release/XKeyIM.app" ]; then
+            echo "🧹 Removing standalone XKeyIM.app (already bundled)..."
+            rm -rf "Release/XKeyIM.app"
+          fi
+          
+          # Cleanup build folder
+          rm -rf "./build/Build/Products/Release/XKey.app"
+          rm -rf "./build/Build/Products/Release/XKeyIM.app"
+          echo "✅ Cleanup complete"
+
+      # ============================================
+      # Upload Artifacts (for testing without release)
+      # ============================================
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: XKey-${{ steps.version.outputs.tag }}
+          path: |
+            Release/XKey.dmg
+            Release/XKey.app
+            Release/signature.txt
+            Release/version.json
+          retention-days: 30
+
+      # ============================================
+      # Create GitHub Release
+      # ============================================
+      - name: Create GitHub Release
+        if: ${{ inputs.enable_github_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚀 Creating GitHub Release..."
+          
+          RELEASE_TAG="${{ steps.version.outputs.tag }}"
+          CURRENT_VERSION="${{ steps.version.outputs.version }}"
+          BUILD_NUMBER="${{ steps.version.outputs.build }}"
+          
+          # Check if release already exists
+          if gh release view "$RELEASE_TAG" &> /dev/null; then
+            echo "⚠️ Release $RELEASE_TAG already exists, deleting..."
+            gh release delete "$RELEASE_TAG" -y
+          fi
+          
+          # Prepare release notes
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            RELEASE_NOTES="${{ inputs.release_notes }}"
+          else
+            # Use latest commit message
+            COMMIT_SUBJECT=$(git log -1 --pretty=format:"%s")
+            COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+            RELEASE_NOTES="## What's New
+          
+          $COMMIT_SUBJECT"
+            
+            if [ -n "$COMMIT_BODY" ]; then
+              RELEASE_NOTES="$RELEASE_NOTES
+          
+          $COMMIT_BODY"
+            fi
+          fi
+          
+          echo "$RELEASE_NOTES" > Release/release_notes.md
+          
+          # Create release
+          gh release create "$RELEASE_TAG" \
+            "Release/$DMG_NAME" \
+            "Release/version.json" \
+            "Release/signature.txt" \
+            --title "XKey v$CURRENT_VERSION (Build $BUILD_NUMBER)" \
+            --notes-file "Release/release_notes.md"
+          
+          echo "✅ GitHub Release created: $RELEASE_TAG"
+
+      # ============================================
+      # Cleanup Keychain
+      # ============================================
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
+
+      # ============================================
+      # Summary
+      # ============================================
+      - name: Build Summary
+        run: |
+          echo "## 🎉 Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ steps.version.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ steps.version.outputs.build }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ steps.version.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Notarized | ${{ inputs.enable_notarize }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | ${{ inputs.enable_github_release }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- XKey.dmg" >> $GITHUB_STEP_SUMMARY
+          echo "- signature.txt (for Sparkle auto-update)" >> $GITHUB_STEP_SUMMARY
+          echo "- version.json" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.enable_github_release }}" = "true" ]; then
+            echo "### 🔗 Release URL" >> $GITHUB_STEP_SUMMARY
+            echo "https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          fi
