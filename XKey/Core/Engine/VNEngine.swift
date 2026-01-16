@@ -2063,7 +2063,13 @@ class VNEngine {
     /// Legacy function - calls both checkVowelAutoFix and checkMarkPosition
     private func checkGrammar(deltaBackSpace: Int) {
         checkVowelAutoFix(deltaBackSpace: deltaBackSpace)
-        if vFreeMark == 0 {
+        // When deleting a character (deltaBackSpace > 0), ALWAYS check mark position
+        // regardless of vFreeMark setting. This is because deleting an ending consonant
+        // changes the "terminated" status of the vowel sequence, which affects where
+        // the tone mark should be placed according to Vietnamese spelling rules.
+        // Example: "bưãn" (mark on 'a') -> delete 'n' -> "bữa" (mark should move to 'ư')
+        // This is NOT a free marking choice - it's a spelling rule.
+        if vFreeMark == 0 || deltaBackSpace > 0 {
             checkMarkPosition(deltaBackSpace: deltaBackSpace)
         }
     }
