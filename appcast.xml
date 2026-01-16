@@ -6,51 +6,37 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260116)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116</link>
-      <sparkle:version>20260116</sparkle:version>
+      <title>Version 1.2.19 (Build 20260116.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.1</link>
+      <sparkle:version>20260116.1</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Implement AX-based matching for Window Title Rules</p>
-<p>Add accessibility (AX) attribute matching to WindowTitleRule for context-aware detection:</p>
-<p><h2>New AX Matching Fields</h2></p>
+<p>fix: Support enabling built-in rules that are disabled by default</p>
+<p>Add enabledBuiltInRules setting to complement disabledBuiltInRules.</p>
+<p>Problem:</p>
 <ul>
-<li>axRolePattern: Match AX Role (AXTextArea, AXTextField, etc.)</li>
-<li>axDescriptionPattern: Match AX Description</li>
-<li>axIdentifierPattern: Match both AXIdentifier AND AXDOMIdentifier</li>
-<li>axDOMClassList: Match if ANY class exists in AXDOMClassList</li>
+<li>Rules like 'Firefox Address Bar (AX Direct)' have isEnabled=false by default</li>
+<li>User could toggle them in UI but they would never be applied</li>
+<li>The matching logic only checked disabledBuiltInRules, ignoring the rule's</li>
 </ul>
-<p><h2>FocusedElementInfo Updates</h2></p>
+<p>  default isEnabled state</p>
+<p>Solution:</p>
 <ul>
-<li>Add domIdentifier field for AXDOMIdentifier attribute</li>
-<li>Query AXDOMIdentifier in getFocusedElementInfo()</li>
+<li>Add enabledBuiltInRules key to SharedSettings for rules disabled by default</li>
+<li>Update rule matching logic to check both lists based on default state:</li>
 </ul>
-<p><h2>Firefox Address Bar Rules</h2></p>
+<p>  - rule.isEnabled=true: check if NOT in disabledBuiltInRules</p>
+<p>  - rule.isEnabled=false: check if IN enabledBuiltInRules</p>
 <ul>
-<li>Add built-in rule 'Firefox Address Bar (Selection)' - enabled by default</li>
-<li>Add built-in rule 'Firefox Address Bar (AX Direct)' - disabled by default</li>
-<li>Both match via axIdentifierPattern: 'urlbar-input'</li>
-<li>Remove hard-coded Firefox address bar detection</li>
+<li>Update getBuiltInRules(), toggleBuiltInRule(), isBuiltInRuleEnabled()</li>
 </ul>
-<p><h2>Rule Matching Logic</h2></p>
-<ul>
-<li>Lazy-load AX info only when rule has AX patterns (performance optimization)</li>
-<li>Fix built-in rules to respect isEnabled flag</li>
-<li>axIdentifierPattern matches EITHER AXIdentifier OR AXDOMIdentifier</li>
-</ul>
-<p><h2>UI Updates (WindowTitleRulesView)</h2></p>
-<ul>
-<li>Add AX Matching groupbox with 4 input fields</li>
-<li>Display '🎯AX' badge for rules with AX patterns</li>
-<li>Update loadExistingRule/saveRule/importRules for AX fields</li>
-<li>Increase sheet size to 560x900</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116">Xem chi tiết trên GitHub</a></p>
+<p>  to properly handle both scenarios</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 16 Jan 2026 15:17:47 +0000</pubDate>
+      <pubDate>Fri, 16 Jan 2026 15:31:51 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116/XKey.dmg" sparkle:version="20260116" sparkle:shortVersionString="1.2.19" length="10546551" type="application/octet-stream" sparkle:edSignature="vdc2qT4JwNL1oDYwTq4dvGoa308vtbzy/HFEI0eQsQWOWtB/6Yj+sGRtEVacYzWFBSzxUqjAZ4xL8Nm9LAPxAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.1/XKey.dmg" sparkle:version="20260116.1" sparkle:shortVersionString="1.2.19" length="10549670" type="application/octet-stream" sparkle:edSignature="59Ll5SK8wMiUp3eYmXNa0RkFenLfYhChJHyJe7FUldES/tLYz6EKMR7hgUVR5xISlmMJviw7nVTvXZcqltOSBw==" />
     </item>
   </channel>
 </rss>
