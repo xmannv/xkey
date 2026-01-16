@@ -691,61 +691,6 @@ class AppBehaviorDetector {
             textSendingMethod: .oneByOne,
             description: "Google Sheets (all browsers) - one-by-one text sending"
         ),
-        
-        // ============================================
-        // Electron apps
-        // ============================================
-        
-        // Note: Notion Code Block is detected via AXDOMClassList in detectInjectionMethod()
-        // Regular Notion text areas use default injection (no rule needed)
-        
-        // ============================================
-        // Firefox Address Bar (AX-based detection)
-        // ============================================
-        
-        // Firefox Address Bar - Selection Method (default, enabled)
-        // Detects via AXIdentifier: "urlbar-input"
-        // Use selection (Select All + Delete + Paste) for reliable text injection
-        WindowTitleRule(
-            name: "Firefox Address Bar (Selection)",
-            bundleIdPattern: "org.mozilla.firefox|org.mozilla.firefoxdeveloperedition|org.mozilla.nightly|org.waterfoxproject.waterfox|io.gitlab.librewolf-community.librewolf|one.ablaze.floorp|org.torproject.torbrowser|net.mullvad.mullvadbrowser",
-            titlePattern: "",  // Match all windows
-            matchMode: .contains,
-            isEnabled: true,
-            axRolePattern: nil,
-            axDescriptionPattern: nil,
-            axIdentifierPattern: "urlbar-input",  // Firefox address bar identifier
-            axDOMClassList: nil,
-            useMarkedText: true,
-            hasMarkedTextIssues: false,
-            commitDelay: 3000,
-            injectionMethod: .selection,
-            injectionDelays: [1000, 3000, 1000],
-            textSendingMethod: .chunked,
-            description: "Firefox Address Bar - using selection method (Select All + Delete + Paste)"
-        ),
-        
-        // Firefox Address Bar - AX Direct Method (alternative, disabled by default)
-        // Alternative method using AX API to set text directly
-        // Enable this if selection method causes issues
-        WindowTitleRule(
-            name: "Firefox Address Bar (AX Direct)",
-            bundleIdPattern: "org.mozilla.firefox|org.mozilla.firefoxdeveloperedition|org.mozilla.nightly|org.waterfoxproject.waterfox|io.gitlab.librewolf-community.librewolf|one.ablaze.floorp|org.torproject.torbrowser|net.mullvad.mullvadbrowser",
-            titlePattern: "",  // Match all windows
-            matchMode: .contains,
-            isEnabled: false,  // Disabled by default - enable to use AX Direct instead of Selection
-            axRolePattern: nil,
-            axDescriptionPattern: nil,
-            axIdentifierPattern: "urlbar-input",  // Firefox address bar identifier
-            axDOMClassList: nil,
-            useMarkedText: true,
-            hasMarkedTextIssues: false,
-            commitDelay: 3000,
-            injectionMethod: .axDirect,
-            injectionDelays: [1000, 3000, 1000],
-            textSendingMethod: .chunked,
-            description: "Firefox Address Bar - using AX Direct method (AX API set value)"
-        ),
     ]
     
     // MARK: - Static App Lists (Single Source of Truth)
@@ -1744,10 +1689,17 @@ class AppBehaviorDetector {
                     description: "Dia Address Bar"
                 )
             }
+            
+            // Firefox-based browsers address bar (AXDOMIdentifier: "urlbar-input")
+            if Self.firefoxBasedBrowsers.contains(bundleId) && isFirefoxStyleAddressBar() {
+                return InjectionMethodInfo(
+                    method: .axDirect,
+                    delays: InjectionMethod.axDirect.defaultDelays,
+                    textSendingMethod: .chunked,
+                    description: "Firefox Address Bar"
+                )
+            }
         }
-
-        // Note: Firefox address bar is now handled by Window Title Rules with AX matching
-        // Rules match axIdentifierPattern: "urlbar-input" and apply appropriate injection method
 
         // Priority 1: Check Window Title Rules for context-specific injection method (merged cascade)
         let mergedResult = getMergedRuleResult()
@@ -1814,7 +1766,7 @@ class AppBehaviorDetector {
         }
 
         // Firefox-based browsers - content area handling
-        // Address bar is handled by Window Title Rules (axIdentifierPattern: "urlbar-input")
+        // Address bar is handled by hardcoded logic in detectInjectionMethod() via isFirefoxStyleAddressBar()
         // Content area (AXWindow): use axDirect method (AX API to set text directly)
         // Note: Selection method in content area interferes with mouse word selection
         if Self.firefoxBasedBrowsers.contains(bundleId) {
