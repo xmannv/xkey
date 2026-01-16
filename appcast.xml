@@ -6,26 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260116.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.2</link>
-      <sparkle:version>20260116.2</sparkle:version>
+      <title>Version 1.2.19 (Build 20260116.3)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.3</link>
+      <sparkle:version>20260116.3</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Refactor: Move Firefox address bar detection to hardcoded logic</p>
-<ul>
-<li>Remove Firefox Address Bar Window Title Rules (Selection and AX Direct variants)</li>
-<li>Add hardcoded Firefox address bar detection using isFirefoxStyleAddressBar()</li>
-<li>Firefox address bar now uses axDirect method (same as Dia browser)</li>
-<li>Detection via AXDOMIdentifier: 'urlbar-input'</li>
-<li>Add GitHub Actions workflow for automated builds</li>
-<li>Add secrets setup documentation</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.2">Xem chi tiết trên GitHub</a></p>
+<p>Fix: Tone mark not moving back when deleting ending consonant with Free Mark enabled</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.3">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 16 Jan 2026 16:46:25 +0000</pubDate>
+      <pubDate>Fri, 16 Jan 2026 17:11:49 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.2/XKey.dmg" sparkle:version="20260116.2" sparkle:shortVersionString="1.2.19" length="10483691" type="application/octet-stream" sparkle:edSignature="FtBPdkIqEKigShzr7Ri0XZaCzgEWzmNqPGazHo2QTRJapF4juIGLGcYozUwber4nTnJar7znigGbxBDHZ+7aAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.3/XKey.dmg" sparkle:version="20260116.3" sparkle:shortVersionString="1.2.19" length="10483710" type="application/octet-stream" sparkle:edSignature="nULE69mddlEhcohGo+4lotUbTlnEz02gLLTV5LtsL8/eEWa1hzoso3gCD/LTqvw5JCEopBD/VSbezb+YcuVoCA==" />
     </item>
   </channel>
 </rss>
