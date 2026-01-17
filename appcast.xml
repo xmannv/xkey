@@ -12,12 +12,12 @@
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix: Tone mark not moving back when deleting ending consonant with Free Mark enabled</p>
+<p>ci: update GitHub Actions runner to macos-26 (Tahoe) with Xcode 26</p>
 <p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.4">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 16 Jan 2026 17:29:58 +0000</pubDate>
+      <pubDate>Sat, 17 Jan 2026 17:13:07 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.4/XKey.dmg" sparkle:version="20260116.4" sparkle:shortVersionString="1.2.19" length="10483708" type="application/octet-stream" sparkle:edSignature="4dF06MCFzTol+q+JZI3VIg1+FNMlD6SxYmGeyjLYcXcPCTotM64sQUmmc1+jZeNycF+y+7EncupBJyWMdi50Cw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.4/XKey.dmg" sparkle:version="20260116.4" sparkle:shortVersionString="1.2.19" length="10339678" type="application/octet-stream" sparkle:edSignature="klroppQZDsOt1qd5Yu1gTISY1vOtHuTTZCzR1eYerj0fuASxEhrCI+a5OgOIvJvxhp89iv6FXBkkLWZlb8tnDQ==" />
     </item>
   </channel>
 </rss>
