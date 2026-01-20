@@ -6,18 +6,33 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260116.4)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.4</link>
-      <sparkle:version>20260116.4</sparkle:version>
+      <title>Version 1.2.19 (Build 20260120)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260120</link>
+      <sparkle:version>20260120</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>ci: update GitHub Actions runner to macos-26 (Tahoe) with Xcode 26</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260116.4">Xem chi tiết trên GitHub</a></p>
+<p>fix(excel): Fix Vietnamese typing with AutoComplete interference</p>
+<ul>
+<li>Add AXTextField support for Microsoft Office in AppBehaviorDetector</li>
+</ul>
+<p>  (fixes issues in dialogs like Data Validation, Find & Replace)</p>
+<ul>
+<li>Send Forward Delete before backspaces in MS Office to clear AutoComplete</li>
+</ul>
+<p>  suggestions that interfere with character replacement</p>
+<ul>
+<li>Improve hasTextAfterCursor() to account for selection length</li>
+</ul>
+<p>  (AutoComplete highlighted suggestions don't count as real text)</p>
+<ul>
+<li>Update build version to 20260120</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260120">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 17 Jan 2026 17:13:07 +0000</pubDate>
+      <pubDate>Tue, 20 Jan 2026 15:02:17 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260116.4/XKey.dmg" sparkle:version="20260116.4" sparkle:shortVersionString="1.2.19" length="10339678" type="application/octet-stream" sparkle:edSignature="klroppQZDsOt1qd5Yu1gTISY1vOtHuTTZCzR1eYerj0fuASxEhrCI+a5OgOIvJvxhp89iv6FXBkkLWZlb8tnDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260120/XKey.dmg" sparkle:version="20260120" sparkle:shortVersionString="1.2.19" length="10343308" type="application/octet-stream" sparkle:edSignature="CL+RuNcRXeiGBlz/7tlxUsAS8+eN977fpt1IfAlxcP6pRH4zEeFrXXs056lIcToxz4WtB2DYzXqR76eEpGW1CQ==" />
     </item>
   </channel>
 </rss>
