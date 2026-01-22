@@ -6,33 +6,28 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260120)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260120</link>
-      <sparkle:version>20260120</sparkle:version>
+      <title>Version 1.2.19 (Build 20260122)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260122</link>
+      <sparkle:version>20260122</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(excel): Fix Vietnamese typing with AutoComplete interference</p>
+<p>fix: Multiple Vietnamese input engine fixes and Adobe Illustrator compatibility</p>
 <ul>
-<li>Add AXTextField support for Microsoft Office in AppBehaviorDetector</li>
+<li>Bypass key repeat events to fix spring-loaded tools in Adobe Illustrator</li>
 </ul>
-<p>  (fixes issues in dialogs like Data Validation, Find & Replace)</p>
+<p>  (holding Z for Zoom, Space for Hand tool no longer causes lag/stuck cursor)</p>
 <ul>
-<li>Send Forward Delete before backspaces in MS Office to clear AutoComplete</li>
+<li>Prevent tone mark from moving on invalid vowel sequences (e.g., "ưoi" + tone)</li>
+<li>Prevent circumflex from being added on invalid vowel sequences</li>
+<li>Add context-aware macro standalone detection via Accessibility API</li>
+<li>Add macro import/export functionality with JSON format support</li>
 </ul>
-<p>  suggestions that interfere with character replacement</p>
-<ul>
-<li>Improve hasTextAfterCursor() to account for selection length</li>
-</ul>
-<p>  (AutoComplete highlighted suggestions don't count as real text)</p>
-<ul>
-<li>Update build version to 20260120</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260120">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260122">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 20 Jan 2026 15:02:17 +0000</pubDate>
+      <pubDate>Thu, 22 Jan 2026 08:38:07 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260120/XKey.dmg" sparkle:version="20260120" sparkle:shortVersionString="1.2.19" length="10343308" type="application/octet-stream" sparkle:edSignature="CL+RuNcRXeiGBlz/7tlxUsAS8+eN977fpt1IfAlxcP6pRH4zEeFrXXs056lIcToxz4WtB2DYzXqR76eEpGW1CQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260122/XKey.dmg" sparkle:version="20260122" sparkle:shortVersionString="1.2.19" length="10597718" type="application/octet-stream" sparkle:edSignature="4nU9FU5TVYLhpdUAdBKCoJSgvwHeI9Iw7xGVeJZzXI+cW9X5EtQyLa62amsYIORV2FxkMh++OjLu/qsNvVMJCw==" />
     </item>
   </channel>
 </rss>
