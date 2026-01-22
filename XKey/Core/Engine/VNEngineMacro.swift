@@ -120,6 +120,20 @@ extension VNEngine {
         // Add new characters
         hookState.macroKey.append(contentsOf: newChars)
     }
+    
+    /// Convert macroKey to human-readable string
+    /// Used for context-aware macro checking (comparing with Accessibility API word)
+    func getMacroKeyAsString() -> String {
+        var result = ""
+        for data in hookState.macroKey {
+            // Use MacroManager's character code conversion logic
+            let charCode = macroManager.getCharacterCodeForDisplay(data)
+            if let scalar = UnicodeScalar(charCode) {
+                result.append(Character(scalar))
+            }
+        }
+        return result
+    }
 }
 
 // MARK: - Macro Result

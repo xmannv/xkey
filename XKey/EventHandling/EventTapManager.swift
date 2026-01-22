@@ -543,5 +543,12 @@ extension CGEvent {
     var hasOtherModifiers: Bool {
         return isCommandPressed || isControlPressed || isOptionPressed
     }
+
+    /// Check if this is a key repeat event (key being held down)
+    /// Key repeat events occur when user holds a key - used for shortcuts like holding Z for Zoom in Adobe apps
+    /// Returns true if this keyDown is an auto-repeat, false for initial key press
+    var isKeyRepeat: Bool {
+        return getIntegerValueField(.keyboardEventAutorepeat) != 0
+    }
 }
 

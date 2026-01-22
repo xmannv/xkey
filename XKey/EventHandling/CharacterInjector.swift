@@ -675,6 +675,93 @@ class CharacterInjector {
         
         return lastWord
     }
+    /// Check if macro is a standalone word (not part of a larger word)
+    /// Simple logic: 
+    ///   - Character BEFORE macro text must be: space/newline/start of text
+    ///   - Character AFTER cursor must be: space/newline/end of text
+    /// Returns: true if standalone, false if part of word, nil if AX not supported
+    func isMacroStandalone(macroLength: Int) -> Bool? {
+        // Skip if macroLength is invalid
+        guard macroLength > 0 else { return nil }
+        
+        let systemWideElement = AXUIElementCreateSystemWide()
+
+        var focusedElement: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
+            return nil  // AX not supported, silently return nil
+        }
+
+        let element = focusedElement as! AXUIElement
+
+        // Get selected text range (cursor position)
+        var selectedRange: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
+            return nil  // AX not supported
+        }
+
+        var rangeValue = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
+            return nil  // AX not supported
+        }
+
+        let cursorPosition = rangeValue.location
+
+        // Get total text length
+        var numberOfCharacters: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &numberOfCharacters) == .success,
+              let totalLength = numberOfCharacters as? Int else {
+            return nil  // AX not supported
+        }
+
+        // Position right before macro text
+        let positionBeforeMacro = cursorPosition - macroLength
+        
+        // --- Check character BEFORE macro ---
+        var charBeforeOK = false
+        if positionBeforeMacro <= 0 {
+            // Macro is at start of text → OK
+            charBeforeOK = true
+        } else {
+            // Read character at position (positionBeforeMacro - 1)
+            let readPos = positionBeforeMacro - 1
+            let readRange = CFRange(location: readPos, length: 1)
+            var readRangeValue = readRange
+            if let axRange = AXValueCreate(.cfRange, &readRangeValue) {
+                var text: CFTypeRef?
+                if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, axRange, &text) == .success,
+                   let charString = text as? String, let char = charString.first {
+                    charBeforeOK = char.isWhitespace || char.isNewline
+                }
+            }
+        }
+
+        // --- Check character AFTER cursor ---
+        var charAfterOK = false
+        if cursorPosition >= totalLength {
+            // Cursor at end of text → OK
+            charAfterOK = true
+        } else {
+            // Read character at cursor position
+            let readRange = CFRange(location: cursorPosition, length: 1)
+            var readRangeValue = readRange
+            if let axRange = AXValueCreate(.cfRange, &readRangeValue) {
+                var text: CFTypeRef?
+                if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, axRange, &text) == .success,
+                   let charString = text as? String, let char = charString.first {
+                    charAfterOK = char.isWhitespace || char.isNewline
+                }
+            }
+        }
+
+        let isStandalone = charBeforeOK && charAfterOK
+        
+        // Only log result when it matters (not standalone = will skip macro)
+        if !isStandalone {
+            debugCallback?("  [AX] Macro not standalone: charBeforeOK=\(charBeforeOK), charAfterOK=\(charAfterOK)")
+        }
+        
+        return isStandalone
+    }
     
     /// Get length of text before cursor using Accessibility API
     private func getTextLengthBeforeCursor() -> Int? {
@@ -726,6 +813,86 @@ class CharacterInjector {
         debugCallback?("  [AX] hasTextAfterCursor: cursor=\(cursorPosition), selection=\(selectionLength), total=\(totalLength), hasRealTextAfter=\(hasRealTextAfter)")
 
         return hasRealTextAfter
+    }
+    
+    /// Check if there is a non-whitespace character immediately after cursor
+    /// Returns: the character if exists and is not whitespace (cursor is mid-word),
+    ///          nil if at end of text, followed by whitespace, or AX not supported
+    /// This is used for context-aware macro checking
+    func getCharacterAfterCursor() -> Character? {
+        let systemWideElement = AXUIElementCreateSystemWide()
+
+        var focusedElement: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get focused element")
+            return nil
+        }
+
+        let element = focusedElement as! AXUIElement
+
+        // Get selected text range (cursor position)
+        var selectedRange: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get selected range")
+            return nil
+        }
+
+        var rangeValue = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to extract range value")
+            return nil
+        }
+
+        let cursorPosition = rangeValue.location
+        let selectionLength = rangeValue.length
+
+        // Get total text length
+        var numberOfCharacters: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &numberOfCharacters) == .success,
+              let totalLength = numberOfCharacters as? Int else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get total length")
+            return nil
+        }
+
+        // Check if there's text after cursor (accounting for selection)
+        let positionAfterCursor = cursorPosition + selectionLength
+        guard positionAfterCursor < totalLength else {
+            debugCallback?("  [AX] getCharacterAfterCursor: At end of text")
+            return nil
+        }
+
+        // Read 1 character after cursor
+        let readRange = CFRange(location: positionAfterCursor, length: 1)
+        var readRangeValue = readRange
+        guard let axRange = AXValueCreate(.cfRange, &readRangeValue) else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to create AXValue")
+            return nil
+        }
+
+        var text: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            kAXStringForRangeParameterizedAttribute as CFString,
+            axRange,
+            &text
+        ) == .success else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Failed to read text")
+            return nil
+        }
+
+        guard let charString = text as? String, let char = charString.first else {
+            debugCallback?("  [AX] getCharacterAfterCursor: Text is empty")
+            return nil
+        }
+
+        debugCallback?("  [AX] getCharacterAfterCursor: char='\(char)' isWhitespace=\(char.isWhitespace)")
+
+        // Return nil if it's whitespace (word boundary)
+        if char.isWhitespace || char.isNewline {
+            return nil
+        }
+
+        return char
     }
 
 

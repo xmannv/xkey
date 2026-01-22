@@ -129,6 +129,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         self.engine.getWordBeforeCursorCallback = { [weak self] in
             return self?.injector.getTextBeforeCursor()
         }
+        
+        // Set up callback for context-aware macro checking via Accessibility API
+        // Returns true if macro is a standalone word (space/newline before and after)
+        self.engine.isMacroStandaloneCallback = { [weak self] macroLength in
+            return self?.injector.isMacroStandalone(macroLength: macroLength)
+        }
 
         // Share managers with VNEngine
         VNEngine.setSharedMacroManager(macroManager)
@@ -303,6 +309,16 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // This is checked BEFORE Vietnamese mode check because passthrough applies regardless
         let confirmedMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
         if confirmedMethod.method == .passthrough {
+            return false
+        }
+
+        // CRITICAL: Skip processing for key repeat events (key being held down)
+        // This fixes issues with spring-loaded tools in apps like Adobe Illustrator:
+        // - Holding Z for Zoom tool, Space for Hand tool
+        // - Key repeat events should pass through immediately without any delay
+        // - Only the first keyDown is processed for potential Vietnamese conversion
+        // - This prevents timing issues where keyUp arrives before delayed repeat keyDowns
+        if type == .keyDown && event.isKeyRepeat {
             return false
         }
 

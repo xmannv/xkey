@@ -110,6 +110,10 @@ class VNEngine {
     /// Callback to get word before cursor using Accessibility API
     /// Returns the actual word from the text field, or nil if AX not available
     var getWordBeforeCursorCallback: (() -> String?)?
+    
+    /// Callback to check if macro is a standalone word using Accessibility API
+    /// Returns: true if standalone (space/newline before and after), false if part of word, nil if AX not available
+    var isMacroStandaloneCallback: ((Int) -> Bool?)?
 
     // MARK: - Hook State (result to send back)
     
@@ -1332,11 +1336,23 @@ class VNEngine {
     
     private func insertAOE(keyCode: UInt16, isCaps: Bool) {
         findAndCalculateVowel()
-        
+
         logCallback?("insertAOE: keyCode=\(keyCode), index=\(index)")
         logCallback?("  Current buffer: \(getCurrentWord())")
         logCallback?("  vowelStartIndex=\(vowelStartIndex), vowelEndIndex=\(vowelEndIndex)")
-        
+
+        // Check if vowel sequence is valid before adding circumflex
+        // Invalid sequences like "ee", "eee", "aa", "aaa" should NOT get circumflex added
+        // This prevents "nhée" + "e" from becoming "nhéê" (should stay as "nhéee")
+        if vowelCount >= 2 {
+            let vowelSequence = getCurrentVowelSequence()
+            if !VowelSequenceValidator.isValid(vowelSequence) {
+                logCallback?("  → Invalid vowel sequence \(vowelSequence), inserting key normally instead of adding circumflex")
+                insertKey(keyCode: keyCode, isCaps: isCaps)
+                return
+            }
+        }
+
         // Track which vowels had TONEW_MASK removed (e.g., ư → u, ơ → o)
         // This is needed to update the output for ALL affected vowels, not just the one getting ^
         // Example: "cươi" + "o" → need to update both ư→u AND ơ→ô
@@ -1665,7 +1681,55 @@ class VNEngine {
             }
         }
     }
-    
+
+    /// Convert typingWord data at given index to VNVowel
+    /// Returns nil if the character is not a vowel or cannot be converted
+    private func convertToVNVowel(at index: Int) -> VNVowel? {
+        let data = typingWord[index]
+        let keyCode = UInt16(data & VNEngine.CHAR_MASK)
+        let hasTone = (data & VNEngine.TONE_MASK) != 0      // circumflex (^)
+        let hasToneW = (data & VNEngine.TONEW_MASK) != 0    // horn (ơ, ư) or breve (ă)
+
+        switch keyCode {
+        case VietnameseData.KEY_A:
+            if hasTone { return .aCircumflex }      // â
+            if hasToneW { return .aBreve }          // ă
+            return .a
+        case VietnameseData.KEY_E:
+            if hasTone { return .eCircumflex }      // ê
+            return .e
+        case VietnameseData.KEY_I:
+            return .i
+        case VietnameseData.KEY_O:
+            if hasTone { return .oCircumflex }      // ô
+            if hasToneW { return .oHorn }           // ơ
+            return .o
+        case VietnameseData.KEY_U:
+            if hasToneW { return .uHorn }           // ư
+            return .u
+        case VietnameseData.KEY_Y:
+            return .y
+        default:
+            return nil
+        }
+    }
+
+    /// Get vowel sequence from current vowelStartIndex to vowelEndIndex
+    /// Returns array of VNVowel or empty array if conversion fails
+    private func getCurrentVowelSequence() -> [VNVowel] {
+        guard vowelCount > 0, vowelStartIndex <= vowelEndIndex else {
+            return []
+        }
+
+        var vowels: [VNVowel] = []
+        for i in vowelStartIndex...vowelEndIndex {
+            if let vowel = convertToVNVowel(at: i) {
+                vowels.append(vowel)
+            }
+        }
+        return vowels
+    }
+
     // MARK: - Spelling Check
     
     private var spellingOK = false
@@ -1995,7 +2059,19 @@ class VNEngine {
             logCallback?("  → Early return: no vowels")
             return
         }
-        
+
+        // Check if vowel sequence is valid before attempting to move mark
+        // Invalid sequences like "ee", "eee", "aa", "aaa" should NOT cause mark movement
+        // This prevents the issue where typing "nheseee" incorrectly becomes "nheế"
+        // instead of "nhéee" (mark should stay on first 'e')
+        if vowelCount >= 2 {
+            let vowelSequence = getCurrentVowelSequence()
+            if !VowelSequenceValidator.isValid(vowelSequence) {
+                logCallback?("  → Early return: invalid vowel sequence \(vowelSequence), not moving mark")
+                return
+            }
+        }
+
         var isAdjusted = false
         
         // IMPORTANT: Save vowelStartIndex before calling insertMarkInternal
@@ -3031,21 +3107,46 @@ extension VNEngine {
         // These are the characters that will trigger spell check restore
         let isRestoreTrigger = isSpace || character == "," || character == "."
         
-        logCallback?("processWordBreak: char='\(character)', isSpace=\(isSpace), isRestoreTrigger=\(isRestoreTrigger), tempDisableKey=\(tempDisableKey), index=\(index)")
+        logCallback?("processWordBreak: char='\(character)', isSpace=\(isSpace), isRestoreTrigger=\(isRestoreTrigger), tempDisableKey=\(tempDisableKey), index=\(index), cursorMovedSinceReset=\(cursorMovedSinceReset)")
         
         // IMPORTANT: Check macro FIRST before spell check
         // This ensures that macros like "dc" get replaced instead of being restored as invalid spelling
         // Macro check takes priority because user explicitly defined these shortcuts
         // Trigger macro on restore trigger characters (space, comma, period)
         if isRestoreTrigger && shouldUseMacro() && !hasHandledMacro {
-            let macroFound = findAndReplaceMacro()
+            // Context-aware macro check:
+            // When cursor was moved (user clicked in middle of text), verify that
+            // the typed text is a standalone word (space/newline before AND after)
+            // If not standalone → macro is part of a larger word → don't trigger
+            var shouldCheckMacro = true
+            
+            if cursorMovedSinceReset && !hookState.macroKey.isEmpty {
+                let macroLength = hookState.macroKey.count
+                
+                // Simple check: is macro text surrounded by word boundaries?
+                // - Character BEFORE macro must be: space/newline/start of text
+                // - Character AFTER cursor must be: space/newline/end of text  
+                if let isStandalone = isMacroStandaloneCallback?(macroLength) {
+                    if !isStandalone {
+                        logCallback?("processWordBreak: SKIP macro - not a standalone word (macroLength=\(macroLength))")
+                        shouldCheckMacro = false
+                    } else {
+                        logCallback?("processWordBreak: Macro is standalone, OK to check")
+                    }
+                }
+                // If callback returns nil (AX not available), allow macro check (default behavior)
+            }
+            
+            if shouldCheckMacro {
+                let macroFound = findAndReplaceMacro()
 
-            if macroFound {
-                logCallback?("processWordBreak: Macro found, replacing")
-                let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
-                // Reset after macro replacement
-                reset()
-                return result
+                if macroFound {
+                    logCallback?("processWordBreak: Macro found, replacing")
+                    let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
+                    // Reset after macro replacement
+                    reset()
+                    return result
+                }
             }
         }
         

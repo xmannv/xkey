@@ -60,16 +60,16 @@ struct MacroSection: View {
                             Text("Từ viết tắt:")
                                 .font(.body)
                                 .foregroundColor(.primary)
-                            TextField("vd: btw", text: $newMacroText)
+                            TextField("vd: btw, ưa, việt", text: $newMacroText)
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: 120)
+                                .frame(width: 150)
                                 .onChange(of: newMacroText) { newValue in
                                     let filtered = filterMacroAbbreviation(newValue)
                                     if filtered != newValue {
                                         newMacroText = filtered
                                     }
                                 }
-                            Text("(không dấu, không cách)")
+                            Text("(hỗ trợ tiếng Việt, không cách)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -252,20 +252,32 @@ struct MacroSection: View {
         }
     }
     
-    /// Filter out Vietnamese diacritics and spaces from macro abbreviation
-    /// Vietnamese characters with diacritics are converted to their base ASCII form
+    /// Filter macro abbreviation - allows Vietnamese characters and removes spaces
+    /// Vietnamese characters with diacritics (ư, ă, ê, etc.) are now supported
     private func filterMacroAbbreviation(_ text: String) -> String {
-        // Remove spaces first
+        // Remove spaces only - Vietnamese characters are now allowed
         let noSpaces = text.replacingOccurrences(of: " ", with: "")
         
-        // Convert Vietnamese characters to ASCII equivalents
-        // This removes diacritics: á → a, é → e, etc.
-        let normalized = noSpaces.folding(options: .diacriticInsensitive, locale: .current)
-        
-        // Only keep ASCII characters (letters, numbers, and common symbols)
-        let filtered = normalized.unicodeScalars.filter { scalar in
-            // Allow ASCII printable characters (except space which we already removed)
-            return scalar.value >= 33 && scalar.value <= 126
+        // Filter to keep only valid characters:
+        // - Vietnamese letters with diacritics (Unicode range for Vietnamese)
+        // - ASCII letters and numbers
+        // - Common symbols used in macros
+        let filtered = noSpaces.unicodeScalars.filter { scalar in
+            let value = scalar.value
+            
+            // ASCII printable characters (except space)
+            if value >= 33 && value <= 126 {
+                return true
+            }
+            
+            // Vietnamese characters (Latin Extended-A, Latin Extended-B, Latin Extended Additional)
+            // Range covers: ă, â, đ, ê, ô, ơ, ư and their tonal variants
+            if (value >= 0x00C0 && value <= 0x024F) ||  // Latin Extended-A & B
+               (value >= 0x1EA0 && value <= 0x1EF9) {    // Vietnamese tonal marks
+                return true
+            }
+            
+            return false
         }
         
         return String(String.UnicodeScalarView(filtered))
@@ -401,7 +413,7 @@ struct EditMacroSheet: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    TextField("vd: btw", text: $editedText)
+                    TextField("vd: btw, ưa, việt", text: $editedText)
                         .textFieldStyle(.roundedBorder)
                         .font(.body)
                         .onChange(of: editedText) { newValue in
@@ -411,7 +423,7 @@ struct EditMacroSheet: View {
                             }
                         }
                     
-                    Text("Không hỗ trợ dấu tiếng Việt và khoảng cách")
+                    Text("Hỗ trợ tiếng Việt, không có khoảng cách")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -525,10 +537,25 @@ struct EditMacroSheet: View {
     }
     
     private func filterMacroAbbreviation(_ text: String) -> String {
+        // Remove spaces only - Vietnamese characters are now allowed
         let noSpaces = text.replacingOccurrences(of: " ", with: "")
-        let normalized = noSpaces.folding(options: .diacriticInsensitive, locale: .current)
-        let filtered = normalized.unicodeScalars.filter { scalar in
-            return scalar.value >= 33 && scalar.value <= 126
+        
+        // Filter to keep only valid characters
+        let filtered = noSpaces.unicodeScalars.filter { scalar in
+            let value = scalar.value
+            
+            // ASCII printable characters (except space)
+            if value >= 33 && value <= 126 {
+                return true
+            }
+            
+            // Vietnamese characters (Latin Extended-A, Latin Extended-B, Latin Extended Additional)
+            if (value >= 0x00C0 && value <= 0x024F) ||  // Latin Extended-A & B
+               (value >= 0x1EA0 && value <= 0x1EF9) {    // Vietnamese tonal marks
+                return true
+            }
+            
+            return false
         }
         return String(String.UnicodeScalarView(filtered))
     }
