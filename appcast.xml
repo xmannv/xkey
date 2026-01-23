@@ -6,24 +6,23 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260123.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.1</link>
-      <sparkle:version>20260123.1</sparkle:version>
+      <title>Version 1.2.19 (Build 20260123.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.2</link>
+      <sparkle:version>20260123.2</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(VowelSequence): Add support for 'yêu' vowel sequence</p>
+<p>Fix Behavior tab alignment in AddRuleSheet dialog</p>
 <ul>
-<li>Add [.y, .eCircumflex, .u] to complete triple vowels list</li>
-<li>Add [.y, .e, .u] to intermediate vowel sequences</li>
-<li>Fixes Vietnamese words like 'yêu', 'yếu' not being recognized correctly</li>
+<li>Add alignment: .topLeading to Group frame containing tab content</li>
+<li>Ensures Behavior tab is left-aligned like Basic and AX Matching tabs</li>
+<li>Bump build version to 20260123.2</li>
 </ul>
-<p>chore: bump build version to 20260123.1</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 23 Jan 2026 07:18:03 +0000</pubDate>
+      <pubDate>Fri, 23 Jan 2026 07:25:26 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260123.1/XKey.dmg" sparkle:version="20260123.1" sparkle:shortVersionString="1.2.19" length="10646622" type="application/octet-stream" sparkle:edSignature="ckuAJlz3k7sw3bGs7DfFs+Q7MzKf5FSZHwUgjaG+gVOqiM2jgIUDDWHqfX2v7At0tEdIy6ABgny4tiB/+zugCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260123.2/XKey.dmg" sparkle:version="20260123.2" sparkle:shortVersionString="1.2.19" length="10646659" type="application/octet-stream" sparkle:edSignature="WGDNAAmcmy4LeNfZmCuRKYIFSqzW9RI+gkax/ptEy1BGJCbonSdKbZd+5er11JifSwoKEdchKXo5FarLT16hCw==" />
     </item>
   </channel>
 </rss>
