@@ -55,6 +55,7 @@ struct VowelSequenceValidator {
 
         // Complete triple vowels (complete = 1)
         [.i, .eCircumflex, .u],  // iêu (tiêu, điều) - ukengine.cpp line 127
+        [.y, .eCircumflex, .u],  // yêu (yêu, yếu) - XKey fix
         [.o, .a, .i],  // oai (loai, hoài) - ukengine.cpp line 128
         [.o, .a, .y],  // oay (hoay) - ukengine.cpp line 129
         [.o, .e, .o],  // oeo (kẹo, khéo) - ukengine.cpp line 130
@@ -129,7 +130,7 @@ struct VowelSequenceValidator {
         [.i, .a], [.i, .e], [.i, .u],
         [.o, .a], [.o, .e], [.o, .i],
         [.u, .a], [.u, .e], [.u, .i], [.u, .o], [.u, .u], [.u, .y],
-        [.y, .a], [.y, .e], [.y, .u],
+        [.y, .a], [.y, .e], [.y, .u], [.y, .e, .u],
 
         // Double vowels with breve
         [.o, .aBreve],  // oă (hoặc, loại, toàn) - ukengine.cpp line 104
@@ -153,6 +154,7 @@ struct VowelSequenceValidator {
         // Triple vowels
         [.i, .e, .u],  // ieu (tiếu, điếu) - ukengine.cpp line 126
         [.i, .eCircumflex, .u],  // iêu (tiêu, điều, siêu) - ukengine.cpp line 127
+        [.y, .eCircumflex, .u],  // yêu (yêu, yếu)
         [.i, .a, .u],  // iau (yêu, giàu) - ukengine.cpp line 126 (same as ieu)
         [.o, .a, .i],  // oai (loai, hoài) - ukengine.cpp line 128
         [.o, .a, .y],  // oay (hoay) - ukengine.cpp line 129
