@@ -6,23 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260123.2)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.2</link>
-      <sparkle:version>20260123.2</sparkle:version>
+      <title>Version 1.2.19 (Build 20260123.3)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.3</link>
+      <sparkle:version>20260123.3</sparkle:version>
       <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix Behavior tab alignment in AddRuleSheet dialog</p>
+<p>fix: Early return for keyUp events to fix Adobe spring-loaded tools</p>
 <ul>
-<li>Add alignment: .topLeading to Group frame containing tab content</li>
-<li>Ensures Behavior tab is left-aligned like Basic and AX Matching tabs</li>
-<li>Bump build version to 20260123.2</li>
+<li>Add immediate pass-through for keyUp events in EventTapManager</li>
+<li>Fixes issue where mouse stays in drag state after releasing Z/Space</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.2">Xem chi tiết trên GitHub</a></p>
+<p>  keys in Adobe Illustrator/Photoshop on low-RAM (8GB) machines</p>
+<ul>
+<li>Spring-loaded tools require precise keyUp timing; event tap's</li>
+</ul>
+<p>  processing delay was causing keyUp to arrive too late</p>
+<ul>
+<li>Safe because XKey only processes keyDown for Vietnamese input</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260123.3">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 23 Jan 2026 07:25:26 +0000</pubDate>
+      <pubDate>Fri, 23 Jan 2026 11:33:28 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260123.2/XKey.dmg" sparkle:version="20260123.2" sparkle:shortVersionString="1.2.19" length="10646659" type="application/octet-stream" sparkle:edSignature="WGDNAAmcmy4LeNfZmCuRKYIFSqzW9RI+gkax/ptEy1BGJCbonSdKbZd+5er11JifSwoKEdchKXo5FarLT16hCw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260123.3/XKey.dmg" sparkle:version="20260123.3" sparkle:shortVersionString="1.2.19" length="10646671" type="application/octet-stream" sparkle:edSignature="j4pYcyc2FCZN+672Sp8cxK//5eTL5rqs59Sm4labMGzo6Wb4mTtDv4Ql+G8194ApkAQYgvChkASL+HbrerFRBw==" />
     </item>
   </channel>
 </rss>
