@@ -758,7 +758,7 @@ struct AddRuleSheet: View {
                     behaviorTab
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             
             // Error message
             if showError {
