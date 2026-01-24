@@ -262,6 +262,14 @@ class EventTapManager {
             return Unmanaged.passUnretained(event)
         }
 
+        // CRITICAL FIX: Pass through key repeat events IMMEDIATELY
+        // Key repeat events occur when user holds a key (spring-loaded tools in Adobe apps)
+        // These must bypass ALL checks (hotkeys, delegate) to avoid any delay
+        // Only the first keyDown needs processing for Vietnamese input
+        if type == .keyDown && event.isKeyRepeat {
+            return Unmanaged.passUnretained(event)
+        }
+
         debugLogCallback?("EventTapManager.eventCallback: type=\(type.rawValue), delegate=\(delegate != nil)")
 
         // Handle tap disabled event
