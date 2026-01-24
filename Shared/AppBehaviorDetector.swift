@@ -65,7 +65,7 @@ enum InjectionMethod: String, Codable, CaseIterable {
         case .selection: return "Selection"
         case .autocomplete: return "Autocomplete"
         case .axDirect: return "AX Direct"
-        case .passthrough: return "Passthrough"
+        case .passthrough: return "Passthrough (tắt tiếng việt)"
         }
     }
 
