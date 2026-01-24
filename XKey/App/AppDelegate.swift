@@ -29,6 +29,137 @@ private func axFocusChangedCallback(
     }
 }
 
+// MARK: - Focused Element Info (cached AX attributes)
+
+/// Cached information about a focused AX element
+/// Used to avoid redundant AX API calls during focus check
+private struct FocusedElementInfo {
+    let element: AXUIElement
+    let role: String?
+    let subrole: String?
+    let description: String?
+    let domId: String?
+    let roleDescription: String?
+    let windowTitle: String?
+    
+    /// Unique signature for detecting focus changes
+    /// Includes role, subrole, description (truncated), DOM ID, and window title
+    /// Window title is included to detect Chrome profile switches (same app, different windows)
+    var signature: String {
+        var parts: [String] = []
+        if let role = role {
+            parts.append(role)
+        }
+        if let subrole = subrole {
+            parts.append(subrole)
+        }
+        if let desc = description, !desc.isEmpty {
+            let truncated = String(desc.prefix(50))
+            parts.append("desc:\(truncated)")
+        }
+        if let domId = domId, !domId.isEmpty {
+            parts.append("dom:\(domId)")
+        }
+        // Include window title to detect Chrome profile switches
+        // When user switches between Chrome profiles, window title changes
+        // This ensures injection method is re-detected immediately
+        if let title = windowTitle, !title.isEmpty {
+            // Truncate to avoid overly long signatures
+            let truncated = String(title.prefix(100))
+            parts.append("win:\(truncated)")
+        }
+        return parts.joined(separator: "|")
+    }
+    
+    /// Check if element is a text input field
+    var isTextInput: Bool {
+        guard let role = role else { return false }
+        
+        // Text input roles - only these are true text inputs
+        let textRoles = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"]
+        if textRoles.contains(role) {
+            return true
+        }
+        
+        // Check subrole for web content text fields
+        if let subrole = subrole {
+            if subrole == "AXSearchField" || subrole == "AXSecureTextField" {
+                return true
+            }
+        }
+        
+        // For contenteditable web elements (role=AXGroup or AXWebArea),
+        // check if RoleDescription contains text input keywords
+        if role == "AXGroup" || role == "AXWebArea" {
+            if let roleDesc = roleDescription {
+                let lowerDesc = roleDesc.lowercased()
+                if lowerDesc.contains("field") || lowerDesc.contains("editor") || lowerDesc.contains("input") {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    /// Create from AXUIElement by querying all needed attributes once
+    static func from(_ element: AXUIElement) -> FocusedElementInfo {
+        var role: String?
+        var subrole: String?
+        var description: String?
+        var domId: String?
+        var roleDescription: String?
+        var windowTitle: String?
+        
+        // Query all attributes in one pass
+        var ref: CFTypeRef?
+        
+        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &ref) == .success {
+            role = ref as? String
+        }
+        
+        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &ref) == .success {
+            subrole = ref as? String
+        }
+        
+        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &ref) == .success {
+            description = ref as? String
+        }
+        
+        if AXUIElementCopyAttributeValue(element, "AXDOMIdentifier" as CFString, &ref) == .success {
+            domId = ref as? String
+        }
+        
+        if AXUIElementCopyAttributeValue(element, kAXRoleDescriptionAttribute as CFString, &ref) == .success {
+            roleDescription = ref as? String
+        }
+        
+        // Get window title from frontmost app's focused window
+        // This is important for detecting Chrome profile switches
+        if let app = NSWorkspace.shared.frontmostApplication {
+            let appElement = AXUIElementCreateApplication(app.processIdentifier)
+            var focusedWindow: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
+               let windowElement = focusedWindow as! AXUIElement? {
+                var titleValue: CFTypeRef?
+                if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success {
+                    windowTitle = titleValue as? String
+                }
+            }
+        }
+        
+        return FocusedElementInfo(
+            element: element,
+            role: role,
+            subrole: subrole,
+            description: description,
+            domId: domId,
+            roleDescription: roleDescription,
+            windowTitle: windowTitle
+        )
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Shared Instance
@@ -1217,27 +1348,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Global monitor - catches clicks in OTHER apps
         mouseClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            // Log that mouse click was detected (always visible, not verbose)
-            self?.debugWindowController?.logEvent("Mouse click (global) → resetting engine buffer")
-
             // Reset engine when mouse is clicked (likely focus change or cursor move)
             // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
             self?.keyboardHandler?.resetWithCursorMoved()
 
-            // Special case: If clicking into overlay app (Spotlight/Raycast/Alfred) with empty input,
-            // reset mid-sentence flag to allow Forward Delete (safe since no text to delete)
-            // Use 0.15s delay to allow AX API to update window title (VSCode needs more time)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                if let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() {
-                    let detector = AppBehaviorDetector.shared
-                    if detector.getFocusedElementInfo().isEmpty {
-                        self?.keyboardHandler?.resetMidSentenceFlag()
-                        self?.debugWindowController?.logEvent("'\(overlayName)' with empty input → reset mid-sentence flag")
-                    }
+            // Log detailed input detection info (ONLY when debug window is visible)
+            // This avoids expensive AX calls during normal usage
+            // PERF: Skip when debug window is hidden to fix spring-loaded tools lag
+            // Note: Overlay mid-sentence reset is handled by OverlayAppDetector's timer callback
+            if self?.debugWindowController?.window?.isVisible == true {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                    self?.logMouseClickInputDetection()
                 }
-
-                // Log detailed input detection info
-                self?.logMouseClickInputDetection()
             }
 
             // Reset lastFocusedElement to allow toolbar to re-show after auto-hide
@@ -1249,16 +1371,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.handleFocusCheck()
             }
         }
-        
-        // Local monitor - catches clicks within XKey app itself (Debug window, Settings, etc.)
-        // This ensures engine resets even when interacting with XKey's own UI
-        NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            // Reset engine when clicking within XKey app
-            self?.keyboardHandler?.resetWithCursorMoved()
-            return event  // Pass through the event
-        }
-
-        debugWindowController?.logEvent("Mouse click monitor registered (global + local)")
     }
 
     /// Log detailed information about the input type when mouse is clicked
@@ -1741,6 +1853,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     /// Main focus check handler - gets focused element once and passes to both processors
+    /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes in a single query
     private func handleFocusCheck() {
         let systemWide = AXUIElementCreateSystemWide()
         
@@ -1757,12 +1870,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let axElement = focusedElement as! AXUIElement
         
+        // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
+        // This reduces AX API calls from ~10 to ~5 per focus check
+        let elementInfo = FocusedElementInfo.from(axElement)
+        
         // 1. ALWAYS check for injection method changes (CMD+T, Tab, etc.)
-        checkIntraAppFocusChange(for: axElement)
+        checkIntraAppFocusChange(with: elementInfo)
         
         // 2. Check toolbar display (only if enabled)
         if SharedSettings.shared.tempOffToolbarEnabled {
-            checkAndShowToolbarForFocusedElement(axElement)
+            checkAndShowToolbarForFocusedElement(with: elementInfo)
         }
     }
 
@@ -1770,10 +1887,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Check if focused element has changed within the same app (e.g., CMD+T in browser)
     /// If so, re-detect injection method (but DO NOT reset engine - that's handled by user actions)
-    /// - Parameter element: The currently focused AXUIElement (passed from handleFocusCheck)
-    private func checkIntraAppFocusChange(for element: AXUIElement) {
-        // Get current element's "signature" (role + description/identifier)
-        let currentSignature = getElementSignature(element)
+    /// - Parameter elementInfo: Cached AX element info (passed from handleFocusCheck)
+    private func checkIntraAppFocusChange(with elementInfo: FocusedElementInfo) {
+        // OPTIMIZED: Use pre-computed signature from FocusedElementInfo
+        let currentSignature = elementInfo.signature
         
         // Check if signature changed (different element type)
         if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
@@ -1884,9 +2001,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Handle focus changed notification from AXObserver
     /// This is called by the C callback function
+    /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes
     func handleAXFocusChanged(_ element: AXUIElement) {
-        // Get current signature
-        let currentSignature = getElementSignature(element)
+        // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
+        let elementInfo = FocusedElementInfo.from(element)
+        let currentSignature = elementInfo.signature
         
         // Only process if signature actually changed
         if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
@@ -1921,56 +2040,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if SharedSettings.shared.tempOffToolbarEnabled {
             // Reset lastFocusedElement to force toolbar re-evaluation
             lastFocusedElement = nil
-            checkAndShowToolbarForFocusedElement(element)
+            checkAndShowToolbarForFocusedElement(with: elementInfo)
         } else {
             // Just update for tracking
             lastFocusedElement = element
         }
     }
     
-    /// Get a signature string for an AX element (used to detect focus changes)
-    /// Signature includes role, subrole, and description/identifier
-    private func getElementSignature(_ element: AXUIElement) -> String {
-        var parts: [String] = []
-        
-        // Get role
-        var roleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let role = roleRef as? String {
-            parts.append(role)
-        }
-        
-        // Get subrole
-        var subroleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-           let subrole = subroleRef as? String {
-            parts.append(subrole)
-        }
-        
-        // Get description (used for address bar detection in browsers)
-        var descRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef) == .success,
-           let desc = descRef as? String, !desc.isEmpty {
-            // Truncate to first 50 chars to avoid overly long signatures
-            let truncated = String(desc.prefix(50))
-            parts.append("desc:\(truncated)")
-        }
-        
-        // Get DOM identifier if available (for web content)
-        var domIdRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, "AXDOMIdentifier" as CFString, &domIdRef) == .success,
-           let domId = domIdRef as? String, !domId.isEmpty {
-            parts.append("dom:\(domId)")
-        }
-        
-        return parts.joined(separator: "|")
-    }
-
     /// Check if focused element is a text field and show toolbar
-    /// - Parameter element: The currently focused AXUIElement (passed from handleFocusCheck)
-    private func checkAndShowToolbarForFocusedElement(_ element: AXUIElement) {
-        // Check if it's the same element as before
-        if let lastElement = lastFocusedElement, CFEqual(lastElement, element) {
+    /// - Parameter elementInfo: Cached AX element info (passed from handleFocusCheck)
+    /// OPTIMIZED: Uses signature comparison instead of CFEqual, and cached isTextInput
+    private func checkAndShowToolbarForFocusedElement(with elementInfo: FocusedElementInfo) {
+        // OPTIMIZED: Use signature comparison instead of CFEqual
+        // Signature is already computed by FocusedElementInfo, no additional AX calls needed
+        let currentSignature = elementInfo.signature
+        
+        // Check if it's the same element as before (using signature)
+        if currentSignature == lastFocusedElementSignature && lastFocusedElement != nil {
             // Same element
             if TempOffToolbarController.shared.isVisible {
                 // Toolbar visible - just update position
@@ -1982,10 +2068,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // New focused element
-        lastFocusedElement = element
+        lastFocusedElement = elementInfo.element
 
-        // Check if it's a text input element
-        if isTextInputElement(element) {
+        // OPTIMIZED: Use cached isTextInput from FocusedElementInfo (no additional AX calls)
+        if elementInfo.isTextInput {
             // Show toolbar near cursor
             TempOffToolbarController.shared.show()
         } else {
@@ -1993,55 +2079,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             TempOffToolbarController.shared.hide()
         }
     }
-
-    /// Check if an AX element is a text input field
-    private func isTextInputElement(_ element: AXUIElement) -> Bool {
-        // Get role
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
-              let role = roleRef as? String else {
-            return false
-        }
-
-        // Text input roles - only these are true text inputs
-        let textRoles = [
-            "AXTextField",
-            "AXTextArea",
-            "AXComboBox",
-            "AXSearchField"
-        ]
-
-        if textRoles.contains(role) {
-            return true
-        }
-
-        // Check subrole for web content text fields
-        var subroleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-           let subrole = subroleRef as? String {
-            // Only text-related subroles
-            if subrole == "AXSearchField" || subrole == "AXSecureTextField" {
-                return true
-            }
-        }
-
-        // For contenteditable web elements (role=AXGroup or AXWebArea),
-        // check if RoleDescription contains text input keywords
-        if role == "AXGroup" || role == "AXWebArea" {
-            var roleDescRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(element, kAXRoleDescriptionAttribute as CFString, &roleDescRef) == .success,
-               let roleDesc = roleDescRef as? String {
-                let lowerDesc = roleDesc.lowercased()
-                if lowerDesc.contains("field") || lowerDesc.contains("editor") || lowerDesc.contains("input") {
-                    return true
-                }
-            }
-        }
-
-        // Do NOT use AXSelectedTextRange as fallback - links and other elements may have it
-        return false
-    }
-
+    
     private func setupTempOffToolbarHotkey() {
         // Get hotkey from preferences
         let preferences = SharedSettings.shared.loadPreferences()

@@ -713,7 +713,19 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     ]
     
     /// Check if the current frontmost app is in the excluded list
+    /// IMPORTANT: Overlay apps (Spotlight, Raycast, Alfred) are NEVER excluded,
+    /// even when the underlying app is in the excluded list.
+    /// This allows Vietnamese typing in overlays regardless of the excluded app beneath.
     private func isCurrentAppExcluded() -> Bool {
+        // PRIORITY 1: Check if overlay app is active (Spotlight, Raycast, Alfred)
+        // Overlay apps use floating panels that don't become frontmostApplication,
+        // so NSWorkspace.shared.frontmostApplication would return the excluded app underneath.
+        // We must check overlay visibility FIRST to avoid blocking Vietnamese in overlays.
+        if OverlayAppDetector.shared.isOverlayAppVisible() {
+            return false  // Overlay apps are never excluded - allow Vietnamese typing
+        }
+        
+        // PRIORITY 2: Check frontmost application for regular apps
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
               let bundleId = frontmostApp.bundleIdentifier else {
             return false
