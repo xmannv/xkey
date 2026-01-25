@@ -6,24 +6,28 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.19 (Build 20260124.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260124.3</link>
-      <sparkle:version>20260124.3</sparkle:version>
-      <sparkle:shortVersionString>1.2.19</sparkle:shortVersionString>
+      <title>Version 1.2.20 (Build 20260125)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125</link>
+      <sparkle:version>20260125</sparkle:version>
+      <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>perf: Optimize focus detection and debug logging performance</p>
+<p>docs: Update README with Translation feature and new version 1.2.20</p>
 <ul>
-<li>Add FocusedElementInfo struct to cache AX attributes, reducing redundant API calls</li>
-<li>Include window title in focus signature to detect Chrome profile switches immediately</li>
-<li>Only run logMouseClickInputDetection when debug window is visible</li>
-<li>Update Passthrough injection method description to clarify it disables Vietnamese input</li>
+<li>Update version badge from 1.2.19 to 1.2.20</li>
+<li>Add new Translation feature section (Section 9)</li>
+<li>Document 3 translation providers: Google, Tencent Transmart, Volcano Engine</li>
+<li>Add Translation to highlights with 30+ supported languages</li>
+<li>Update project structure to include Translation/ directory</li>
+<li>Update section numbering (Input Sources → 10, Window Rules → 11, Others → 12)</li>
+<li>Add new files: DebugLogger.swift, TranslationLanguage.swift to Shared</li>
+<li>Fix broken emoji characters</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.19-20260124.3">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 24 Jan 2026 12:43:36 +0000</pubDate>
+      <pubDate>Sun, 25 Jan 2026 09:16:22 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.19-20260124.3/XKey.dmg" sparkle:version="20260124.3" sparkle:shortVersionString="1.2.19" length="10650887" type="application/octet-stream" sparkle:edSignature="VNgLWwloWC0pIPicaqfC9lrKLsMtM8A5C4dDPB9vmEFIXLN08UV/F9/k36YDYcx4iwIfse+50rACU1EiGBnEDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260125/XKey.dmg" sparkle:version="20260125" sparkle:shortVersionString="1.2.20" length="11111921" type="application/octet-stream" sparkle:edSignature="/77dquX/CWBF/Z1xYs9OBAWoM3+YgJfEZNH3HFgkVDn9ndNhIfkonNtRyGE5DKQFkV400+nZSOXA0tr+45ldDQ==" />
     </item>
   </channel>
 </rss>
