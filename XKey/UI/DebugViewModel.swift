@@ -13,7 +13,7 @@ class DebugViewModel: ObservableObject {
     @Published var statusText = "Status: Initializing..."
     @Published var logLines: [String] = []  // Changed from logText to array for better performance
     @Published var isLoggingEnabled = true
-    @Published var isVerboseLogging = false {
+    @Published var isVerboseLogging = true {
         didSet {
             verboseLoggingCallback?(isVerboseLogging)
         }

@@ -61,10 +61,13 @@ class CharacterInjector {
     /// Wait for previous injection to complete (call BEFORE processing next keystroke)
     /// Uses semaphore to ensure 100% synchronization (better than cooldown timer)
     func waitForInjectionComplete() {
-        debugCallback?("    → Waiting for previous injection to complete...")
+        let startTime = CFAbsoluteTimeGetCurrent()
         injectionSemaphore.wait()
         injectionSemaphore.signal()
-        debugCallback?("    → Previous injection complete, proceeding")
+        let waitTimeMs = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        if waitTimeMs > 0.5 {
+            debugCallback?("    → Waited \(String(format: "%.1f", waitTimeMs))ms for previous injection")
+        }
     }
     
     /// Begin injection (call at start of injection)

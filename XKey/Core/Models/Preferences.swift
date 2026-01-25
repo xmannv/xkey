@@ -60,6 +60,7 @@ struct Preferences: Codable {
     
     // Debug settings
     var debugModeEnabled: Bool = false           // Show debug window (even in production)
+    var debugHotkey: Hotkey = Hotkey(keyCode: 0x02, modifiers: [.command, .option])  // Default: Cmd+Option+D
     
     // IMKit settings (experimental)
     var imkitUseMarkedText: Bool = false         // Show underline when composing (IMKit mode)
@@ -72,6 +73,13 @@ struct Preferences: Codable {
     
     // Excluded apps - apps where Vietnamese input is disabled
     var excludedApps: [ExcludedApp] = []
+    
+    // Translation settings
+    var translationEnabled: Bool = false         // Enable translation feature
+    var translationHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .shift])  // Default: Cmd+Shift+T
+    var translationSourceLanguage: TranslationLanguage = .auto
+    var translationTargetLanguage: TranslationLanguage = .vietnamese
+    var translationReplaceOriginal: Bool = true  // Replace selected text with translation
 }
 
 // MARK: - Excluded App Model

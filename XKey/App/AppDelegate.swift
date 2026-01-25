@@ -304,6 +304,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup convert tool hotkey
         setupConvertToolHotkey()
 
+        // Setup translation hotkey
+        setupTranslationHotkey()
+
+        // Setup debug hotkey
+        setupDebugHotkey()
+
         // Setup Sparkle auto-update
         setupSparkleUpdater()
 
@@ -406,6 +412,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
                 self?.keyboardHandler?.verboseEngineLogging = isVerbose
                 self?.debugWindowController?.logEvent(isVerbose ? "Verbose engine logging ENABLED (may cause lag)" : "Verbose engine logging DISABLED")
+            }
+            
+            // Trigger callback immediately with current value to sync initial state
+            // (didSet is not called during property initialization)
+            if let controller = debugWindowController, controller.isVerboseLogging {
+                keyboardHandler?.verboseEngineLogging = true
+                debugWindowController?.logEvent("Verbose engine logging ENABLED (initial state)")
             }
             
             // Setup window close callback - disable debug mode when window is closed via Close button
@@ -717,6 +730,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
                     self?.keyboardHandler?.verboseEngineLogging = isVerbose
                     self?.debugWindowController?.logEvent(isVerbose ? "Verbose engine logging ENABLED (may cause lag)" : "Verbose engine logging DISABLED")
+                }
+                
+                // Trigger callback immediately with current value to sync initial state
+                // (didSet is not called during property initialization)
+                if let controller = debugWindowController, controller.isVerboseLogging {
+                    keyboardHandler?.verboseEngineLogging = true
+                    debugWindowController?.logEvent("Verbose engine logging ENABLED (initial state)")
                 }
                 // Setup window close callback - disable debug mode when window is closed via Close button
                 debugWindowController?.onWindowClose = { [weak self] in
@@ -2158,6 +2178,166 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         debugWindowController?.logEvent("Convert tool hotkey set: \(hotkey.displayString)")
+    }
+
+    // MARK: - Translation Hotkey
+
+    private func setupTranslationHotkey() {
+        // Connect TranslationService logging to Debug Window
+        TranslationService.shared.logCallback = { [weak self] message in
+            self?.debugWindowController?.logEvent(message)
+        }
+        
+        // Setup notification observer for hotkey/settings changes
+        NotificationCenter.default.addObserver(
+            forName: .translationSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateTranslationHotkey()
+        }
+
+        // Initial setup
+        updateTranslationHotkey()
+    }
+
+    private func updateTranslationHotkey() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        
+        // Check if translation is enabled
+        guard preferences.translationEnabled else {
+            eventTapManager?.translationHotkey = nil
+            eventTapManager?.onTranslationHotkey = nil
+            debugWindowController?.logEvent("Translation hotkey disabled (feature off)")
+            return
+        }
+
+        let hotkey = preferences.translationHotkey
+
+        // If no keycode, disable hotkey
+        guard hotkey.keyCode != 0 else {
+            eventTapManager?.translationHotkey = nil
+            eventTapManager?.onTranslationHotkey = nil
+            debugWindowController?.logEvent("Translation hotkey disabled (no key set)")
+            return
+        }
+
+        // Configure EventTapManager to handle translation hotkey
+        eventTapManager?.translationHotkey = hotkey
+        eventTapManager?.onTranslationHotkey = { [weak self] in
+            self?.performTranslation()
+        }
+
+        debugWindowController?.logEvent("Translation hotkey set: \(hotkey.displayString)")
+    }
+
+    /// Perform translation on selected text or full input value
+    private func performTranslation() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        let service = TranslationService.shared
+        
+        debugWindowController?.logEvent("Translation triggered via hotkey")
+        
+        // Get selected text or full value via AX
+        guard let textToTranslate = service.getSelectedText(), !textToTranslate.isEmpty else {
+            debugWindowController?.logEvent("   No text to translate")
+            // Show notification to user
+            showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
+            return
+        }
+        
+        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\"")
+        
+        // Perform translation asynchronously
+        Task {
+            do {
+                let result = try await service.translate(
+                    text: textToTranslate,
+                    from: preferences.translationSourceLanguage,
+                    to: preferences.translationTargetLanguage
+                )
+                
+                await MainActor.run {
+                    // Preserve case pattern from original text
+                    let finalText = service.preserveCase(original: textToTranslate, translated: result.translatedText)
+                    debugWindowController?.logEvent("   Translated: \"\(result.translatedText.prefix(50))...\"")
+                    debugWindowController?.logEvent("   Case preserved: \"\(finalText.prefix(50))...\"")
+                    
+                    if preferences.translationReplaceOriginal {
+                        // Replace selected text with translation
+                        if service.replaceSelectedText(with: finalText) {
+                            debugWindowController?.logEvent("   Replaced original text")
+                        } else {
+                            // Fallback: copy to clipboard
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(finalText, forType: .string)
+                            debugWindowController?.logEvent("   Could not replace, copied to clipboard")
+                            showTranslationNotification(message: "Đã copy bản dịch vào clipboard")
+                        }
+                    } else {
+                        // Copy to clipboard
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(finalText, forType: .string)
+                        debugWindowController?.logEvent("   Copied to clipboard")
+                        showTranslationNotification(message: "Đã copy bản dịch vào clipboard")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    debugWindowController?.logEvent("   Translation failed: \(error.localizedDescription)")
+                    showTranslationNotification(message: "Lỗi dịch: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    /// Show a brief notification to user about translation result
+    private func showTranslationNotification(message: String) {
+        // Use NSUserNotification or a simple overlay
+        // For now, just use status bar tooltip update
+        DispatchQueue.main.async {
+            // Simple approach: update status bar tooltip temporarily
+            // Could be enhanced with proper notification banner
+            print("[Translation] \(message)")
+        }
+    }
+
+    // MARK: - Debug Hotkey
+
+    private func setupDebugHotkey() {
+        // Setup notification observer for hotkey/settings changes
+        NotificationCenter.default.addObserver(
+            forName: .debugSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateDebugHotkey()
+        }
+
+        // Initial setup
+        updateDebugHotkey()
+    }
+
+    private func updateDebugHotkey() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        let hotkey = preferences.debugHotkey
+
+        // If no keycode, disable hotkey
+        guard hotkey.keyCode != 0 else {
+            eventTapManager?.debugHotkey = nil
+            eventTapManager?.onDebugHotkey = nil
+            debugWindowController?.logEvent("Debug hotkey disabled (no key set)")
+            return
+        }
+
+        // Configure EventTapManager to handle debug hotkey
+        eventTapManager?.debugHotkey = hotkey
+        eventTapManager?.onDebugHotkey = { [weak self] in
+            self?.toggleDebugWindowFromMenu()
+            self?.debugWindowController?.logEvent("Debug mode toggled via hotkey (\(hotkey.displayString))")
+        }
+
+        debugWindowController?.logEvent("Debug hotkey set: \(hotkey.displayString)")
     }
 }
 

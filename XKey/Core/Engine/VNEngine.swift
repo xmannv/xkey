@@ -306,7 +306,8 @@ class VNEngine {
     // MARK: - Delete Handling
     
     private func handleDelete() {
-        logCallback?("handleDelete: index=\(index), spaceCount=\(spaceCount), specialChar.count=\(specialChar.count)")
+        let currentWord = index > 0 ? getCurrentWord() : "(empty)"
+        logCallback?("handleDelete: index=\(index), spaceCount=\(spaceCount), specialChar.count=\(specialChar.count), buffer='\(currentWord)'")
         
         hookState.code = UInt8(vDoNothing)
         hookState.extCode = 2 // delete
@@ -322,7 +323,7 @@ class VNEngine {
             spaceCount -= 1
             logCallback?("  → Removed space, remaining spaceCount=\(spaceCount)")
             if spaceCount == 0 {
-                logCallback?("  → spaceCount=0, restoring...")
+                logCallback?("  → spaceCount=0, will restore previous word...")
                 restoreLastTypingState()
             }
         } else {
