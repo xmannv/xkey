@@ -61,6 +61,7 @@ enum SharedSettingsKey: String {
     case debugModeEnabled = "XKey.debugModeEnabled"
     case debugHotkeyCode = "XKey.debugHotkeyCode"
     case debugHotkeyModifiers = "XKey.debugHotkeyModifiers"
+    case openDebugOnLaunch = "XKey.openDebugOnLaunch"
 
     // IMKit settings
     case imkitUseMarkedText = "XKey.imkitUseMarkedText"
@@ -95,6 +96,7 @@ enum SharedSettingsKey: String {
     case translationSourceLanguage = "XKey.translationSourceLanguage"
     case translationTargetLanguage = "XKey.translationTargetLanguage"
     case translationReplaceOriginal = "XKey.translationReplaceOriginal"
+    case translationToolbarEnabled = "XKey.translationToolbarEnabled"
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -503,6 +505,12 @@ class SharedSettings {
         }
     }
 
+    /// Open debug window automatically when app launches
+    var openDebugOnLaunch: Bool {
+        get { readBool(forKey: SharedSettingsKey.openDebugOnLaunch.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.openDebugOnLaunch.rawValue) }
+    }
+
     /// Notify that debug settings have changed
     private func notifyDebugSettingsChanged() {
         guard !isBatchUpdating else { return }
@@ -593,6 +601,32 @@ class SharedSettings {
     var translationReplaceOriginal: Bool {
         get { readBool(forKey: SharedSettingsKey.translationReplaceOriginal.rawValue) }
         set { writeBool(newValue, forKey: SharedSettingsKey.translationReplaceOriginal.rawValue) }
+    }
+
+    var translationToolbarEnabled: Bool {
+        get {
+            // Default is true (as defined in Preferences.swift)
+            let value = readBool(forKey: SharedSettingsKey.translationToolbarEnabled.rawValue)
+            // Check if key exists in plist - if not, return true (default)
+            let dict = readPlistDict()
+            if dict[SharedSettingsKey.translationToolbarEnabled.rawValue] == nil {
+                return true
+            }
+            return value
+        }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.translationToolbarEnabled.rawValue)
+            notifyTranslationToolbarSettingsChanged()
+        }
+    }
+
+    /// Notify that translation toolbar settings have changed
+    private func notifyTranslationToolbarSettingsChanged() {
+        guard !isBatchUpdating else { return }
+        NotificationCenter.default.post(
+            name: .translationToolbarSettingsDidChange,
+            object: nil
+        )
     }
 
     /// Notify that translation settings have changed
@@ -955,9 +989,11 @@ class SharedSettings {
         prefs.translationSourceLanguageCode = translationSourceLanguage
         prefs.translationTargetLanguageCode = translationTargetLanguage
         prefs.translationReplaceOriginal = translationReplaceOriginal
+        prefs.translationToolbarEnabled = translationToolbarEnabled
 
         // Debug settings
         prefs.debugModeEnabled = debugModeEnabled
+        prefs.openDebugOnLaunch = openDebugOnLaunch
         let dbgHotkeyCode = debugHotkeyCode
         let dbgHotkeyModifiers = debugHotkeyModifiers
         if dbgHotkeyCode != 0 || dbgHotkeyModifiers != 0 {
@@ -1032,6 +1068,7 @@ class SharedSettings {
 
         // Debug
         debugModeEnabled = prefs.debugModeEnabled
+        openDebugOnLaunch = prefs.openDebugOnLaunch
 
         // IMKit
         imkitUseMarkedText = prefs.imkitUseMarkedText
@@ -1065,6 +1102,7 @@ class SharedSettings {
         translationSourceLanguage = prefs.translationSourceLanguageCode
         translationTargetLanguage = prefs.translationTargetLanguageCode
         translationReplaceOriginal = prefs.translationReplaceOriginal
+        translationToolbarEnabled = prefs.translationToolbarEnabled
 
         // Batch update is done - settings are already written to plist via setters
         isBatchUpdating = false
@@ -1111,4 +1149,7 @@ extension Notification.Name {
 
     /// Posted when debug settings change
     static let debugSettingsDidChange = Notification.Name("XKey.debugSettingsDidChange")
+    
+    /// Posted when translation toolbar settings change (enabled/disabled)
+    static let translationToolbarSettingsDidChange = Notification.Name("XKey.translationToolbarSettingsDidChange")
 }

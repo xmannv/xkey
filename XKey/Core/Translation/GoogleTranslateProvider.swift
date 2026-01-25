@@ -28,17 +28,9 @@ class GoogleTranslateProvider: TranslationProvider {
     
     // MARK: - Private Properties
     
-    private let session: URLSession
+    /// Use shared session to reduce memory footprint
+    private var session: URLSession { TranslationNetworkManager.shared.session }
     private let baseURL = "https://translate.googleapis.com/translate_a/single"
-    
-    // MARK: - Initialization
-    
-    init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 10
-        config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config)
-    }
     
     // MARK: - Translation
     

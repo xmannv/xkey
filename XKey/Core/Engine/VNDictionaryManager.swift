@@ -188,10 +188,40 @@ class VNDictionaryManager {
         }
         return stats
     }
+    
+    /// Estimate memory usage of loaded dictionaries in bytes
+    /// Each Vietnamese word averages ~10 characters × 2 bytes (UTF-16) + Set overhead
+    func getEstimatedMemoryUsage() -> Int {
+        var totalBytes = 0
+        for (_, wordSet) in wordSets {
+            // Estimate: average word length × 2 bytes (UTF-16) + 24 bytes overhead per word
+            let avgWordLength = 10
+            let bytesPerWord = avgWordLength * 2 + 24  // UTF-16 + String/Set overhead
+            totalBytes += wordSet.count * bytesPerWord
+        }
+        return totalBytes
+    }
+    
+    /// Human-readable memory usage string
+    func getMemoryUsageString() -> String {
+        let bytes = getEstimatedMemoryUsage()
+        if bytes == 0 {
+            return "0 KB"
+        } else if bytes < 1024 * 1024 {
+            return String(format: "%.1f KB", Double(bytes) / 1024)
+        } else {
+            return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
+        }
+    }
 
     /// Clear loaded dictionaries from memory
     func clearCache() {
-        wordSets.removeAll()
+        if !wordSets.isEmpty {
+            let memoryBefore = getMemoryUsageString()
+            let wordCount = wordSets.values.reduce(0) { $0 + $1.count }
+            wordSets.removeAll()
+            DebugLogger.shared.log("[VNDict] Cleared dictionary cache: \(wordCount) words, freed ~\(memoryBefore)")
+        }
     }
 
     /// Delete local dictionary files

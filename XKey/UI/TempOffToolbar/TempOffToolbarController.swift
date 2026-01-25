@@ -18,7 +18,19 @@ class TempOffToolbarController {
     // MARK: - Properties
 
     private var panel: NSPanel?
-    private let viewModel = TempOffToolbarViewModel()
+    
+    /// Lazy-initialized ViewModel - only created when toolbar is first shown
+    /// This saves memory when the TempOff toolbar feature is disabled
+    private var _viewModel: TempOffToolbarViewModel?
+    private var viewModel: TempOffToolbarViewModel {
+        if _viewModel == nil {
+            let vm = TempOffToolbarViewModel()
+            setupCallbacks(for: vm)
+            _viewModel = vm
+        }
+        return _viewModel!
+    }
+    
     private var hideTimer: Timer?
     private var modifierMonitor: Any?  // Monitor for Ctrl/Option key
 
@@ -35,15 +47,15 @@ class TempOffToolbarController {
     // MARK: - Initialization
 
     private init() {
-        setupCallbacks()
+        // Lazy initialization - ViewModel and callbacks will be setup when first accessed
     }
 
-    private func setupCallbacks() {
-        viewModel.onSpellingToggle = { [weak self] isOff in
+    private func setupCallbacks(for vm: TempOffToolbarViewModel) {
+        vm.onSpellingToggle = { [weak self] isOff in
             self?.notifyStateChange()
         }
 
-        viewModel.onEngineToggle = { [weak self] isOff in
+        vm.onEngineToggle = { [weak self] isOff in
             self?.notifyStateChange()
         }
     }
@@ -87,12 +99,8 @@ class TempOffToolbarController {
     // MARK: - Show/Hide
 
     /// Show the toolbar at the current cursor position
+    /// Uses mouse position as fallback if caret position not available
     func show() {
-        // Save mouse position immediately for fallback
-        // This captures the position at the moment show() is called,
-        // which is likely close to where user clicked/focused
-        savedMousePosition = NSEvent.mouseLocation
-        
         // Create panel if needed
         if panel == nil {
             panel = createPanel()
@@ -290,6 +298,8 @@ class TempOffToolbarController {
 
     // MARK: - Positioning
 
+    /// Position toolbar near cursor/caret
+    /// Uses mouse position as fallback if caret position not available
     private func positionNearCursor() {
         guard let panel = panel else { return }
 
@@ -297,9 +307,8 @@ class TempOffToolbarController {
         if let cursorRect = getCursorRectFromAccessibility() {
             positionPanel(panel, relativeTo: cursorRect, isCursorRect: true)
         } else {
-            // Fallback: position near saved mouse position
-            let mouseLocation = savedMousePosition ?? NSEvent.mouseLocation
-
+            // Fallback: position near mouse position
+            let mouseLocation = NSEvent.mouseLocation
             let mouseRect = NSRect(x: mouseLocation.x, y: mouseLocation.y, width: 1, height: 20)
             positionPanel(panel, relativeTo: mouseRect, isCursorRect: false)
         }

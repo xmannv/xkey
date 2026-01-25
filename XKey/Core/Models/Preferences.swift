@@ -61,6 +61,7 @@ struct Preferences: Codable {
     // Debug settings
     var debugModeEnabled: Bool = false           // Show debug window (even in production)
     var debugHotkey: Hotkey = Hotkey(keyCode: 0x02, modifiers: [.command, .option])  // Default: Cmd+Option+D
+    var openDebugOnLaunch: Bool = false          // Open debug window when app starts
     
     // IMKit settings (experimental)
     var imkitUseMarkedText: Bool = false         // Show underline when composing (IMKit mode)
@@ -80,6 +81,7 @@ struct Preferences: Codable {
     var translationSourceLanguageCode: String = "auto"     // ISO 639-1 code
     var translationTargetLanguageCode: String = "vi"       // ISO 639-1 code
     var translationReplaceOriginal: Bool = true  // Replace selected text with translation
+    var translationToolbarEnabled: Bool = true   // Show floating toolbar for quick language selection
     
     /// Get source language as TranslationLanguage object
     var translationSourceLanguage: TranslationLanguage {

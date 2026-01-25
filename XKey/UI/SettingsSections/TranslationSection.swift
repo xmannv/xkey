@@ -156,6 +156,19 @@ struct TranslationSection: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+                            
+                            Divider()
+                                .padding(.vertical, 4)
+                            
+                            Toggle("Hiển thị thanh công cụ dịch thuật", isOn: $viewModel.preferences.translationToolbarEnabled)
+                                .onChange(of: viewModel.preferences.translationToolbarEnabled) { _ in
+                                    viewModel.save()
+                                    NotificationCenter.default.post(name: .translationToolbarSettingsDidChange, object: nil)
+                                }
+                            
+                            Text("Khi focus vào ô nhập liệu, thanh công cụ nhỏ sẽ hiện ra cho phép bạn đổi ngôn ngữ nguồn/đích nhanh chóng mà không cần mở Thiết lập.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
                     
@@ -347,24 +360,28 @@ private struct ProviderRow: View {
 
 @MainActor
 class TranslationSectionViewModel: ObservableObject {
-    @Published var providers: [TranslationProvider] = []
     @Published var testText: String = ""
     @Published var testResult: String?
     @Published var testError: String?
     @Published var isTranslating: Bool = false
     
-    private let service = TranslationService.shared
+    /// Provider list - only computed when accessed to defer memory allocation
+    /// This prevents TranslationService.shared from being initialized when Settings opens
+    var providers: [TranslationProvider] {
+        return TranslationService.shared.sortedProviders
+    }
     
     init() {
-        providers = service.sortedProviders
+        // Do not access TranslationService.shared here!
+        // Providers will be loaded lazily when the view section is displayed
     }
     
     func isProviderEnabled(_ id: String) -> Bool {
-        return service.isProviderEnabled(id)
+        return TranslationService.shared.isProviderEnabled(id)
     }
     
     func setProviderEnabled(_ id: String, enabled: Bool) {
-        service.setProviderEnabled(id, enabled: enabled)
+        TranslationService.shared.setProviderEnabled(id, enabled: enabled)
         objectWillChange.send()
     }
     
@@ -377,7 +394,7 @@ class TranslationSectionViewModel: ObservableObject {
         
         Task {
             do {
-                let result = try await service.translate(
+                let result = try await TranslationService.shared.translate(
                     text: testText,
                     from: sourceCode,
                     to: targetCode

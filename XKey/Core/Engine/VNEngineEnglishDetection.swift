@@ -966,9 +966,25 @@ extension VNEngine {
         return result
     }
 
-    /// Get raw input keys as a String (original ASCII)
-    func getRawInputString() -> String {
-        buffer.getRawInputString { keyCode in
+    /// Get raw input keys as a String for ENGLISH DETECTION purposes
+    /// This EXCLUDES overflow entries to avoid false positives after restore.
+    ///
+    /// Problem: After restoreLastTypingState(), overflow may contain old word data.
+    /// When user types new characters, getRawInputString() returns overflow + entries,
+    /// which can cause false English pattern detection.
+    ///
+    /// Example scenario:
+    /// 1. User types "thật" + space → saved to history
+    /// 2. User types "lo", then backspaces to empty → restore "thật" into buffer
+    /// 3. Buffer: overflow=['t'], entries=['h','ậ','t'] (simplified)
+    /// 4. User types 'l' → entries now has 'l' at some position
+    /// 5. getRawInputString() = "t..." + "l" → may detect "tl" as English pattern!
+    /// 6. User cannot type Vietnamese anymore due to false detection
+    ///
+    /// Solution: For English detection, only check entries (current typing),
+    /// not overflow (old data from restored words).
+    func getRawInputStringForEnglishDetection() -> String {
+        buffer.getRawInputStringFromEntries { keyCode in
             Self.keyCodeToChar(keyCode)
         }
     }

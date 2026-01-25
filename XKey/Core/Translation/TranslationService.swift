@@ -18,11 +18,49 @@ class TranslationService {
     
     // MARK: - Properties
     
-    /// All available providers
-    private(set) var providers: [TranslationProvider] = []
+    /// All available providers - lazily initialized to reduce memory footprint
+    private(set) lazy var providers: [TranslationProvider] = {
+        // Create providers only when first accessed
+        let providerList: [TranslationProvider] = [
+            GoogleTranslateProvider(),
+            TencentTransmartProvider(),
+            VolcanoEngineProvider()
+        ]
+        
+        // Setup default configs for each provider
+        for (index, provider) in providerList.enumerated() {
+            if self._providerConfigs[provider.id] == nil {
+                self._providerConfigs[provider.id] = TranslationProviderConfig(
+                    id: provider.id,
+                    isEnabled: provider.isEnabled,
+                    priority: index
+                )
+            }
+            log("Registered translation provider: \(provider.name)")
+        }
+        
+        return providerList
+    }()
     
-    /// Provider configurations (for enable/disable state)
-    private var providerConfigs: [String: TranslationProviderConfig] = [:]
+    /// Provider configurations storage (for enable/disable state)
+    private var _providerConfigs: [String: TranslationProviderConfig] = [:]
+    
+    /// Provider configurations accessor
+    private var providerConfigs: [String: TranslationProviderConfig] {
+        get {
+            // Ensure configs are loaded
+            if !_configsLoaded {
+                loadProviderConfigs()
+            }
+            return _providerConfigs
+        }
+        set {
+            _providerConfigs = newValue
+        }
+    }
+    
+    /// Whether configs have been loaded from UserDefaults
+    private var _configsLoaded = false
     
     /// Callback for logging (optional)
     var logCallback: ((String) -> Void)?
@@ -30,13 +68,8 @@ class TranslationService {
     // MARK: - Initialization
     
     private init() {
-        // Register default providers (only working free providers)
-        registerProvider(GoogleTranslateProvider())
-        registerProvider(TencentTransmartProvider())
-        registerProvider(VolcanoEngineProvider())
-        
-        // Load saved configurations
-        loadProviderConfigs()
+        // Lazy initialization - providers will be created when first accessed
+        // This saves ~20-30MB of memory until translation is actually needed
     }
     
     // MARK: - Provider Management
@@ -151,16 +184,43 @@ class TranslationService {
     
     // MARK: - AX Text Reading
     
+    /// Source of the retrieved text
+    enum TextSource {
+        case selection       // Text was selected by user
+        case clipboard       // Text was copied via Cmd+C
+        case fullValue       // Entire text field value (no selection)
+    }
+    
+    /// Result of text retrieval including source information
+    struct TextRetrievalResult {
+        let text: String
+        let source: TextSource
+        
+        /// Whether to use select-all before paste when replacing
+        var needsSelectAllForReplace: Bool {
+            return source == .fullValue
+        }
+    }
+    
     /// Read selected text from the focused application using Accessibility API
     /// Falls back to Cmd+C (copy) if AX fails
     func getSelectedText() -> String? {
+        return getSelectedTextWithSource()?.text
+    }
+    
+    /// Read selected text with source information
+    /// Returns both the text and how it was retrieved
+    func getSelectedTextWithSource() -> TextRetrievalResult? {
         let systemWide = AXUIElementCreateSystemWide()
         
         var focusedElement: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success,
               let element = focusedElement else {
             log("Cannot get focused element, trying clipboard fallback")
-            return getTextViaClipboard()
+            if let text = getTextViaClipboard() {
+                return TextRetrievalResult(text: text, source: .clipboard)
+            }
+            return nil
         }
         
         let axElement = element as! AXUIElement
@@ -171,13 +231,13 @@ class TranslationService {
            let selectedText = selectedTextValue as? String,
            !selectedText.isEmpty {
             log("Got selected text via AX: '\(selectedText.prefix(50))...'")
-            return selectedText
+            return TextRetrievalResult(text: selectedText, source: .selection)
         }
         
         // If no selection via AX, try clipboard fallback (Cmd+C)
         log("No AX selection, trying clipboard fallback")
         if let text = getTextViaClipboard() {
-            return text
+            return TextRetrievalResult(text: text, source: .clipboard)
         }
         
         // Last resort: get entire value (for text fields/areas)
@@ -186,7 +246,7 @@ class TranslationService {
            let fullText = valueRef as? String,
            !fullText.isEmpty {
             log("Got full text value: '\(fullText.prefix(50))...'")
-            return fullText
+            return TextRetrievalResult(text: fullText, source: .fullValue)
         }
         
         log("No text found in focused element")
@@ -285,7 +345,10 @@ class TranslationService {
     /// Replace selected text with translated text
     /// Uses clipboard + Cmd+V for maximum compatibility across all apps
     /// Note: AX methods return success but don't actually work for Chrome/Electron DOM-based inputs
-    func replaceSelectedText(with newText: String) -> Bool {
+    /// - Parameters:
+    ///   - newText: The text to replace with
+    ///   - selectAllBeforePaste: If true, performs Cmd+A before paste (for full text replacement)
+    func replaceSelectedText(with newText: String, selectAllBeforePaste: Bool = false) -> Bool {
         let systemWide = AXUIElementCreateSystemWide()
         
         var focusedElement: CFTypeRef?
@@ -307,7 +370,7 @@ class TranslationService {
         
         // Get frontmost app bundle ID
         let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "Unknown"
-        log("Replacing text in \(bundleId), role: \(role)")
+        log("Replacing text in \(bundleId), role: \(role), selectAll: \(selectAllBeforePaste)")
         
         // Check if there's a selection
         var selectedRangeValue: CFTypeRef?
@@ -318,6 +381,12 @@ class TranslationService {
                 hasSelection = range.length > 0
                 log("Selection range: location=\(range.location), length=\(range.length)")
             }
+        }
+        
+        // If selectAllBeforePaste is requested, skip AX method and go straight to clipboard
+        if selectAllBeforePaste {
+            log("Using select all + clipboard paste method")
+            return replaceViaClipboardPaste(newText, selectAllFirst: true)
         }
         
         // UNIVERSAL APPROACH: Try AX first, then verify, then fallback
@@ -355,11 +424,14 @@ class TranslationService {
         
         // Fallback: Use clipboard + paste (most reliable)
         log("Using clipboard + paste method")
-        return replaceViaClipboardPaste(newText)
+        return replaceViaClipboardPaste(newText, selectAllFirst: false)
     }
     
     /// Replace text using clipboard and Cmd+V paste
-    private func replaceViaClipboardPaste(_ text: String) -> Bool {
+    /// - Parameters:
+    ///   - text: The text to paste
+    ///   - selectAllFirst: If true, performs Cmd+A before paste to select all text
+    private func replaceViaClipboardPaste(_ text: String, selectAllFirst: Bool) -> Bool {
         // Get frontmost app PID
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
             log("Paste fallback: no frontmost app")
@@ -375,8 +447,28 @@ class TranslationService {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         
-        // Simulate Cmd+V - use combinedSessionState for better compatibility
+        // Use combinedSessionState for better compatibility
         let source = CGEventSource(stateID: .combinedSessionState)
+        
+        // If selectAllFirst is true, perform Cmd+A first
+        if selectAllFirst {
+            guard let selectAllDown = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: true),
+                  let selectAllUp = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: false) else {
+                log("Failed to create Cmd+A event")
+                return false
+            }
+            
+            selectAllDown.flags = .maskCommand
+            selectAllUp.flags = .maskCommand
+            
+            selectAllDown.postToPid(pid)
+            selectAllUp.postToPid(pid)
+            
+            log("Cmd+A (select all) posted to PID \(pid)")
+            
+            // Small delay to let select all complete
+            Thread.sleep(forTimeInterval: 0.05)
+        }
         
         // Key down V with Command
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) else {
@@ -412,15 +504,18 @@ class TranslationService {
     // MARK: - Persistence
     
     private func loadProviderConfigs() {
+        guard !_configsLoaded else { return }
+        _configsLoaded = true
+        
         if let data = UserDefaults.standard.data(forKey: "TranslationProviderConfigs"),
            let configs = try? JSONDecoder().decode([TranslationProviderConfig].self, from: data) {
-            providerConfigs = Dictionary(uniqueKeysWithValues: configs.map { ($0.id, $0) })
+            _providerConfigs = Dictionary(uniqueKeysWithValues: configs.map { ($0.id, $0) })
             log("Loaded \(configs.count) provider configs")
         }
     }
     
     private func saveProviderConfigs() {
-        let configs = Array(providerConfigs.values)
+        let configs = Array(_providerConfigs.values)
         if let data = try? JSONEncoder().encode(configs) {
             UserDefaults.standard.set(data, forKey: "TranslationProviderConfigs")
         }

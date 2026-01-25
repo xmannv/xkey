@@ -437,12 +437,35 @@ final class TypingBuffer {
     }
 
     /// Get raw input as string (ASCII without Vietnamese transforms)
+    /// NOTE: This includes overflow entries - use getRawInputStringFromEntries() for English detection
     func getRawInputString(using keyCodeToChar: (UInt16) -> Character?) -> String {
         var result = ""
         for keystroke in getAllRawKeystrokes() {
             if let char = keyCodeToChar(keystroke.keyCode) {
                 let finalChar = keystroke.isCaps ? Character(String(char).uppercased()) : char
                 result.append(finalChar)
+            }
+        }
+        return result
+    }
+
+    /// Get raw input as string from ENTRIES ONLY (excludes overflow)
+    /// Use this for English pattern detection to avoid false positives from restored overflow data
+    ///
+    /// Problem: After restore, overflow may contain old word data. When user types new characters,
+    /// getRawInputString() returns overflow + entries, which can cause false English pattern detection.
+    /// Example: overflow=['t'], entries=['l','o'] → getRawInputString()="tlo" → "tl" detected as English!
+    ///
+    /// Solution: For English detection, only check entries (what user is currently typing),
+    /// not overflow (old data from previous words).
+    func getRawInputStringFromEntries(using keyCodeToChar: (UInt16) -> Character?) -> String {
+        var result = ""
+        for entry in entries {
+            for keystroke in entry.allKeystrokes {
+                if let char = keyCodeToChar(keystroke.keyCode) {
+                    let finalChar = keystroke.isCaps ? Character(String(char).uppercased()) : char
+                    result.append(finalChar)
+                }
             }
         }
         return result
@@ -564,18 +587,43 @@ struct BufferSnapshot: Equatable {
 /// Manages the history of typed words for restore functionality
 final class TypingHistory {
 
+    // MARK: - Configuration
+    
+    /// Maximum number of snapshots to keep in history
+    /// This prevents unbounded memory growth for long typing sessions
+    /// Default: 10 words (typical Vietnamese words)
+    private let maxSnapshots: Int
+    
+    // MARK: - Storage
+    
     private var snapshots: [BufferSnapshot] = []
 
+    // MARK: - Initialization
+    
+    init(maxSnapshots: Int = 10) {
+        self.maxSnapshots = maxSnapshots
+    }
+    
+    // MARK: - Properties
+    
     /// Number of saved words
     var count: Int { snapshots.count }
 
     /// Whether history is empty
     var isEmpty: Bool { snapshots.isEmpty }
+    
+    /// Current capacity limit
+    var capacity: Int { maxSnapshots }
 
+    // MARK: - Save Operations
+    
     /// Save current buffer state
     func save(_ snapshot: BufferSnapshot) {
         guard !snapshot.entries.isEmpty else { return }
         snapshots.append(snapshot)
+        
+        // Auto-trim if exceeds limit
+        trimIfNeeded()
     }
 
     /// Save a space word
@@ -585,7 +633,12 @@ final class TypingHistory {
             entries.append(CharacterEntry(keyCode: keyCode, isCaps: false))
         }
         snapshots.append(BufferSnapshot(entries: entries, overflow: []))
+        
+        // Auto-trim if exceeds limit
+        trimIfNeeded()
     }
+    
+    // MARK: - Retrieve Operations
 
     /// Pop and return the last saved snapshot
     @discardableResult
@@ -602,4 +655,36 @@ final class TypingHistory {
     func clear() {
         snapshots.removeAll()
     }
+    
+    // MARK: - Memory Management
+    
+    /// Trim history to stay within limit
+    /// Called automatically on save, but can be called manually
+    func trimIfNeeded() {
+        if snapshots.count > maxSnapshots {
+            let excess = snapshots.count - maxSnapshots
+            snapshots.removeFirst(excess)
+        }
+    }
+    
+    /// Manually trim to a specific count
+    func trimTo(count targetCount: Int) {
+        guard targetCount >= 0 && targetCount < snapshots.count else { return }
+        let excess = snapshots.count - targetCount
+        snapshots.removeFirst(excess)
+    }
+    
+    /// Get estimated memory usage in bytes
+    /// Each snapshot: ~(entries.count * 48) bytes for CharacterEntry structs
+    func estimatedMemoryUsage() -> Int {
+        var totalBytes = 0
+        for snapshot in snapshots {
+            // CharacterEntry: ~48 bytes (RawKeystroke + array + UInt32 + overhead)
+            let entryBytes = snapshot.entries.count * 48
+            let overflowBytes = snapshot.overflow.count * 48
+            totalBytes += entryBytes + overflowBytes + 16  // 16 bytes for BufferSnapshot overhead
+        }
+        return totalBytes
+    }
 }
+

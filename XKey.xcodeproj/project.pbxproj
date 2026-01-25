@@ -53,6 +53,7 @@
 		1097C5E52EF6662500969052 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1097C5E42EF6662500969052 /* Sparkle */; };
 		10A214992ED42DFA005B52BD /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A214972ED42DFA005B52BD /* HotkeyRecorderView.swift */; };
 		10A2149A2ED42DFA005B52BD /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */; };
+		10BEC2BC2F2675B200D6A3C3 /* TranslationNetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */; };
 		10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */; };
 		10F26F0F2ED6CAF900B9FA1F /* ConvertTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */; };
 		10F26F102ED6CAF900B9FA1F /* SmartSwitchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */; };
@@ -112,6 +113,9 @@
 		TEST00019 /* TypingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00020 /* TypingBufferTests.swift */; };
 		TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00022 /* VNEngineBufferIntegrationTests.swift */; };
 		TEST00023 /* TranslationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00024 /* TranslationProviderTests.swift */; };
+		TRANSLATTB001 /* TranslationToolbarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRANSLATTB002 /* TranslationToolbarController.swift */; };
+		TRANSLATTB003 /* TranslationToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRANSLATTB004 /* TranslationToolbarView.swift */; };
+		TRANSLATTB005 /* TranslationToolbarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRANSLATTB006 /* TranslationToolbarViewModel.swift */; };
 		TYPBUF001 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 		TYPBUF003 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 /* End PBXBuildFile section */
@@ -154,6 +158,7 @@
 		1095C4DD2EFB02EA00C03826 /* VNEngineSpellCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineSpellCheck.swift; sourceTree = "<group>"; };
 		10A214972ED42DFA005B52BD /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
+		10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationNetworkManager.swift; sourceTree = "<group>"; };
 		10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLoadingOverlay.swift; sourceTree = "<group>"; };
 		10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertTool.swift; sourceTree = "<group>"; };
 		10F26F0B2ED6CAF900B9FA1F /* MacroManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManager.swift; sourceTree = "<group>"; };
@@ -215,6 +220,9 @@
 		TEST00020 /* TypingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBufferTests.swift; sourceTree = "<group>"; };
 		TEST00022 /* VNEngineBufferIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineBufferIntegrationTests.swift; sourceTree = "<group>"; };
 		TEST00024 /* TranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderTests.swift; sourceTree = "<group>"; };
+		TRANSLATTB002 /* TranslationToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarController.swift; sourceTree = "<group>"; };
+		TRANSLATTB004 /* TranslationToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarView.swift; sourceTree = "<group>"; };
+		TRANSLATTB006 /* TranslationToolbarViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarViewModel.swift; sourceTree = "<group>"; };
 		TYPBUF002 /* TypingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBuffer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -284,6 +292,7 @@
 		102986B12F252F5700B4DEEE /* Translation */ = {
 			isa = PBXGroup;
 			children = (
+				10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */,
 				10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */,
 				102986AE2F252F5700B4DEEE /* GoogleTranslateProvider.swift */,
 				102986AF2F252F5700B4DEEE /* TranslationProvider.swift */,
@@ -407,6 +416,7 @@
 				0D7A4B3BFC35CF0327897BFD /* SettingsSections */,
 				1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */,
 				53FD9B0D641FE6019C3870E0 /* TempOffToolbar */,
+				TRANSLATTB007 /* TranslationToolbar */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -455,6 +465,16 @@
 				TEST00024 /* TranslationProviderTests.swift */,
 			);
 			path = XKeyTests;
+			sourceTree = "<group>";
+		};
+		TRANSLATTB007 /* TranslationToolbar */ = {
+			isa = PBXGroup;
+			children = (
+				TRANSLATTB002 /* TranslationToolbarController.swift */,
+				TRANSLATTB004 /* TranslationToolbarView.swift */,
+				TRANSLATTB006 /* TranslationToolbarViewModel.swift */,
+			);
+			path = TranslationToolbar;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -672,6 +692,7 @@
 				100D2BE62EF2C72600C26B87 /* SharedSettings.swift in Sources */,
 				F97414DA17E4F78264530EF0 /* KeyCodeToCharacter.swift in Sources */,
 				795D22D182670DD83BDECF21 /* XKey/UI/WindowTitleRulesView.swift in Sources */,
+				10BEC2BC2F2675B200D6A3C3 /* TranslationNetworkManager.swift in Sources */,
 				0B6000E78A4C06F6DCE7780B /* DebugLogger.swift in Sources */,
 				ECDC6B719E71FFE4F91DC588 /* GeneralSection.swift in Sources */,
 				CEBF55C134CDBDA34B5E84A8 /* QuickTypingSection.swift in Sources */,
@@ -698,6 +719,9 @@
 				102986B52F25400000B4DEEE /* TencentTransmartProvider.swift in Sources */,
 				102986B92F25400000B4DEEE /* VolcanoEngineProvider.swift in Sources */,
 				TYPBUF001 /* TypingBuffer.swift in Sources */,
+				TRANSLATTB001 /* TranslationToolbarController.swift in Sources */,
+				TRANSLATTB003 /* TranslationToolbarView.swift in Sources */,
+				TRANSLATTB005 /* TranslationToolbarViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

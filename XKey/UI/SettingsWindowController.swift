@@ -9,10 +9,13 @@ import Cocoa
 import SwiftUI
 
 @available(macOS 13.0, *)
-class SettingsWindowController: NSWindowController {
+class SettingsWindowController: NSWindowController, NSWindowDelegate {
     
     private var pinButton: NSButton?
     private var isAlwaysOnTop: Bool = true
+    
+    /// Callback when window is closed - used to nil out reference in AppDelegate
+    var onWindowClosed: (() -> Void)?
 
     convenience init(selectedSection: SettingsSection = .general, onSave: @escaping (Preferences) -> Void) {
         // Create window with modern style
@@ -25,11 +28,15 @@ class SettingsWindowController: NSWindowController {
 
         window.title = "Cài đặt XKey"
         window.titlebarAppearsTransparent = false
-        window.isReleasedWhenClosed = false
+        // Allow window to be released when closed to free memory
+        window.isReleasedWhenClosed = true
         window.level = .floating
         window.center()
 
         self.init(window: window)
+        
+        // Set window delegate to handle close
+        window.delegate = self
 
         // Create SwiftUI view with auto-save callback
         let settingsView = SettingsView(
@@ -44,6 +51,16 @@ class SettingsWindowController: NSWindowController {
         
         // Add pin button to title bar
         setupPinButton()
+    }
+    
+    // MARK: - NSWindowDelegate
+    
+    func windowWillClose(_ notification: Notification) {
+        // Clear content to release SwiftUI views immediately
+        window?.contentViewController = nil
+        
+        // Notify delegate to nil out the reference
+        onWindowClosed?()
     }
     
     // MARK: - Pin Button
@@ -91,3 +108,4 @@ class SettingsWindowController: NSWindowController {
         pinButton?.contentTintColor = isPinned ? .systemBlue : .systemGray
     }
 }
+

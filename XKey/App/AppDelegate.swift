@@ -102,6 +102,26 @@ private struct FocusedElementInfo {
         return false
     }
     
+    /// Check if element has a text caret (insertion point)
+    /// Fallback to isTextInput if kAXSelectedTextRangeAttribute is not supported
+    var hasCaret: Bool {
+        // Try to get selected text range - if this exists, element has a caret
+        var rangeRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success {
+            return rangeRef != nil
+        }
+        
+        // Fallback: if can't check caret, use role-based check
+        // Some apps (e.g., Electron, some web apps) don't support kAXSelectedTextRangeAttribute
+        return isTextInput
+    }
+    
+    /// Check if element is an editable text field with caret
+    /// More strict check: must be text input AND have caret
+    var isEditableTextInput: Bool {
+        return isTextInput && hasCaret
+    }
+    
     /// Create from AXUIElement by querying all needed attributes once
     static func from(_ element: AXUIElement) -> FocusedElementInfo {
         var role: String?
@@ -393,7 +413,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupDebugWindow() {
         // Check if debug mode is enabled in preferences
         let preferences = SharedSettings.shared.loadPreferences()
-        let shouldShowDebug = preferences.debugModeEnabled
+        
+        // Show debug window if:
+        // 1. debugModeEnabled is true (user explicitly enabled debug mode), OR
+        // 2. openDebugOnLaunch is true (user wants to open debug on every launch)
+        let shouldShowDebug = preferences.debugModeEnabled || preferences.openDebugOnLaunch
 
         // Show debug window only if enabled in settings
         if shouldShowDebug {
@@ -494,6 +518,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ForceAccessibilityManager.shared.logCallback = { [weak self] message in
             self?.debugWindowController?.logEvent(message)
         }
+        
+        // IMPORTANT: Sync verboseEngineLogging AFTER keyboardHandler is created
+        // setupDebugWindow() runs before setupKeyboardHandling(), so keyboardHandler is nil
+        // when the verbose logging callback tries to set verboseEngineLogging.
+        // We must sync it here after keyboardHandler exists.
+        if let controller = debugWindowController, controller.isVerboseLogging {
+            keyboardHandler?.verboseEngineLogging = true
+            debugWindowController?.logEvent("Verbose engine logging synced after keyboardHandler creation")
+        }
 
         // Check permission BEFORE trying to start event tap
         // This prevents macOS system dialog from appearing
@@ -570,10 +603,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindowController = nil
         }
         
-        settingsWindowController = SettingsWindowController(selectedSection: selectedSection) { [weak self] preferences in
+        let controller = SettingsWindowController(selectedSection: selectedSection) { [weak self] preferences in
             self?.applyPreferences(preferences)
         }
         
+        // Handle window close to release memory
+        controller.onWindowClosed = { [weak self] in
+            self?.settingsWindowController = nil
+        }
+        
+        settingsWindowController = controller
         settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -585,10 +624,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             preferencesWindowController = nil
         }
         
-        preferencesWindowController = PreferencesWindowController(selectedTab: selectedTab) { [weak self] preferences in
+        let controller = PreferencesWindowController(selectedTab: selectedTab) { [weak self] preferences in
             self?.applyPreferences(preferences)
         }
         
+        // Handle window close to release memory
+        controller.onWindowClosed = { [weak self] in
+            self?.preferencesWindowController = nil
+        }
+        
+        preferencesWindowController = controller
         preferencesWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -655,7 +700,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.excludedApps = preferences.excludedApps
         
         // Apply debug mode (toggle debug window)
-        toggleDebugWindow(enabled: preferences.debugModeEnabled)
+        // Keep debug window open if either debugModeEnabled OR openDebugOnLaunch is true
+        let shouldShowDebug = preferences.debugModeEnabled || preferences.openDebugOnLaunch
+        toggleDebugWindow(enabled: shouldShowDebug)
         
         // Update status bar manager
         statusBarManager?.viewModel.currentInputMethod = preferences.inputMethod
@@ -741,6 +788,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Setup window close callback - disable debug mode when window is closed via Close button
                 debugWindowController?.onWindowClose = { [weak self] in
                     self?.handleDebugWindowClosed()
+                }
+                // Setup memory release callback - nil out reference when window closes
+                debugWindowController?.onWindowClosed = { [weak self] in
+                    self?.debugWindowController = nil
+                    DebugLogger.shared.debugWindowController = nil
                 }
                 debugWindowController?.logEvent("Debug window enabled via settings")
             }
@@ -2060,7 +2112,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Check toolbar display (only if enabled)
         // This ensures toolbar shows/hides when focus changes via keyboard (CMD+T, Tab, etc.)
-        if SharedSettings.shared.tempOffToolbarEnabled {
+        let preferences = SharedSettings.shared.loadPreferences()
+        let shouldShowTempOffToolbar = preferences.tempOffToolbarEnabled
+        let shouldShowTranslationToolbar = preferences.translationEnabled && preferences.translationToolbarEnabled
+        
+        if shouldShowTempOffToolbar || shouldShowTranslationToolbar {
             // Reset lastFocusedElement to force toolbar re-evaluation
             lastFocusedElement = nil
             checkAndShowToolbarForFocusedElement(with: elementInfo)
@@ -2078,28 +2134,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Signature is already computed by FocusedElementInfo, no additional AX calls needed
         let currentSignature = elementInfo.signature
         
+        let preferences = SharedSettings.shared.loadPreferences()
+        let showTempOff = preferences.tempOffToolbarEnabled
+        let showTranslation = preferences.translationEnabled && preferences.translationToolbarEnabled
+        
         // Check if it's the same element as before (using signature)
         if currentSignature == lastFocusedElementSignature && lastFocusedElement != nil {
-            // Same element
-            if TempOffToolbarController.shared.isVisible {
-                // Toolbar visible - just update position
-                TempOffToolbarController.shared.updatePosition()
+            // Same element - update positions if visible, or re-show if hidden (only if has caret)
+            let hasTextCursor = elementInfo.hasCaret
+            
+            if showTempOff {
+                if TempOffToolbarController.shared.isVisible {
+                    TempOffToolbarController.shared.updatePosition()
+                } else if hasTextCursor {
+                    // Toolbar was hidden (auto-hide), re-show it on click
+                    TempOffToolbarController.shared.show()
+                }
             }
-            // If toolbar is hidden (after auto-hide), we'll re-show when mouse click triggers
-            // The mouse click handler will reset lastFocusedElement
+            if showTranslation {
+                if TranslationToolbarController.shared.isVisible {
+                    TranslationToolbarController.shared.updatePosition()
+                } else if hasTextCursor {
+                    // Toolbar was hidden (auto-hide), re-show it on click (only if has caret)
+                    TranslationToolbarController.shared.show()
+                }
+            }
             return
         }
 
         // New focused element
         lastFocusedElement = elementInfo.element
 
-        // OPTIMIZED: Use cached isTextInput from FocusedElementInfo (no additional AX calls)
-        if elementInfo.isTextInput {
-            // Show toolbar near cursor
-            TempOffToolbarController.shared.show()
+        // Both toolbars use hasCaret check - only show when element has actual text cursor
+        let hasTextCursor = elementInfo.hasCaret
+        
+        if hasTextCursor {
+            // Show TempOff toolbar if enabled
+            if showTempOff {
+                TempOffToolbarController.shared.show()
+            }
+            // Show Translation toolbar if enabled
+            if showTranslation {
+                TranslationToolbarController.shared.show()
+            }
         } else {
-            // Not a text field - hide toolbar
-            TempOffToolbarController.shared.hide()
+            // No caret - hide both toolbars
+            if showTempOff {
+                TempOffToolbarController.shared.hide()
+            }
+            if showTranslation && !TranslationToolbarController.shared.isInteracting {
+                TranslationToolbarController.shared.hide()
+            }
         }
     }
     
@@ -2188,6 +2273,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debugWindowController?.logEvent(message)
         }
         
+        // Setup TranslationToolbar callback
+        TranslationToolbarController.shared.onTranslateRequested = { [weak self] in
+            self?.performTranslation()
+        }
+        
         // Setup notification observer for hotkey/settings changes
         NotificationCenter.default.addObserver(
             forName: .translationSettingsDidChange,
@@ -2196,9 +2286,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             self?.updateTranslationHotkey()
         }
+        
+        // Setup notification observer for translation toolbar settings changes
+        NotificationCenter.default.addObserver(
+            forName: .translationToolbarSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleTranslationToolbarSettingsChange()
+        }
 
         // Initial setup
         updateTranslationHotkey()
+    }
+    
+    /// Handle translation toolbar settings changes (enable/disable)
+    private func handleTranslationToolbarSettingsChange() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        
+        if preferences.translationEnabled && preferences.translationToolbarEnabled {
+            debugWindowController?.logEvent("Translation toolbar enabled")
+        } else {
+            // Hide toolbar if disabled
+            TranslationToolbarController.shared.hide()
+            debugWindowController?.logEvent("Translation toolbar disabled")
+        }
     }
 
     private func updateTranslationHotkey() {
@@ -2238,15 +2350,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugWindowController?.logEvent("Translation triggered via hotkey")
         
-        // Get selected text or full value via AX
-        guard let textToTranslate = service.getSelectedText(), !textToTranslate.isEmpty else {
+        // Get selected text or full value via AX (with source info)
+        guard let textResult = service.getSelectedTextWithSource(), !textResult.text.isEmpty else {
             debugWindowController?.logEvent("   No text to translate")
             // Show notification to user
             showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
             return
         }
         
-        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\"")
+        let textToTranslate = textResult.text
+        let needsSelectAll = textResult.needsSelectAllForReplace
+        
+        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\" (source: \(textResult.source), needsSelectAll: \(needsSelectAll))")
         
         // Show loading overlay near cursor
         TranslationLoadingOverlay.shared.show()
@@ -2271,8 +2386,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     if preferences.translationReplaceOriginal {
                         // Replace selected text with translation
-                        if service.replaceSelectedText(with: finalText) {
-                            debugWindowController?.logEvent("   Replaced original text")
+                        // Use selectAllBeforePaste when text was from full value (no selection)
+                        if service.replaceSelectedText(with: finalText, selectAllBeforePaste: needsSelectAll) {
+                            debugWindowController?.logEvent("   Replaced original text (selectAll: \(needsSelectAll))")
                         } else {
                             // Fallback: copy to clipboard
                             NSPasteboard.general.clearContents()

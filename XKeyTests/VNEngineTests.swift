@@ -854,13 +854,13 @@ class VNEngineTests: XCTestCase {
     /// Test that getRawInputString returns correct primary keystrokes only
     func testRawInputString_NoDoubleKeystrokes() {
         engine.reset()
-        
+
         // l-y → should be "ly" in raw input, not "lyy"
         _ = engine.processKey(character: "l", keyCode: VietnameseData.KEY_L, isUppercase: false)
         _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
-        
-        let rawInput = engine.getRawInputString()
-        XCTAssertEqual(rawInput, "ly", "getRawInputString() should return 'ly', not 'lyy' (no duplicate keystrokes)")
+
+        let rawInput = engine.getRawInputStringForEnglishDetection()
+        XCTAssertEqual(rawInput, "ly", "getRawInputStringForEnglishDetection() should return 'ly', not 'lyy' (no duplicate keystrokes)")
     }
     
     /// Test similar words that should not be detected as English
@@ -1016,7 +1016,7 @@ class VNEngineTests: XCTestCase {
         engine.reset()
         
         XCTAssertEqual(engine.getCurrentWord(), "", "Buffer should be empty after reset")
-        XCTAssertEqual(engine.getRawInputString(), "", "Raw input should be empty after reset")
+        XCTAssertEqual(engine.getRawInputStringForEnglishDetection(), "", "Raw input should be empty after reset")
     }
 
 }

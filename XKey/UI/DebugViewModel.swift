@@ -99,8 +99,8 @@ class DebugViewModel: ObservableObject {
     /// Read interval - how often to check for new logs (500ms is a good balance)
     private let readInterval: TimeInterval = 0.5
     
-    /// Maximum lines to keep in memory
-    private let maxDisplayLines = 5000
+    /// Maximum lines to keep in memory (reduced from 5000 to save ~300KB RAM)
+    private let maxDisplayLines = 2000
     
     /// Lock for file write operations
     private let writeLock = NSLock()
@@ -426,6 +426,12 @@ class DebugViewModel: ObservableObject {
     
     func windowDidBecomeVisible() {
         isWindowVisible = true
+        
+        // Restart read timer if it was stopped
+        if readTimer == nil {
+            startReadTimer()
+        }
+        
         // Force read when window becomes visible
         readNewLogs()
         
@@ -438,6 +444,29 @@ class DebugViewModel: ObservableObject {
     
     func windowDidBecomeHidden() {
         isWindowVisible = false
+        // Stop read timer to save CPU when window is hidden
+        readTimer?.invalidate()
+        readTimer = nil
+    }
+    
+    /// Stop all timers - called when window is closing to release resources
+    func stopAllTimers() {
+        readTimer?.invalidate()
+        readTimer = nil
+        externalMonitorTimer?.invalidate()
+        externalMonitorTimer = nil
+        appDetectorTestTimer?.invalidate()
+        appDetectorTestTimer = nil
+        
+        // Clear log lines to free memory
+        logLines.removeAll()
+        appDetectorTestLog.removeAll()
+        
+        // Reset log reader
+        logReader.reset()
+        
+        // Remove notification observer
+        DistributedNotificationCenter.default().removeObserver(self)
     }
     
     // MARK: - Text Test Methods

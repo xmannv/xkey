@@ -226,6 +226,129 @@ class TypingBufferTests: XCTestCase {
         XCTAssertTrue(buffer.hasOverflow)
     }
 
+    // MARK: - Overflow + getRawInputString Tests (Issue: English Detection with Overflow)
+
+    /// Test that getRawInputString includes overflow entries
+    /// This verifies the CURRENT behavior (which may cause English detection issues)
+    func testGetRawInputString_IncludesOverflow() {
+        // Create a simple keyCodeToChar function for testing
+        let keyCodeToChar: (UInt16) -> Character? = { keyCode in
+            // Map some key codes to characters for testing
+            switch keyCode {
+            case VietnameseData.KEY_A: return "a"
+            case VietnameseData.KEY_B: return "b"
+            case VietnameseData.KEY_C: return "c"
+            case VietnameseData.KEY_T: return "t"
+            case VietnameseData.KEY_L: return "l"
+            case VietnameseData.KEY_O: return "o"
+            default: return Character(UnicodeScalar(Int(keyCode) + 97)!) // a=0, b=1, etc.
+            }
+        }
+
+        // Fill buffer to MAX_SIZE with 'a' characters
+        for _ in 0..<TypingBuffer.MAX_SIZE {
+            buffer.append(keyCode: VietnameseData.KEY_A, isCaps: false)
+        }
+        XCTAssertEqual(buffer.count, TypingBuffer.MAX_SIZE)
+        XCTAssertFalse(buffer.hasOverflow)
+
+        // Add one more to trigger overflow
+        buffer.append(keyCode: VietnameseData.KEY_T, isCaps: false)
+        XCTAssertTrue(buffer.hasOverflow, "Should have overflow after exceeding MAX_SIZE")
+        XCTAssertEqual(buffer.count, TypingBuffer.MAX_SIZE, "Count should still be MAX_SIZE")
+
+        // Add 'l' to create "tl" pattern at the boundary
+        buffer.append(keyCode: VietnameseData.KEY_L, isCaps: false)
+
+        // Get raw input string - this includes overflow
+        let rawInput = buffer.getRawInputString(using: keyCodeToChar)
+
+        // The raw input should include the overflow 'a' at the beginning
+        // Total: 32 'a's initially, then 't', 'l' added (2 go to overflow when exceeding)
+        // After adding 't': overflow has 1 'a', entries has 31 'a's + 't'
+        // After adding 'l': overflow has 2 'a's, entries has 30 'a's + 't' + 'l'
+        XCTAssertTrue(rawInput.count > buffer.count,
+            "getRawInputString should include overflow, so length (\(rawInput.count)) > buffer.count (\(buffer.count))")
+
+        // Check that overflow content is included
+        XCTAssertTrue(rawInput.hasPrefix("a"), "Raw input should start with overflow 'a'")
+    }
+
+    /// Test scenario: After restore, overflow contains old word data
+    /// When user types new characters, English detection uses overflow + entries
+    /// This can cause false English pattern detection
+    func testOverflow_AfterRestore_CausesEnglishPatternIssue() {
+        let keyCodeToChar: (UInt16) -> Character? = { keyCode in
+            switch keyCode {
+            case VietnameseData.KEY_A: return "a"
+            case VietnameseData.KEY_T: return "t"
+            case VietnameseData.KEY_H: return "h"
+            case VietnameseData.KEY_L: return "l"
+            case VietnameseData.KEY_O: return "o"
+            default: return nil
+            }
+        }
+
+        // Simulate: User typed a word ending with 't', saved to history
+        // Then restored, overflow contains 't'
+
+        // Create a snapshot with overflow containing 't'
+        let overflowEntry = CharacterEntry(keyCode: VietnameseData.KEY_T, isCaps: false)
+        let entries = [CharacterEntry](repeating: CharacterEntry(keyCode: VietnameseData.KEY_A, isCaps: false), count: 5)
+        let snapshot = BufferSnapshot(entries: entries, overflow: [overflowEntry])
+
+        // Restore from snapshot
+        buffer.restore(from: snapshot)
+
+        XCTAssertTrue(buffer.hasOverflow, "Should have overflow after restore")
+        XCTAssertEqual(buffer.count, 5, "entries count should be 5")
+
+        // Now user types 'l' - simulating typing after restore
+        buffer.append(keyCode: VietnameseData.KEY_L, isCaps: false)
+
+        // Get raw input - this includes overflow 't' + entries 'aaaaa' + new 'l'
+        let rawInput = buffer.getRawInputString(using: keyCodeToChar)
+
+        // The problem: rawInput starts with 't' from overflow
+        // If entries also start with something that makes "tl" pattern...
+        XCTAssertTrue(rawInput.hasPrefix("t"),
+            "Raw input starts with 't' from overflow - this can cause 'tl' English pattern detection!")
+
+        // This demonstrates the issue: overflow data affects English detection
+        // even though user only typed 'l' after restore
+    }
+
+    /// Test proposed solution: getRawInputString should only use entries, not overflow
+    /// for English pattern detection purposes
+    func testGetRawInputStringFromEntries_ExcludesOverflow() {
+        let keyCodeToChar: (UInt16) -> Character? = { keyCode in
+            switch keyCode {
+            case VietnameseData.KEY_A: return "a"
+            case VietnameseData.KEY_T: return "t"
+            case VietnameseData.KEY_L: return "l"
+            default: return nil
+            }
+        }
+
+        // Create snapshot with overflow
+        let overflowEntry = CharacterEntry(keyCode: VietnameseData.KEY_T, isCaps: false)
+        let entries = [
+            CharacterEntry(keyCode: VietnameseData.KEY_L, isCaps: false),
+            CharacterEntry(keyCode: VietnameseData.KEY_A, isCaps: false)
+        ]
+        let snapshot = BufferSnapshot(entries: entries, overflow: [overflowEntry])
+
+        buffer.restore(from: snapshot)
+
+        // Current behavior: includes overflow
+        let rawInputWithOverflow = buffer.getRawInputString(using: keyCodeToChar)
+        XCTAssertEqual(rawInputWithOverflow, "tla", "Current: includes overflow 't'")
+
+        // Proposed solution: only from entries
+        let rawInputEntriesOnly = buffer.getRawInputStringFromEntries(using: keyCodeToChar)
+        XCTAssertEqual(rawInputEntriesOnly, "la", "Proposed: only entries, no overflow")
+    }
+
     // MARK: - Edge Cases
 
     func testSubscriptOutOfBounds() {

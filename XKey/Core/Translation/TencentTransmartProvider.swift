@@ -28,7 +28,8 @@ class TencentTransmartProvider: TranslationProvider {
     
     // MARK: - Private Properties
     
-    private let session: URLSession
+    /// Use shared session to reduce memory footprint
+    private var session: URLSession { TranslationNetworkManager.shared.session }
     private let baseURL = "https://transmart.qq.com/api/imt"
     
     // Language code mapping (ISO 639-1 to Tencent format)
@@ -56,15 +57,6 @@ class TencentTransmartProvider: TranslationProvider {
         "pl": "pl",
         "nl": "nl"
     ]
-    
-    // MARK: - Initialization
-    
-    init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config)
-    }
     
     // MARK: - Language Mapping
     

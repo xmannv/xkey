@@ -8,10 +8,13 @@
 import Cocoa
 import SwiftUI
 
-class PreferencesWindowController: NSWindowController {
+class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     
     private var pinButton: NSButton?
     private var isAlwaysOnTop: Bool = true
+    
+    /// Callback when window is closed - used to nil out reference in AppDelegate
+    var onWindowClosed: (() -> Void)?
 
     convenience init(selectedTab: Int = 0, onSave: @escaping (Preferences) -> Void) {
         // Create window first
@@ -22,7 +25,8 @@ class PreferencesWindowController: NSWindowController {
             defer: false
         )
         window.title = "Bảng điều khiển XKey"
-        window.isReleasedWhenClosed = false
+        // Allow window to be released when closed to free memory
+        window.isReleasedWhenClosed = true
         window.level = .floating  // Always on top
         window.center()
 
@@ -32,6 +36,9 @@ class PreferencesWindowController: NSWindowController {
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
         self.init(window: window)
+        
+        // Set window delegate to handle close
+        window.delegate = self
 
         // Create SwiftUI view with close callback
         let preferencesView = PreferencesView(
@@ -48,6 +55,16 @@ class PreferencesWindowController: NSWindowController {
         
         // Add pin button to title bar
         setupPinButton()
+    }
+    
+    // MARK: - NSWindowDelegate
+    
+    func windowWillClose(_ notification: Notification) {
+        // Clear content to release SwiftUI views immediately
+        window?.contentViewController = nil
+        
+        // Notify delegate to nil out the reference
+        onWindowClosed?()
     }
     
     // MARK: - Pin Button
@@ -94,3 +111,4 @@ class PreferencesWindowController: NSWindowController {
         pinButton?.contentTintColor = isPinned ? .systemBlue : .systemGray
     }
 }
+

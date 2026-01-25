@@ -24,6 +24,11 @@ class CharacterInjector {
     private var eventSource: CGEventSource?
     private var isTypingMidSentence: Bool = false  // Track if user moved cursor (typing in middle of text)
     
+    /// Timeout for AX queries in seconds
+    /// With complex Notes documents (5k+ chars, formatted text), AX API can be very slow
+    /// This timeout prevents lag by skipping slow AX queries
+    private let axQueryTimeout: TimeInterval = 0.05  // 50ms - fast enough to not cause noticeable lag
+    
     /// Semaphore to ensure injection completes before next keystroke is processed
     /// This prevents race conditions where backspace arrives before previous injection is rendered
     private let injectionSemaphore = DispatchSemaphore(value: 1)
@@ -616,7 +621,32 @@ class CharacterInjector {
     
     /// Get text (word) before cursor until space
     /// Used for spell checking when engine loses context (e.g., after backspace into previous word)
+    /// PERF: Uses timeout to prevent lag with complex Notes documents (5k+ chars, formatted text)
     func getTextBeforeCursor() -> String? {
+        // Use semaphore with timeout to prevent blocking on slow AX queries
+        // Complex Notes documents can cause AX API to be very slow (100ms+)
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: String?
+        
+        // Run AX query on background thread with timeout
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            result = self?.getTextBeforeCursorSync()
+            semaphore.signal()
+        }
+        
+        // Wait with timeout - if query takes too long, skip it
+        let waitResult = semaphore.wait(timeout: .now() + axQueryTimeout)
+        
+        if waitResult == .timedOut {
+            debugCallback?("  [AX] Query timed out (>\(Int(axQueryTimeout * 1000))ms) - skipping to avoid lag")
+            return nil
+        }
+        
+        return result
+    }
+    
+    /// Synchronous version of getTextBeforeCursor (called from background thread)
+    private func getTextBeforeCursorSync() -> String? {
         let systemWideElement = AXUIElementCreateSystemWide()
         
         var focusedElement: CFTypeRef?
@@ -682,11 +712,35 @@ class CharacterInjector {
     /// Simple logic: 
     ///   - Character BEFORE macro text must be: space/newline/start of text
     ///   - Character AFTER cursor must be: space/newline/end of text
-    /// Returns: true if standalone, false if part of word, nil if AX not supported
+    /// Returns: true if standalone, false if part of word, nil if AX not supported or timed out
+    /// PERF: Uses timeout to prevent lag with complex Notes documents (5k+ chars, formatted text)
     func isMacroStandalone(macroLength: Int) -> Bool? {
         // Skip if macroLength is invalid
         guard macroLength > 0 else { return nil }
         
+        // Use semaphore with timeout to prevent blocking on slow AX queries
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Bool?
+        
+        // Run AX query on background thread with timeout
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            result = self?.isMacroStandaloneSync(macroLength: macroLength)
+            semaphore.signal()
+        }
+        
+        // Wait with timeout - if query takes too long, return nil (skip macro check)
+        let waitResult = semaphore.wait(timeout: .now() + axQueryTimeout)
+        
+        if waitResult == .timedOut {
+            debugCallback?("  [AX] isMacroStandalone timed out (>\(Int(axQueryTimeout * 1000))ms) - skipping")
+            return nil  // Timeout = treat as unknown, allowing macro to proceed
+        }
+        
+        return result
+    }
+    
+    /// Synchronous version of isMacroStandalone (called from background thread)
+    private func isMacroStandaloneSync(macroLength: Int) -> Bool? {
         let systemWideElement = AXUIElementCreateSystemWide()
 
         var focusedElement: CFTypeRef?

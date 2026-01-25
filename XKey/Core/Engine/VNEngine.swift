@@ -703,10 +703,19 @@ class VNEngine {
         // - "street" (starts with "str")
         // - "micros" (ends with "s")
         // - "micro" (has "cr" in middle)
-        let rawInput = getRawInputString()
+        // NOTE: Use getRawInputStringForEnglishDetection() which EXCLUDES overflow entries
+        // to avoid false positives after restoreLastTypingState()
+        let rawInput = getRawInputStringForEnglishDetection()
         let allowZFWJ = vAllowConsonantZFWJ == 1
         if rawInput.isDefinitelyNotVietnameseForRawInput(inputType: vInputType, allowZFWJ: allowZFWJ) {
-            logCallback?("handleMainKey: SKIP Vietnamese processing - detected English pattern: '\(rawInput)'")
+            // ENHANCED LOGGING: Log full context when English pattern is detected
+            // This helps debug buffer desync issues
+            logCallback?("⚠️ ENGLISH PATTERN DETECTED:")
+            logCallback?("   rawInput='\(rawInput)', bufferCount=\(buffer.count), historyCount=\(history.count)")
+            logCallback?("   tempDisableKey=\(tempDisableKey), cursorMovedSinceReset=\(cursorMovedSinceReset)")
+            let charDisplay = Self.keyCodeToChar(keyCode).map { String($0) } ?? "?"
+            logCallback?("   Adding keyCode=\(keyCode) '\(charDisplay)'")
+            
             insertKey(keyCode: keyCode, isCaps: isCaps)
             
             // Set tempDisableKey so subsequent keys don't get processed as Vietnamese
@@ -2386,7 +2395,8 @@ class VNEngine {
                     // Get raw input for English pattern detection
                     // Use hasEnglishStartPattern which only checks beginning/middle of word
                     // This avoids false positives from Telex mark keys (s/f/r/x/j) at the end
-                    let rawInput = getRawInputString()
+                    // NOTE: Use getRawInputStringForEnglishDetection() which EXCLUDES overflow
+                    let rawInput = getRawInputStringForEnglishDetection()
                     let isEnglishPattern = rawInput.hasEnglishStartPattern
                     
                     logCallback?("  → Word invalid, checking if English: rawInput='\(rawInput)', isEnglish=\(isEnglishPattern)")

@@ -15,6 +15,9 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
     /// Callback when window is closed (via Close button on title bar)
     var onWindowClose: (() -> Void)?
     
+    /// Callback when window is closed - used to nil out reference in AppDelegate
+    var onWindowClosed: (() -> Void)?
+    
     init() {
         self.viewModel = DebugViewModel()
         
@@ -28,7 +31,8 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
         let window = NSWindow(contentViewController: hostingController)
         window.title = "XKey Debug Console"
         window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        window.isReleasedWhenClosed = false
+        // Allow window to be released when closed to free memory
+        window.isReleasedWhenClosed = true
         window.setContentSize(NSSize(width: 900, height: 700))
         window.minSize = NSSize(width: 700, height: 500)
         window.level = .floating  // Always on top by default
@@ -57,6 +61,15 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
         // User clicked the Close button on title bar
         // Notify AppDelegate to disable debug mode
         onWindowClose?()
+        
+        // Stop ViewModel timers when window closes
+        viewModel.stopAllTimers()
+        
+        // Clear content to release SwiftUI views immediately
+        window?.contentViewController = nil
+        
+        // Notify delegate to nil out the reference
+        onWindowClosed?()
     }
     
     required init?(coder: NSCoder) {
