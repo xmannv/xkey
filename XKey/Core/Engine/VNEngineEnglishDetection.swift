@@ -951,63 +951,31 @@ extension String {
 // MARK: - VNEngine Helper Extensions
 
 extension VNEngine {
-    
+
     /// Get current typing word as a String for analysis
-    /// Converts internal buffer to readable text
     func getCurrentWordString() -> String {
-        guard index > 0 else { return "" }
-        
+        guard !buffer.isEmpty else { return "" }
+
         var result = ""
-        for i in 0..<Int(index) {
-            let keyCode = UInt16(typingWord[i] & VNEngine.CHAR_MASK)
-            
-            // Convert keyCode to character
-            if let char = keyCodeToCharacter(keyCode) {
+        for i in 0..<buffer.count {
+            let keyCode = buffer.keyCode(at: i)
+            if let char = Self.keyCodeToChar(keyCode) {
                 result.append(char)
             }
         }
-        
         return result
     }
-    
-    /// Get raw input keys as a String (original ASCII without Vietnamese transforms)
+
+    /// Get raw input keys as a String (original ASCII)
     func getRawInputString() -> String {
-        guard stateIndex > 0 else { return "" }
-        
-        var result = ""
-        for i in 0..<Int(stateIndex) {
-            let keyCode = UInt16(keyStates[i] & VNEngine.CHAR_MASK)
-            
-            // Convert keyCode to character
-            if let char = keyCodeToCharacter(keyCode) {
-                result.append(char)
-            }
+        buffer.getRawInputString { keyCode in
+            Self.keyCodeToChar(keyCode)
         }
-        
-        return result
     }
-    
-    /// Convert keyCode to character for string building
-    private func keyCodeToCharacter(_ keyCode: UInt16) -> Character? {
-        // Map common key codes to characters
-        let mapping: [UInt16: Character] = [
-            0x00: "a", 0x0B: "b", 0x08: "c", 0x02: "d", 0x0E: "e",
-            0x03: "f", 0x05: "g", 0x04: "h", 0x22: "i", 0x26: "j",
-            0x28: "k", 0x25: "l", 0x2E: "m", 0x2D: "n", 0x1F: "o",
-            0x23: "p", 0x0C: "q", 0x0F: "r", 0x01: "s", 0x11: "t",
-            0x20: "u", 0x09: "v", 0x0D: "w", 0x07: "x", 0x10: "y",
-            0x06: "z"
-        ]
-        return mapping[keyCode]
-    }
-    
+
     /// Check if current buffer is definitely English
-    /// Used as early exit optimization in spell checking
     func isCurrentWordDefinitelyEnglish() -> Bool {
-        // Only check if we have enough characters to make a determination
-        guard index >= 3 else { return false }
-        
-        let word = getCurrentWordString()
-        return word.isDefinitelyEnglish
+        guard buffer.count >= 3 else { return false }
+        return getCurrentWordString().isDefinitelyEnglish
     }
 }

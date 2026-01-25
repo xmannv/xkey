@@ -14,49 +14,35 @@ extension VNEngine {
     
     /// Handle Quick Telex conversion (cc→ch, gg→gi, etc.)
     func handleQuickTelex(keyCode: UInt16, isCaps: Bool) {
-        guard index > 0 else {
+        guard !buffer.isEmpty else {
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
         }
-        
-        // Quick Telex mappings:
-        // cc → ch, gg → gi, kk → kh, nn → ng
-        // pp → ph, qq → qu, tt → th
-        
+
+        // Quick Telex mappings
         var replacementKey: UInt16 = 0
-        
+
         switch keyCode {
-        case VietnameseData.KEY_C:
-            replacementKey = VietnameseData.KEY_H  // cc → ch
-        case VietnameseData.KEY_G:
-            replacementKey = VietnameseData.KEY_I  // gg → gi
-        case VietnameseData.KEY_K:
-            replacementKey = VietnameseData.KEY_H  // kk → kh
-        case VietnameseData.KEY_N:
-            replacementKey = VietnameseData.KEY_G  // nn → ng
-        case VietnameseData.KEY_P:
-            replacementKey = VietnameseData.KEY_H  // pp → ph
-        case VietnameseData.KEY_Q:
-            replacementKey = VietnameseData.KEY_U  // qq → qu
-        case VietnameseData.KEY_T:
-            replacementKey = VietnameseData.KEY_H  // tt → th
+        case VietnameseData.KEY_C: replacementKey = VietnameseData.KEY_H  // cc → ch
+        case VietnameseData.KEY_G: replacementKey = VietnameseData.KEY_I  // gg → gi
+        case VietnameseData.KEY_K: replacementKey = VietnameseData.KEY_H  // kk → kh
+        case VietnameseData.KEY_N: replacementKey = VietnameseData.KEY_G  // nn → ng
+        case VietnameseData.KEY_P: replacementKey = VietnameseData.KEY_H  // pp → ph
+        case VietnameseData.KEY_Q: replacementKey = VietnameseData.KEY_U  // qq → qu
+        case VietnameseData.KEY_T: replacementKey = VietnameseData.KEY_H  // tt → th
         default:
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
         }
-        
-        // Insert the replacement key
+
         hookState.code = UInt8(vWillProcess)
         hookState.backspaceCount = 0
         hookState.newCharCount = 1
-        
-        // Set the new character
-        setKeyData(index: index, keyCode: replacementKey, isCaps: isCaps)
-        index += 1
-        
-        // Return the character to send
-        hookState.charData[0] = getCharacterCode(typingWord[Int(index) - 1])
-        
+
+        // Append the replacement key
+        buffer.append(keyCode: replacementKey, isCaps: isCaps)
+
+        hookState.charData[0] = getCharacterCode(buffer.last!.processedData)
         logCallback?("Quick Telex: \(keyCode)\(keyCode) → \(keyCode)\(replacementKey)")
     }
     
@@ -65,92 +51,79 @@ extension VNEngine {
     /// Check and handle Quick Start/End Consonant
     func checkQuickConsonant() {
         hasHandleQuickConsonant = false
-        
-        guard index > 0 else { return }
-        
+
+        guard !buffer.isEmpty else { return }
+
         // Quick Start Consonant: f→ph, j→gi, w→qu
-        if vQuickStartConsonant == 1 && index >= 1 {
+        if vQuickStartConsonant == 1 && buffer.count >= 1 {
             let firstKey = chr(0)
             var replacement: (UInt16, UInt16)? = nil
-            
+
             switch firstKey {
-            case VietnameseData.KEY_F:
-                replacement = (VietnameseData.KEY_P, VietnameseData.KEY_H)  // f → ph
-            case VietnameseData.KEY_J:
-                replacement = (VietnameseData.KEY_G, VietnameseData.KEY_I)  // j → gi
-            case VietnameseData.KEY_W:
-                replacement = (VietnameseData.KEY_Q, VietnameseData.KEY_U)  // w → qu
-            default:
-                break
+            case VietnameseData.KEY_F: replacement = (VietnameseData.KEY_P, VietnameseData.KEY_H)
+            case VietnameseData.KEY_J: replacement = (VietnameseData.KEY_G, VietnameseData.KEY_I)
+            case VietnameseData.KEY_W: replacement = (VietnameseData.KEY_Q, VietnameseData.KEY_U)
+            default: break
             }
-            
+
             if let (first, second) = replacement {
-                // Replace first character and insert second
-                let isCaps = (typingWord[0] & VNEngine.CAPS_MASK) != 0
-                
-                // Shift all characters right by 1
-                for i in stride(from: Int(index), through: 1, by: -1) {
-                    typingWord[i] = typingWord[i - 1]
-                }
-                
-                // Set new characters
-                typingWord[0] = UInt32(first) | (isCaps ? VNEngine.CAPS_MASK : 0)
-                typingWord[1] = UInt32(second) | (isCaps ? VNEngine.CAPS_MASK : 0)
-                index += 1
-                
-                // Set hook state to send backspaces and new characters
+                let isCaps = buffer[0].isCaps
+
+                // Insert new entry at position 1, shift others
+                let secondEntry = CharacterEntry(keyCode: second, isCaps: isCaps)
+                buffer[0].processedData = UInt32(first) | (isCaps ? VNEngine.CAPS_MASK : 0)
+
+                // Insert second character after first
+                var entries = buffer.getAllEntries()
+                entries.insert(secondEntry, at: 1)
+                buffer.clear()
+                for entry in entries { buffer.append(entry) }
+
                 hookState.code = UInt8(vWillProcess)
-                hookState.backspaceCount = Int(index)
-                hookState.newCharCount = Int(index)
-                
-                for i in 0..<Int(index) {
-                    hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                hookState.backspaceCount = buffer.count
+                hookState.newCharCount = buffer.count
+
+                for i in 0..<buffer.count {
+                    hookState.charData[buffer.count - 1 - i] = getCharacterCode(buffer[i].processedData)
                 }
-                
+
                 hasHandleQuickConsonant = true
                 logCallback?("Quick Start Consonant: \(firstKey) → \(first)\(second)")
                 return
             }
         }
-        
+
         // Quick End Consonant: g→ng, h→nh, k→ch
-        if vQuickEndConsonant == 1 && index >= 2 {
-            let lastKey = chr(Int(index) - 1)
+        if vQuickEndConsonant == 1 && buffer.count >= 2 {
+            let lastKey = chr(buffer.count - 1)
             var replacement: (UInt16, UInt16)? = nil
-            
-            // Only apply if previous char is a vowel
-            let prevKey = chr(Int(index) - 2)
+
+            let prevKey = chr(buffer.count - 2)
             let isVowel = !vietnameseData.isConsonant(prevKey)
-            
+
             if isVowel {
                 switch lastKey {
-                case VietnameseData.KEY_G:
-                    replacement = (VietnameseData.KEY_N, VietnameseData.KEY_G)  // g → ng
-                case VietnameseData.KEY_H:
-                    replacement = (VietnameseData.KEY_N, VietnameseData.KEY_H)  // h → nh
-                case VietnameseData.KEY_K:
-                    replacement = (VietnameseData.KEY_C, VietnameseData.KEY_H)  // k → ch
-                default:
-                    break
+                case VietnameseData.KEY_G: replacement = (VietnameseData.KEY_N, VietnameseData.KEY_G)
+                case VietnameseData.KEY_H: replacement = (VietnameseData.KEY_N, VietnameseData.KEY_H)
+                case VietnameseData.KEY_K: replacement = (VietnameseData.KEY_C, VietnameseData.KEY_H)
+                default: break
                 }
             }
-            
+
             if let (first, second) = replacement {
-                let isCaps = (typingWord[Int(index) - 1] & VNEngine.CAPS_MASK) != 0
-                
-                // Replace last character with two characters
-                typingWord[Int(index) - 1] = UInt32(first) | (isCaps ? VNEngine.CAPS_MASK : 0)
-                typingWord[Int(index)] = UInt32(second) | (isCaps ? VNEngine.CAPS_MASK : 0)
-                index += 1
-                
-                // Set hook state
+                let isCaps = buffer[buffer.count - 1].isCaps
+
+                // Replace last and append new
+                buffer[buffer.count - 1].processedData = UInt32(first) | (isCaps ? VNEngine.CAPS_MASK : 0)
+                buffer.append(keyCode: second, isCaps: isCaps)
+
                 hookState.code = UInt8(vWillProcess)
                 hookState.backspaceCount = 1
                 hookState.newCharCount = 2
-                
-                hookState.charData[0] = getCharacterCode(typingWord[Int(index) - 1])
-                hookState.charData[1] = getCharacterCode(typingWord[Int(index) - 2])
-                
+
+                hookState.charData[0] = getCharacterCode(buffer[buffer.count - 1].processedData)
+                hookState.charData[1] = getCharacterCode(buffer[buffer.count - 2].processedData)
+
                 hasHandleQuickConsonant = true
                 logCallback?("Quick End Consonant: \(lastKey) → \(first)\(second)")
             }
@@ -161,117 +134,86 @@ extension VNEngine {
     
     /// Auto capitalize first character after sentence end
     func upperCaseFirstCharacter() {
-        guard index >= 1 else { return }
-        
-        // Check if first character is lowercase
-        let firstChar = typingWord[0]
-        let keyCode = UInt16(firstChar & VNEngine.CHAR_MASK)
-        
-        // Only capitalize if it's a letter and not already uppercase
+        guard buffer.count >= 1 else { return }
+
+        let firstEntry = buffer[0]
+        let keyCode = firstEntry.keyCode
+
         guard vietnameseData.isLetter(keyCode) else { return }
-        guard (firstChar & VNEngine.CAPS_MASK) == 0 else { return }
-        
+        guard !firstEntry.isCaps else { return }
+
         // Set uppercase flag
-        typingWord[0] |= VNEngine.CAPS_MASK
-        
-        // Update hook state to send the change
+        buffer[0].isCaps = true
+
         hookState.code = UInt8(vWillProcess)
-        hookState.backspaceCount = Int(index)
-        hookState.newCharCount = Int(index)
-        
-        for i in 0..<Int(index) {
-            hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+        hookState.backspaceCount = buffer.count
+        hookState.newCharCount = buffer.count
+
+        for i in 0..<buffer.count {
+            hookState.charData[buffer.count - 1 - i] = getCharacterCode(buffer[i].processedData)
         }
-        
-        logCallback?("Upper Case First Char: Applied to first character")
+
+        logCallback?("Upper Case First Char: Applied")
     }
     
     // MARK: - Restore If Wrong Spelling
-    
+
     /// Check and restore if word has wrong spelling
     @discardableResult
     func checkRestoreIfWrongSpelling(handleCode: Int) -> Bool {
         guard tempDisableKey else { return false }
-        guard index > 0 else { return false }
-        
-        // IMPORTANT: Detect emoji autocomplete patterns and skip restore for them.
-        // Emoji shortcuts often use special characters like `:d` → 😃 or `;)` → 😉
-        // But we SHOULD restore short Vietnamese words like "fĩ", "ío", "đi", "là"
-        // 
-        // Strategy: Skip restore only if we detect special character patterns,
-        // not just based on word length.
+        guard !buffer.isEmpty else { return false }
+
         if shouldSkipRestoreForSpecialPattern() {
-            logCallback?("Restore Wrong Spelling: Skipping restore for special pattern (likely emoji autocomplete)")
+            logCallback?("Restore Wrong Spelling: Skipping (special pattern)")
             return false
         }
-        
-        // Get original typed keys from keyStates
-        var originalWord = [UInt32]()
-        for i in 0..<Int(stateIndex) {
-            originalWord.append(keyStates[i])
-        }
-        
-        guard !originalWord.isEmpty else { return false }
-        
-        // Calculate backspaces needed
+
+        // Get all raw keystrokes from buffer
+        let originalKeystrokes = buffer.getAllRawKeystrokes()
+        guard !originalKeystrokes.isEmpty else { return false }
+
         hookState.code = UInt8(handleCode)
-        hookState.backspaceCount = Int(index)
-        hookState.newCharCount = originalWord.count
-        
+        hookState.backspaceCount = buffer.count
+        hookState.newCharCount = originalKeystrokes.count
+
         // Set original characters to send
-        for i in 0..<originalWord.count {
-            let keyData = originalWord[i]
-            let keyCode = UInt16(keyData & VNEngine.CHAR_MASK)
-            let isCaps = (keyData & VNEngine.CAPS_MASK) != 0
-            
-            // Convert to character code
-            var charCode = UInt32(keyCode)
-            if isCaps {
+        for (i, keystroke) in originalKeystrokes.enumerated() {
+            var charCode = UInt32(keystroke.keyCode)
+            if keystroke.isCaps {
                 charCode |= VNEngine.CAPS_MASK
             }
-            hookState.charData[originalWord.count - 1 - i] = charCode
+            hookState.charData[originalKeystrokes.count - 1 - i] = charCode
         }
-        
-        logCallback?("Restore Wrong Spelling: Restoring \(originalWord.count) characters")
-        
-        // Reset state - use reset() to also clear typingStates
-        // This prevents stale words from appearing when backspacing after restore
+
+        logCallback?("Restore Wrong Spelling: Restoring \(originalKeystrokes.count) chars")
+
         if handleCode == vRestoreAndStartNewSession {
             reset()
         }
-        
+
         return true
     }
-    
+
     // MARK: - Special Pattern Detection
-    
+
     /// Check if current buffer looks like an emoji autocomplete pattern
-    /// Returns true if we should skip restore (likely an emoji shortcut)
-    /// Returns false if it looks like a normal Vietnamese word
     private func shouldSkipRestoreForSpecialPattern() -> Bool {
-        guard stateIndex > 0 else { return false }
-        
-        // Skip restore for single character - never a valid Vietnamese word
-        // This also prevents conflicts with emoji autocomplete like `:d` → 😀
-        // When user types `:d`, the `:` is processed as word break, so keyStates only has `d`.
-        // If we restore `d`, we'll accidentally delete the emoji that Zalo/Slack autocompleted.
-        if index == 1 {
-            logCallback?("Special Pattern: Single character, skipping restore")
+        guard !buffer.isEmpty else { return false }
+
+        // Single character - skip restore
+        if buffer.count == 1 {
+            logCallback?("Special Pattern: Single char, skipping")
             return true
         }
-        
-        // Simple logic: If first character is NOT a letter, skip restore
-        // Emoji shortcuts typically start with special characters like `:`, `;`, `<`, etc.
-        // Vietnamese words always start with letters (a-z, A-Z)
-        let firstKeyData = keyStates[0]
-        let firstKeyCode = UInt16(firstKeyData & VNEngine.CHAR_MASK)
-        
+
+        // First char not a letter - likely emoji shortcut
+        let firstKeyCode = buffer.keyCode(at: 0)
         if !vietnameseData.isLetter(firstKeyCode) {
-            logCallback?("Special Pattern: First char is not a letter (keyCode=\(firstKeyCode)), skipping restore")
+            logCallback?("Special Pattern: First char not letter, skipping")
             return true
         }
-        
-        // First char is a letter, allow restore
+
         return false
     }
 }
