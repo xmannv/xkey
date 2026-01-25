@@ -14,16 +14,16 @@ class GoogleTranslateProvider: TranslationProvider {
     
     let id = "google_translate"
     let name = "Google Translate"
-    let description = "Dịch bằng Google Translate (miễn phí)"
+    let description = "Dịch bằng Google Translate (miễn phí, có giới hạn)"
     
     var isEnabled: Bool = true
     
-    var supportedSourceLanguages: [TranslationLanguage]? {
-        return TranslationLanguage.allCases  // Supports all languages including auto-detect
+    var supportedSourceLanguages: [String]? {
+        return nil  // Supports all ISO 639-1 language codes including "auto"
     }
     
-    var supportedTargetLanguages: [TranslationLanguage] {
-        return TranslationLanguage.allCases.filter { $0 != .auto }
+    var supportedTargetLanguages: [String]? {
+        return nil  // Supports all ISO 639-1 language codes (except "auto")
     }
     
     // MARK: - Private Properties
@@ -44,8 +44,8 @@ class GoogleTranslateProvider: TranslationProvider {
     
     func translate(
         text: String,
-        from sourceLanguage: TranslationLanguage,
-        to targetLanguage: TranslationLanguage
+        from sourceLanguageCode: String,
+        to targetLanguageCode: String
     ) async throws -> TranslationResult {
         
         guard isEnabled else {
@@ -60,8 +60,8 @@ class GoogleTranslateProvider: TranslationProvider {
         var components = URLComponents(string: baseURL)!
         components.queryItems = [
             URLQueryItem(name: "client", value: "gtx"),
-            URLQueryItem(name: "sl", value: sourceLanguage.rawValue),
-            URLQueryItem(name: "tl", value: targetLanguage.rawValue),
+            URLQueryItem(name: "sl", value: sourceLanguageCode),
+            URLQueryItem(name: "tl", value: targetLanguageCode),
             URLQueryItem(name: "dt", value: "t"),
             URLQueryItem(name: "q", value: text)
         ]
@@ -120,7 +120,7 @@ class GoogleTranslateProvider: TranslationProvider {
                 originalText: text,
                 translatedText: translatedText,
                 sourceLanguage: detectedSourceLanguage,
-                targetLanguage: targetLanguage.rawValue,
+                targetLanguage: targetLanguageCode,
                 providerName: name
             )
             

@@ -67,6 +67,47 @@ struct AboutSection: View {
                 
                 Divider()
                     .padding(.horizontal, 80)
+                
+                // GitHub Links
+                HStack(spacing: 20) {
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/xmannv/xkey") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image("GitHubIcon")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 14, height: 14)
+                            Text("GitHub")
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/xmannv/xkey/issues/new/choose") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image("BugIcon")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 14, height: 14)
+                            Text("Báo lỗi")
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 8)
+                
+                Divider()
+                    .padding(.horizontal, 80)
 
                 // Update Check Section - Using Sparkle
                 VStack(spacing: 10) {

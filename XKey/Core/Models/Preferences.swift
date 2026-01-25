@@ -77,9 +77,21 @@ struct Preferences: Codable {
     // Translation settings
     var translationEnabled: Bool = false         // Enable translation feature
     var translationHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .shift])  // Default: Cmd+Shift+T
-    var translationSourceLanguage: TranslationLanguage = .auto
-    var translationTargetLanguage: TranslationLanguage = .vietnamese
+    var translationSourceLanguageCode: String = "auto"     // ISO 639-1 code
+    var translationTargetLanguageCode: String = "vi"       // ISO 639-1 code
     var translationReplaceOriginal: Bool = true  // Replace selected text with translation
+    
+    /// Get source language as TranslationLanguage object
+    var translationSourceLanguage: TranslationLanguage {
+        get { TranslationLanguage.find(byCode: translationSourceLanguageCode) }
+        set { translationSourceLanguageCode = newValue.code }
+    }
+    
+    /// Get target language as TranslationLanguage object
+    var translationTargetLanguage: TranslationLanguage {
+        get { TranslationLanguage.find(byCode: translationTargetLanguageCode) }
+        set { translationTargetLanguageCode = newValue.code }
+    }
 }
 
 // MARK: - Excluded App Model

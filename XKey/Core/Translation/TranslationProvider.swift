@@ -63,17 +63,23 @@ protocol TranslationProvider {
     /// Whether the provider is currently enabled
     var isEnabled: Bool { get set }
     
-    /// Supported source languages (nil means all)
-    var supportedSourceLanguages: [TranslationLanguage]? { get }
+    /// Supported source languages (nil means all languages supported)
+    /// Return nil to indicate that any ISO 639-1 code is supported
+    var supportedSourceLanguages: [String]? { get }
     
-    /// Supported target languages
-    var supportedTargetLanguages: [TranslationLanguage] { get }
+    /// Supported target languages (nil means all languages supported)
+    /// Return nil to indicate that any ISO 639-1 code is supported
+    var supportedTargetLanguages: [String]? { get }
     
     /// Translate text asynchronously
+    /// - Parameters:
+    ///   - text: The text to translate
+    ///   - sourceLanguageCode: ISO 639-1 source language code (e.g., "en", "auto")
+    ///   - targetLanguageCode: ISO 639-1 target language code (e.g., "vi")
     func translate(
         text: String,
-        from sourceLanguage: TranslationLanguage,
-        to targetLanguage: TranslationLanguage
+        from sourceLanguageCode: String,
+        to targetLanguageCode: String
     ) async throws -> TranslationResult
 }
 

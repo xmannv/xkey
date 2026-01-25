@@ -461,7 +461,15 @@ class VNEngine {
             saveSpecialChar()
         }
 
-        insertState(keyCode: keyCode, isCaps: isCaps)
+        // NOTE: Removed unconditional insertState() call here.
+        // insertState was adding EVERY keystroke as a modifier to the last entry,
+        // causing getRawInputString() to return duplicate keystrokes (e.g., "ly" → "lyy").
+        // This led to false English pattern detection (e.g., "ltyyyyys" instead of "lys")
+        // and prevented Vietnamese typing like "lý".
+        // 
+        // If modifier tracking is needed for Telex sequences (aa→â, dd→đ, etc.),
+        // it should be added in the specific handlers (insertAOE, insertD, handleMarkKey)
+        // ONLY when a key actually modifies an existing entry.
         
         let isSpecial = isSpecialKey(keyCode: keyCode)
         
@@ -538,8 +546,10 @@ class VNEngine {
         // so we should NOT insert it again. Only insert key for normal restore (undo mark).
         if hookState.code == UInt8(vRestore) && hookState.extCode != 5 {
             insertKey(keyCode: keyCode, isCaps: isCaps)
-            // Remove last modifier from buffer (undo the Telex sequence)
-            buffer.removeLastModifierFromLast()
+            // NOTE: We do NOT remove modifier here because raw keystrokes should reflect
+            // what user actually typed. E.g., "ass" should have raw keystrokes ["a", "s", "s"]
+            // The modifier "s" on entry "á" represents the first "s", and the new entry "s"
+            // from insertKey represents the second "s" that triggered restore.
         }
         
         // Insert or replace key for macro
@@ -819,6 +829,13 @@ class VNEngine {
                     }
                     
                     insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
+                    
+                    // Track modifier keystroke for restore functionality
+                    // Only add if not a restore operation (duplicate mark key)
+                    // Add to the ACTUAL modified vowel (vowelWillSetMark), not the last entry
+                    if hookState.code != UInt8(vRestore) {
+                        insertStateAt(index: vowelWillSetMark, keyCode: keyCode, isCaps: isCaps)
+                    }
                     break
                 }
             }
@@ -855,6 +872,12 @@ class VNEngine {
                     
                     if markMask != 0 {
                         insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
+                        
+                        // Track modifier keystroke for restore functionality
+                        // Add to the ACTUAL modified vowel (vowelWillSetMark), not the last entry
+                        if hookState.code != UInt8(vRestore) {
+                            insertStateAt(index: vowelWillSetMark, keyCode: keyCode, isCaps: isCaps)
+                        }
                         return
                     }
                 }
@@ -1330,8 +1353,15 @@ class VNEngine {
     }
 
     /// Record a raw keystroke as modifier (for Telex sequences like aa→â)
+    /// Adds to the LAST entry in buffer
     func insertState(keyCode: UInt16, isCaps: Bool) {
         buffer.addModifierToLast(RawKeystroke(keyCode: keyCode, isCaps: isCaps))
+    }
+    
+    /// Record a raw keystroke as modifier at a specific buffer index
+    /// Use this when the modified entry is NOT the last one (e.g., mark on first vowel of "ưa")
+    func insertStateAt(index: Int, keyCode: UInt16, isCaps: Bool) {
+        buffer.addModifier(at: index, keystroke: RawKeystroke(keyCode: keyCode, isCaps: isCaps))
     }
     
     private var isChanged = false
@@ -1355,7 +1385,10 @@ class VNEngine {
                 } else {
                     typingWord[i] |= VNEngine.TONE_MASK
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
-
+                    
+                    // Track modifier keystroke for restore functionality (dd→đ)
+                    // Add to the ACTUAL modified 'D' (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {
@@ -1472,6 +1505,10 @@ class VNEngine {
                     }
                     
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                    
+                    // Track modifier keystroke for restore functionality (aa→â, oo→ô, ee→ê)
+                    // Add to the ACTUAL modified vowel (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {
@@ -1579,6 +1616,12 @@ class VNEngine {
                 for i in vowelStartIndex..<Int(index) {
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
                 }
+                
+                // Track modifier keystroke for restore functionality (w→ư/ơ for multi-vowel)
+                // Add to the FIRST modified vowel (vowelStartIndex), not the last entry
+                if hookState.code != UInt8(vDoNothing) {
+                    insertStateAt(index: vowelStartIndex, keyCode: keyCode, isCaps: isCaps)
+                }
             }
             
             return
@@ -1603,9 +1646,9 @@ class VNEngine {
                         hookState.code = UInt8(vWillProcess)
                         if key == VietnameseData.KEY_U {
                             typingWord[i] = UInt32(VietnameseData.KEY_W) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
-                            // When undoing standalone "ư" → "w", remove the modifier keystroke
+                            // When undoing standalone "ư" → "w", remove the modifier from the ACTUAL entry (index i)
                             isRestoredW = true
-                            buffer.removeLastModifierFromLast()
+                            buffer.removeLastModifier(at: i)
                         } else if key == VietnameseData.KEY_O {
                             hookState.code = UInt8(vRestore)
                             typingWord[i] = UInt32(VietnameseData.KEY_O) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
@@ -1625,6 +1668,10 @@ class VNEngine {
                     typingWord[i] &= ~VNEngine.TONE_MASK
                     logCallback?("insertW: Added TONEW_MASK to typingWord[\(i)], now=\(String(format: "0x%X", typingWord[i]))")
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                    
+                    // Track modifier keystroke for restore functionality (w→ư/ơ/ă for single vowel)
+                    // Add to the ACTUAL modified vowel (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {

@@ -951,12 +951,9 @@ class SharedSettings {
                 modifiers: ModifierFlags(rawValue: transHotkeyModifiers)
             )
         }
-        if let sourceLang = TranslationLanguage(rawValue: translationSourceLanguage) {
-            prefs.translationSourceLanguage = sourceLang
-        }
-        if let targetLang = TranslationLanguage(rawValue: translationTargetLanguage) {
-            prefs.translationTargetLanguage = targetLang
-        }
+        // Translation language codes (stored as String)
+        prefs.translationSourceLanguageCode = translationSourceLanguage
+        prefs.translationTargetLanguageCode = translationTargetLanguage
         prefs.translationReplaceOriginal = translationReplaceOriginal
 
         // Debug settings
@@ -1065,8 +1062,8 @@ class SharedSettings {
         translationEnabled = prefs.translationEnabled
         translationHotkeyCode = prefs.translationHotkey.keyCode
         translationHotkeyModifiers = prefs.translationHotkey.modifiers.rawValue
-        translationSourceLanguage = prefs.translationSourceLanguage.rawValue
-        translationTargetLanguage = prefs.translationTargetLanguage.rawValue
+        translationSourceLanguage = prefs.translationSourceLanguageCode
+        translationTargetLanguage = prefs.translationTargetLanguageCode
         translationReplaceOriginal = prefs.translationReplaceOriginal
 
         // Batch update is done - settings are already written to plist via setters

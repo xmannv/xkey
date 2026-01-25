@@ -336,6 +336,13 @@ final class TypingBuffer {
         guard !entries.isEmpty else { return nil }
         return entries[entries.count - 1].removeLastModifier()
     }
+    
+    /// Remove the last modifier from entry at specific index
+    @discardableResult
+    func removeLastModifier(at index: Int) -> RawKeystroke? {
+        guard index >= 0 && index < entries.count else { return nil }
+        return entries[index].removeLastModifier()
+    }
 
     // MARK: - Query Operations
 

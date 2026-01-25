@@ -32,6 +32,8 @@
 		102986B22F252F5700B4DEEE /* TranslationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986AF2F252F5700B4DEEE /* TranslationProvider.swift */; };
 		102986B32F252F5700B4DEEE /* TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986B02F252F5700B4DEEE /* TranslationService.swift */; };
 		102986B42F252F5700B4DEEE /* GoogleTranslateProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986AE2F252F5700B4DEEE /* GoogleTranslateProvider.swift */; };
+		102986B52F25400000B4DEEE /* TencentTransmartProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986B62F25400000B4DEEE /* TencentTransmartProvider.swift */; };
+		102986B92F25400000B4DEEE /* VolcanoEngineProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986BA2F25400000B4DEEE /* VolcanoEngineProvider.swift */; };
 		102986BC2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */; };
 		102986BD2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */; };
 		1029C48F2EF0504D0073ABCD /* DonationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1029C48E2EF0504D0073ABCD /* DonationView.swift */; };
@@ -48,11 +50,10 @@
 		1095C4D72EFB016B00C03826 /* VNDictionaryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1095C4D52EFB016B00C03826 /* VNDictionaryManager.swift */; };
 		1095C4DE2EFB02EA00C03826 /* VNEngineSpellCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1095C4DD2EFB02EA00C03826 /* VNEngineSpellCheck.swift */; };
 		1095C4DF2EFB02EA00C03826 /* VNEngineSpellCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1095C4DD2EFB02EA00C03826 /* VNEngineSpellCheck.swift */; };
-		TYPBUF001 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
-		TYPBUF003 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 		1097C5E52EF6662500969052 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1097C5E42EF6662500969052 /* Sparkle */; };
 		10A214992ED42DFA005B52BD /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A214972ED42DFA005B52BD /* HotkeyRecorderView.swift */; };
 		10A2149A2ED42DFA005B52BD /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */; };
+		10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */; };
 		10F26F0F2ED6CAF900B9FA1F /* ConvertTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */; };
 		10F26F102ED6CAF900B9FA1F /* SmartSwitchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */; };
 		10F26F112ED6CAF900B9FA1F /* VietnameseData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */; };
@@ -110,6 +111,9 @@
 		TEST00003 /* KeyCodeToCharacterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00004 /* KeyCodeToCharacterTests.swift */; };
 		TEST00019 /* TypingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00020 /* TypingBufferTests.swift */; };
 		TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00022 /* VNEngineBufferIntegrationTests.swift */; };
+		TEST00023 /* TranslationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00024 /* TranslationProviderTests.swift */; };
+		TYPBUF001 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
+		TYPBUF003 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -134,6 +138,8 @@
 		102986AE2F252F5700B4DEEE /* GoogleTranslateProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleTranslateProvider.swift; sourceTree = "<group>"; };
 		102986AF2F252F5700B4DEEE /* TranslationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProvider.swift; sourceTree = "<group>"; };
 		102986B02F252F5700B4DEEE /* TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationService.swift; sourceTree = "<group>"; };
+		102986B62F25400000B4DEEE /* TencentTransmartProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TencentTransmartProvider.swift; sourceTree = "<group>"; };
+		102986BA2F25400000B4DEEE /* VolcanoEngineProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolcanoEngineProvider.swift; sourceTree = "<group>"; };
 		102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLanguage.swift; sourceTree = "<group>"; };
 		1029C48E2EF0504D0073ABCD /* DonationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DonationView.swift; sourceTree = "<group>"; };
 		10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForceAccessibilityManager.swift; sourceTree = "<group>"; };
@@ -146,9 +152,9 @@
 		1089F7EB2EF76F2300E833ED /* OverlayAppDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayAppDetector.swift; sourceTree = "<group>"; };
 		1095C4D52EFB016B00C03826 /* VNDictionaryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNDictionaryManager.swift; sourceTree = "<group>"; };
 		1095C4DD2EFB02EA00C03826 /* VNEngineSpellCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineSpellCheck.swift; sourceTree = "<group>"; };
-		TYPBUF002 /* TypingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBuffer.swift; sourceTree = "<group>"; };
 		10A214972ED42DFA005B52BD /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
 		10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
+		10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLoadingOverlay.swift; sourceTree = "<group>"; };
 		10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertTool.swift; sourceTree = "<group>"; };
 		10F26F0B2ED6CAF900B9FA1F /* MacroManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManager.swift; sourceTree = "<group>"; };
 		10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSwitchManager.swift; sourceTree = "<group>"; };
@@ -208,6 +214,8 @@
 		TEST00005 /* XKeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XKeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TEST00020 /* TypingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBufferTests.swift; sourceTree = "<group>"; };
 		TEST00022 /* VNEngineBufferIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineBufferIntegrationTests.swift; sourceTree = "<group>"; };
+		TEST00024 /* TranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderTests.swift; sourceTree = "<group>"; };
+		TYPBUF002 /* TypingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBuffer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -276,9 +284,12 @@
 		102986B12F252F5700B4DEEE /* Translation */ = {
 			isa = PBXGroup;
 			children = (
+				10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */,
 				102986AE2F252F5700B4DEEE /* GoogleTranslateProvider.swift */,
 				102986AF2F252F5700B4DEEE /* TranslationProvider.swift */,
 				102986B02F252F5700B4DEEE /* TranslationService.swift */,
+				102986B62F25400000B4DEEE /* TencentTransmartProvider.swift */,
+				102986BA2F25400000B4DEEE /* VolcanoEngineProvider.swift */,
 			);
 			name = Translation;
 			path = XKey/Core/Translation;
@@ -441,6 +452,7 @@
 				TEST00004 /* KeyCodeToCharacterTests.swift */,
 				TEST00020 /* TypingBufferTests.swift */,
 				TEST00022 /* VNEngineBufferIntegrationTests.swift */,
+				TEST00024 /* TranslationProviderTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -680,8 +692,11 @@
 				DA898EBD755CC092AEB1B685 /* TempOffToolbarView.swift in Sources */,
 				AA51E2E403268ACC6EF82BA4 /* TempOffToolbarViewModel.swift in Sources */,
 				102986B22F252F5700B4DEEE /* TranslationProvider.swift in Sources */,
+				10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */,
 				102986B32F252F5700B4DEEE /* TranslationService.swift in Sources */,
 				102986B42F252F5700B4DEEE /* GoogleTranslateProvider.swift in Sources */,
+				102986B52F25400000B4DEEE /* TencentTransmartProvider.swift in Sources */,
+				102986B92F25400000B4DEEE /* VolcanoEngineProvider.swift in Sources */,
 				TYPBUF001 /* TypingBuffer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -694,6 +709,7 @@
 				TEST00003 /* KeyCodeToCharacterTests.swift in Sources */,
 				TEST00019 /* TypingBufferTests.swift in Sources */,
 				TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */,
+				TEST00023 /* TranslationProviderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -12,6 +12,12 @@ struct TranslationSection: View {
     @ObservedObject var viewModel: PreferencesViewModel
     @StateObject private var translationVM = TranslationSectionViewModel()
     
+    // Custom language input states
+    @State private var showCustomSourceInput = false
+    @State private var showCustomTargetInput = false
+    @State private var customSourceCode = ""
+    @State private var customTargetCode = ""
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -46,30 +52,102 @@ struct TranslationSection: View {
                     
                     // Language Settings
                     SettingsGroup(title: "Ngôn ngữ") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Ngôn ngữ nguồn:")
-                                Spacer()
-                                Picker("", selection: $viewModel.preferences.translationSourceLanguage) {
-                                    ForEach(TranslationLanguage.allCases) { lang in
-                                        Text("\(lang.flag) \(lang.displayName)")
-                                            .tag(lang)
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Source Language
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Ngôn ngữ nguồn:")
+                                    Spacer()
+                                    
+                                    Picker("", selection: Binding(
+                                        get: { viewModel.preferences.translationSourceLanguageCode },
+                                        set: { newCode in
+                                            if newCode == "__custom__" {
+                                                showCustomSourceInput = true
+                                            } else {
+                                                viewModel.preferences.translationSourceLanguageCode = newCode
+                                            }
+                                        }
+                                    )) {
+                                        ForEach(TranslationLanguage.sourcePresets) { lang in
+                                            Text("\(lang.flag) \(lang.displayName)")
+                                                .tag(lang.code)
+                                        }
+                                        Divider()
+                                        Text("🌍 Nhập mã ngôn ngữ khác...").tag("__custom__")
+                                    }
+                                    .frame(width: 280)
+                                }
+                                
+                                // Show current custom language if using one
+                                if !TranslationLanguage.sourcePresets.contains(where: { $0.code == viewModel.preferences.translationSourceLanguageCode }) {
+                                    HStack {
+                                        Text("Đang dùng mã tùy chỉnh:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(viewModel.preferences.translationSourceLanguageCode.uppercased())
+                                            .font(.caption.monospaced())
+                                            .foregroundColor(.blue)
+                                        Button("Đổi") {
+                                            showCustomSourceInput = true
+                                        }
+                                        .font(.caption)
                                     }
                                 }
-                                .frame(width: 200)
                             }
                             
-                            HStack {
-                                Text("Ngôn ngữ đích:")
-                                Spacer()
-                                Picker("", selection: $viewModel.preferences.translationTargetLanguage) {
-                                    ForEach(TranslationLanguage.allCases.filter { $0 != .auto }) { lang in
-                                        Text("\(lang.flag) \(lang.displayName)")
-                                            .tag(lang)
+                            // Target Language
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Ngôn ngữ đích:")
+                                    Spacer()
+                                    
+                                    Picker("", selection: Binding(
+                                        get: { viewModel.preferences.translationTargetLanguageCode },
+                                        set: { newCode in
+                                            if newCode == "__custom__" {
+                                                showCustomTargetInput = true
+                                            } else {
+                                                viewModel.preferences.translationTargetLanguageCode = newCode
+                                            }
+                                        }
+                                    )) {
+                                        ForEach(TranslationLanguage.targetPresets) { lang in
+                                            Text("\(lang.flag) \(lang.displayName)")
+                                                .tag(lang.code)
+                                        }
+                                        Divider()
+                                        Text("🌍 Nhập mã ngôn ngữ khác...").tag("__custom__")
+                                    }
+                                    .frame(width: 280)
+                                }
+                                
+                                // Show current custom language if using one
+                                if !TranslationLanguage.targetPresets.contains(where: { $0.code == viewModel.preferences.translationTargetLanguageCode }) {
+                                    HStack {
+                                        Text("Đang dùng mã tùy chỉnh:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(viewModel.preferences.translationTargetLanguageCode.uppercased())
+                                            .font(.caption.monospaced())
+                                            .foregroundColor(.blue)
+                                        Button("Đổi") {
+                                            showCustomTargetInput = true
+                                        }
+                                        .font(.caption)
                                     }
                                 }
-                                .frame(width: 200)
                             }
+                            
+                            // Info about supported languages
+                            HStack(spacing: 4) {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.blue)
+                                Text("Hỗ trợ 130+ ngôn ngữ theo chuẩn ISO 639-1. ")
+                                    .foregroundColor(.secondary)
+                                Link("Xem danh sách", destination: URL(string: "https://cloud.google.com/translate/docs/languages")!)
+                            }
+                            .font(.caption)
                             
                             Toggle("Thay thế text gốc bằng bản dịch", isOn: $viewModel.preferences.translationReplaceOriginal)
                             
@@ -111,8 +189,8 @@ struct TranslationSection: View {
                             HStack {
                                 Button("Dịch thử") {
                                     translationVM.testTranslation(
-                                        from: viewModel.preferences.translationSourceLanguage,
-                                        to: viewModel.preferences.translationTargetLanguage
+                                        from: viewModel.preferences.translationSourceLanguageCode,
+                                        to: viewModel.preferences.translationTargetLanguageCode
                                     )
                                 }
                                 .disabled(translationVM.testText.isEmpty || translationVM.isTranslating)
@@ -123,6 +201,13 @@ struct TranslationSection: View {
                                 }
                                 
                                 Spacer()
+                                
+                                // Display current language pair
+                                let sourceLang = TranslationLanguage.find(byCode: viewModel.preferences.translationSourceLanguageCode)
+                                let targetLang = TranslationLanguage.find(byCode: viewModel.preferences.translationTargetLanguageCode)
+                                Text("\(sourceLang.flag) → \(targetLang.flag)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             
                             if let result = translationVM.testResult {
@@ -151,6 +236,80 @@ struct TranslationSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
         }
+        // Custom Source Language Input Sheet
+        .sheet(isPresented: $showCustomSourceInput) {
+            CustomLanguageInputView(
+                title: "Nhập mã ngôn ngữ nguồn",
+                code: $customSourceCode,
+                isPresented: $showCustomSourceInput,
+                onSave: { code in
+                    viewModel.preferences.translationSourceLanguageCode = code.lowercased()
+                }
+            )
+        }
+        // Custom Target Language Input Sheet
+        .sheet(isPresented: $showCustomTargetInput) {
+            CustomLanguageInputView(
+                title: "Nhập mã ngôn ngữ đích",
+                code: $customTargetCode,
+                isPresented: $showCustomTargetInput,
+                onSave: { code in
+                    viewModel.preferences.translationTargetLanguageCode = code.lowercased()
+                }
+            )
+        }
+    }
+}
+
+// MARK: - Custom Language Input View
+
+struct CustomLanguageInputView: View {
+    let title: String
+    @Binding var code: String
+    @Binding var isPresented: Bool
+    let onSave: (String) -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(title)
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Nhập mã ngôn ngữ ISO 639-1 (2 ký tự):")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                TextField("VD: pt, ar, hi, bn...", text: $code)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 200)
+                
+                Text("Một số mã phổ biến: pt (Bồ Đào Nha), ar (Ả Rập), hi (Hindi), bn (Bengal), sw (Swahili), af (Afrikaans)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            HStack(spacing: 16) {
+                Button("Hủy") {
+                    code = ""
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+                
+                Button("Lưu") {
+                    let trimmedCode = code.trimmingCharacters(in: .whitespaces).lowercased()
+                    if !trimmedCode.isEmpty {
+                        onSave(trimmedCode)
+                    }
+                    code = ""
+                    isPresented = false
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 400)
     }
 }
 
@@ -209,7 +368,7 @@ class TranslationSectionViewModel: ObservableObject {
         objectWillChange.send()
     }
     
-    func testTranslation(from source: TranslationLanguage, to target: TranslationLanguage) {
+    func testTranslation(from sourceCode: String, to targetCode: String) {
         guard !testText.isEmpty else { return }
         
         isTranslating = true
@@ -220,8 +379,8 @@ class TranslationSectionViewModel: ObservableObject {
             do {
                 let result = try await service.translate(
                     text: testText,
-                    from: source,
-                    to: target
+                    from: sourceCode,
+                    to: targetCode
                 )
                 await MainActor.run {
                     self.testResult = result.translatedText

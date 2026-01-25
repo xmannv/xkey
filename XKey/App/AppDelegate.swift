@@ -2248,6 +2248,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\"")
         
+        // Show loading overlay near cursor
+        TranslationLoadingOverlay.shared.show()
+        
         // Perform translation asynchronously
         Task {
             do {
@@ -2258,6 +2261,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 
                 await MainActor.run {
+                    // Hide loading overlay
+                    TranslationLoadingOverlay.shared.hide()
+                    
                     // Preserve case pattern from original text
                     let finalText = service.preserveCase(original: textToTranslate, translated: result.translatedText)
                     debugWindowController?.logEvent("   Translated: \"\(result.translatedText.prefix(50))...\"")
@@ -2284,6 +2290,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             } catch {
                 await MainActor.run {
+                    // Hide loading overlay on error
+                    TranslationLoadingOverlay.shared.hide()
+                    
                     debugWindowController?.logEvent("   Translation failed: \(error.localizedDescription)")
                     showTranslationNotification(message: "Lỗi dịch: \(error.localizedDescription)")
                 }

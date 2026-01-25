@@ -30,8 +30,10 @@ class TranslationService {
     // MARK: - Initialization
     
     private init() {
-        // Register default providers
+        // Register default providers (only working free providers)
         registerProvider(GoogleTranslateProvider())
+        registerProvider(TencentTransmartProvider())
+        registerProvider(VolcanoEngineProvider())
         
         // Load saved configurations
         loadProviderConfigs()
@@ -93,10 +95,14 @@ class TranslationService {
     // MARK: - Translation
     
     /// Translate text using the first available enabled provider
+    /// - Parameters:
+    ///   - text: The text to translate
+    ///   - sourceLanguageCode: ISO 639-1 source language code (default: "auto")
+    ///   - targetLanguageCode: ISO 639-1 target language code
     func translate(
         text: String,
-        from sourceLanguage: TranslationLanguage = .auto,
-        to targetLanguage: TranslationLanguage
+        from sourceLanguageCode: String = "auto",
+        to targetLanguageCode: String
     ) async throws -> TranslationResult {
         
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -108,7 +114,7 @@ class TranslationService {
             throw TranslationError.providerDisabled
         }
         
-        log("Translating '\(text.prefix(50))...' from \(sourceLanguage.rawValue) to \(targetLanguage.rawValue)")
+        log("Translating '\(text.prefix(50))...' from \(sourceLanguageCode) to \(targetLanguageCode)")
         
         // Try each provider in order until one succeeds
         var lastError: Error?
@@ -116,8 +122,8 @@ class TranslationService {
             do {
                 let result = try await provider.translate(
                     text: text,
-                    from: sourceLanguage,
-                    to: targetLanguage
+                    from: sourceLanguageCode,
+                    to: targetLanguageCode
                 )
                 log("Translation successful via \(provider.name): '\(result.translatedText.prefix(50))...'")
                 return result
@@ -128,6 +134,19 @@ class TranslationService {
         }
         
         throw lastError ?? TranslationError.unknown("All providers failed")
+    }
+    
+    /// Translate using TranslationLanguage objects (convenience method)
+    func translate(
+        text: String,
+        from sourceLanguage: TranslationLanguage,
+        to targetLanguage: TranslationLanguage
+    ) async throws -> TranslationResult {
+        return try await translate(
+            text: text,
+            from: sourceLanguage.code,
+            to: targetLanguage.code
+        )
     }
     
     // MARK: - AX Text Reading
