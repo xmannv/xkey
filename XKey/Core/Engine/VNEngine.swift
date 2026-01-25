@@ -75,17 +75,85 @@ class VNEngine {
     var vQuickEndConsonant = 0     // 0: No, 1: Yes (g->ng, h->nh, k->ch)
     var vTempOffOpenKey = 0        // 0: No, 1: Yes (temp off engine with Option key)
     
-    // MARK: - Internal State (from Engine.cpp)
-    // Note: Using internal access for extension support
-    
-    var typingWord = [UInt32](repeating: 0, count: MAX_BUFF)
-    var index: UInt8 = 0
-    var longWordHelper = [UInt32]()
-    var typingStates = [[UInt32]]()
-    
-    var keyStates = [UInt32](repeating: 0, count: MAX_BUFF)
-    var stateIndex: UInt8 = 0
-    
+    // MARK: - Unified Buffer System
+    //
+    // Single source of truth for typing state.
+    // Each CharacterEntry contains both raw keystrokes and processed output.
+
+    /// Primary typing buffer
+    let buffer = TypingBuffer()
+
+    /// History of typed words for restore functionality
+    let history = TypingHistory()
+
+    // MARK: - Buffer Accessors
+    //
+    // Wrapper types provide array-like access to buffer while using
+    // unified buffer as single source of truth.
+
+    /// Wrapper for accessing processed character data with array syntax
+    struct ProcessedDataAccessor {
+        let buffer: TypingBuffer
+
+        subscript(i: Int) -> UInt32 {
+            get {
+                guard i >= 0 && i < buffer.count else { return 0 }
+                return buffer[i].processedData
+            }
+            nonmutating set {
+                guard i >= 0 && i < buffer.count else { return }
+                buffer[i].processedData = newValue
+            }
+        }
+
+        var count: Int { buffer.count }
+    }
+
+    /// Wrapper for accessing raw keystrokes with array syntax
+    struct RawKeystrokeAccessor {
+        let buffer: TypingBuffer
+
+        subscript(i: Int) -> UInt32 {
+            get {
+                // Use direct access instead of creating array each time
+                guard let keystroke = buffer.getRawKeystroke(at: i) else { return 0 }
+                return keystroke.asUInt32
+            }
+            nonmutating set {
+                // Raw keystrokes are managed through buffer operations
+            }
+        }
+
+        var count: Int { buffer.totalKeystrokeCount }
+    }
+
+    /// Access to processed data (typingWord replacement)
+    var typingWord: ProcessedDataAccessor {
+        ProcessedDataAccessor(buffer: buffer)
+    }
+
+    /// Access to raw keystrokes (keyStates replacement)
+    var keyStates: RawKeystrokeAccessor {
+        RawKeystrokeAccessor(buffer: buffer)
+    }
+
+    /// Number of characters in buffer
+    var index: UInt8 {
+        UInt8(min(buffer.count, Int(UInt8.max)))
+    }
+
+    /// Total raw keystrokes count
+    var stateIndex: UInt8 {
+        UInt8(min(buffer.totalKeystrokeCount, Int(UInt8.max)))
+    }
+
+    /// Get key code at index
+    func chr(_ idx: Int) -> UInt16 {
+        buffer.keyCode(at: idx)
+    }
+
+    // MARK: - Engine State
+
     var tempDisableKey = false
     var spaceCount = 0
     var hasHandledMacro = false
@@ -260,7 +328,7 @@ class VNEngine {
         // Handle special char saving
         if !isCharKeyCode {
             specialChar.removeAll()
-            typingStates.removeAll()
+            history.clear()
         } else {
             if spaceCount > 0 {
                 saveWord(keyCode: VietnameseData.KEY_SPACE, count: spaceCount)
@@ -287,7 +355,7 @@ class VNEngine {
             vCheckSpelling = useSpellCheckingBefore ? 1 : 0
             willTempOffEngine = false
         } else if hookState.code == UInt8(vReplaceMacro) || hasHandleQuickConsonant {
-            index = 0
+            buffer.clear()
         }
         
         // Upper case first char
@@ -304,60 +372,60 @@ class VNEngine {
     
     
     // MARK: - Delete Handling
-    
+
+    /// Handle delete/backspace key
     private func handleDelete() {
-        logCallback?("handleDelete: index=\(index), spaceCount=\(spaceCount), specialChar.count=\(specialChar.count)")
-        
+        let currentWord = !buffer.isEmpty ? getCurrentWord() : "(empty)"
+        logCallback?("handleDelete: count=\(buffer.count), spaceCount=\(spaceCount), specialChar=\(specialChar.count), word='\(currentWord)'")
+
         hookState.code = UInt8(vDoNothing)
-        hookState.extCode = 2 // delete
-        
+        hookState.extCode = 2
+
         if !specialChar.isEmpty {
             specialChar.removeLast()
             logCallback?("  → Removed special char, remaining=\(specialChar.count)")
             if specialChar.isEmpty {
-                logCallback?("  → specialChar empty, restoring...")
                 restoreLastTypingState()
             }
         } else if spaceCount > 0 {
             spaceCount -= 1
-            logCallback?("  → Removed space, remaining spaceCount=\(spaceCount)")
+            logCallback?("  → Removed space, remaining=\(spaceCount)")
             if spaceCount == 0 {
-                logCallback?("  → spaceCount=0, restoring...")
                 restoreLastTypingState()
             }
         } else {
-            if stateIndex > 0 {
-                stateIndex -= 1
-            }
-            if index > 0 {
-                index -= 1
-                logCallback?("  → Removed char, new index=\(index)")
-                if !longWordHelper.isEmpty {
-                    // Right shift
-                    for i in stride(from: VNEngine.MAX_BUFF - 1, through: 1, by: -1) {
-                        typingWord[i] = typingWord[i - 1]
-                    }
-                    typingWord[0] = longWordHelper.removeLast()
-                    index += 1
-                }
+            if !buffer.isEmpty {
+                buffer.removeLast()
+                logCallback?("  → Removed char, count=\(buffer.count)")
+
                 if vCheckSpelling == 1 {
                     checkSpelling()
                 }
             }
-            
+
             if vUseMacro == 1 && !hookState.macroKey.isEmpty {
                 hookState.macroKey.removeLast()
             }
-            
+
             hookState.backspaceCount = 0
             hookState.newCharCount = 0
             hookState.extCode = 2
-            
-            if index == 0 {
-                logCallback?("  → index=0, starting new session and restoring...")
+
+            if buffer.isEmpty {
+                logCallback?("  → Buffer empty, restoring...")
                 startNewSession()
                 specialChar.removeAll()
-                restoreLastTypingState()
+                
+                // CRITICAL: Only restore from history if cursor hasn't been moved
+                // If cursor was moved (click, arrow keys, app switch), history may contain
+                // stale data that doesn't match the actual screen content.
+                // Restoring in this case causes buffer desync (buffer has "tl" but screen has space).
+                if cursorMovedSinceReset {
+                    logCallback?("  → SKIP restore: cursor was moved, history may be stale")
+                    history.clear()  // Clear stale history to prevent future desync
+                } else {
+                    restoreLastTypingState()
+                }
             } else {
                 checkGrammar(deltaBackSpace: 1)
             }
@@ -403,7 +471,15 @@ class VNEngine {
             saveSpecialChar()
         }
 
-        insertState(keyCode: keyCode, isCaps: isCaps)
+        // NOTE: Removed unconditional insertState() call here.
+        // insertState was adding EVERY keystroke as a modifier to the last entry,
+        // causing getRawInputString() to return duplicate keystrokes (e.g., "ly" → "lyy").
+        // This led to false English pattern detection (e.g., "ltyyyyys" instead of "lys")
+        // and prevented Vietnamese typing like "lý".
+        // 
+        // If modifier tracking is needed for Telex sequences (aa→â, dd→đ, etc.),
+        // it should be added in the specific handlers (insertAOE, insertD, handleMarkKey)
+        // ONLY when a key actually modifies an existing entry.
         
         let isSpecial = isSpecialKey(keyCode: keyCode)
         
@@ -480,7 +556,10 @@ class VNEngine {
         // so we should NOT insert it again. Only insert key for normal restore (undo mark).
         if hookState.code == UInt8(vRestore) && hookState.extCode != 5 {
             insertKey(keyCode: keyCode, isCaps: isCaps)
-            stateIndex -= 1
+            // NOTE: We do NOT remove modifier here because raw keystrokes should reflect
+            // what user actually typed. E.g., "ass" should have raw keystrokes ["a", "s", "s"]
+            // The modifier "s" on entry "á" represents the first "s", and the new entry "s"
+            // from insertKey represents the second "s" that triggered restore.
         }
         
         // Insert or replace key for macro
@@ -495,8 +574,8 @@ class VNEngine {
                     }
                 }
                 let startIdx = Int(index) - hookState.backspaceCount
-                for i in startIdx..<(Int(hookState.newCharCount) + startIdx) {
-                    if i >= 0 && i < typingWord.count {
+                for i in startIdx..<(hookState.newCharCount + startIdx) {
+                    if i >= 0 && i < Int(index) {
                         hookState.macroKey.append(typingWord[i])
                     }
                 }
@@ -515,13 +594,13 @@ class VNEngine {
         
         // Handle bracket keys
         if isBracketKey(keyCode: keyCode) && (isBracketKey(hookState.charData[0]) || vInputType == 2 || vInputType == 3) {
-            if Int(index) - (hookState.code == UInt8(vWillProcess) ? hookState.backspaceCount : 0) > 0 {
-                index -= 1
+            let effectiveCount = buffer.count - (hookState.code == UInt8(vWillProcess) ? hookState.backspaceCount : 0)
+            if effectiveCount > 0 {
+                buffer.removeLast()
                 saveWord()
             }
-            index = 0
+            buffer.clear()
             tempDisableKey = false
-            stateIndex = 0
             hookState.extCode = 3
             specialChar.append(UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0))
         }
@@ -760,6 +839,13 @@ class VNEngine {
                     }
                     
                     insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
+                    
+                    // Track modifier keystroke for restore functionality
+                    // Only add if not a restore operation (duplicate mark key)
+                    // Add to the ACTUAL modified vowel (vowelWillSetMark), not the last entry
+                    if hookState.code != UInt8(vRestore) {
+                        insertStateAt(index: vowelWillSetMark, keyCode: keyCode, isCaps: isCaps)
+                    }
                     break
                 }
             }
@@ -796,6 +882,12 @@ class VNEngine {
                     
                     if markMask != 0 {
                         insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
+                        
+                        // Track modifier keystroke for restore functionality
+                        // Add to the ACTUAL modified vowel (vowelWillSetMark), not the last entry
+                        if hookState.code != UInt8(vRestore) {
+                            insertStateAt(index: vowelWillSetMark, keyCode: keyCode, isCaps: isCaps)
+                        }
                         return
                     }
                 }
@@ -1241,65 +1333,45 @@ class VNEngine {
     }
     
     // MARK: - Insert Functions
-    
+
+    /// Insert a new character into the buffer
     func insertKey(keyCode: UInt16, isCaps: Bool, isCheckSpelling: Bool = true) {
         let charDisplay = Self.keyCodeToChar(keyCode).map { " '\($0)'" } ?? ""
-        logCallback?("insertKey: keyCode=\(keyCode)\(charDisplay), isCaps=\(isCaps), currentIndex=\(index)")
-        
-        // IMPORTANT: Do NOT reset cursorMovedSinceReset here!
-        // The flag should remain true for the entire word if cursor was moved.
-        // This prevents incorrect restore when user:
-        // 1. Moves cursor to middle of word "hãy"
-        // 2. Deletes part of it (e.g., deletes "hãy")
-        // 3. Types partial word "ãy" + space
-        // Without this fix, engine would restore "ãy" to "axy" because it doesn't know
-        // the context of the original word "hãy".
-        // The flag will be reset only on word break (space) in processWordBreak.
-        
-        if index >= VNEngine.MAX_BUFF {
-            longWordHelper.append(typingWord[0])
-            // Left shift
-            for i in 0..<(VNEngine.MAX_BUFF - 1) {
-                typingWord[i] = typingWord[i + 1]
-            }
-            setKeyData(index: UInt8(VNEngine.MAX_BUFF - 1), keyCode: keyCode, isCaps: isCaps)
-        } else {
-            setKeyData(index: index, keyCode: keyCode, isCaps: isCaps)
-            index += 1
-            logCallback?("  → After insert: index=\(index), typingWord[\(index-1)]=\(typingWord[Int(index)-1])")
-        }
-        
+        logCallback?("insertKey: keyCode=\(keyCode)\(charDisplay), isCaps=\(isCaps), count=\(buffer.count)")
+
+        buffer.append(keyCode: keyCode, isCaps: isCaps)
+
+        logCallback?("  → After insert: count=\(buffer.count)")
+
         if vCheckSpelling == 1 && isCheckSpelling {
             checkSpelling()
         }
-        
+
         // Allow d after consonant
-        if keyCode == VietnameseData.KEY_D && index >= 2 {
-            let prevKey = UInt16(typingWord[Int(index) - 2] & VNEngine.CHAR_MASK)
+        if keyCode == VietnameseData.KEY_D && buffer.count >= 2 {
+            let prevKey = buffer.keyCode(at: buffer.count - 2)
             if vietnameseData.isConsonant(prevKey) {
                 tempDisableKey = false
             }
         }
     }
-    
-    func setKeyData(index: UInt8, keyCode: UInt16, isCaps: Bool) {
-        if index < 0 || index >= VNEngine.MAX_BUFF {
-            return
-        }
-        typingWord[Int(index)] = UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0)
+
+    /// Set processed data at a specific index
+    func setKeyData(at index: Int, keyCode: UInt16, isCaps: Bool) {
+        guard index >= 0 && index < buffer.count else { return }
+        buffer[index].processedData = UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0)
+    }
+
+    /// Record a raw keystroke as modifier (for Telex sequences like aa→â)
+    /// Adds to the LAST entry in buffer
+    func insertState(keyCode: UInt16, isCaps: Bool) {
+        buffer.addModifierToLast(RawKeystroke(keyCode: keyCode, isCaps: isCaps))
     }
     
-    func insertState(keyCode: UInt16, isCaps: Bool) {
-        if stateIndex >= VNEngine.MAX_BUFF {
-            // Left shift
-            for i in 0..<(VNEngine.MAX_BUFF - 1) {
-                keyStates[i] = keyStates[i + 1]
-            }
-            keyStates[VNEngine.MAX_BUFF - 1] = UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0)
-        } else {
-            keyStates[Int(stateIndex)] = UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0)
-            stateIndex += 1
-        }
+    /// Record a raw keystroke as modifier at a specific buffer index
+    /// Use this when the modified entry is NOT the last one (e.g., mark on first vowel of "ưa")
+    func insertStateAt(index: Int, keyCode: UInt16, isCaps: Bool) {
+        buffer.addModifier(at: index, keystroke: RawKeystroke(keyCode: keyCode, isCaps: isCaps))
     }
     
     private var isChanged = false
@@ -1323,7 +1395,10 @@ class VNEngine {
                 } else {
                     typingWord[i] |= VNEngine.TONE_MASK
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
-
+                    
+                    // Track modifier keystroke for restore functionality (dd→đ)
+                    // Add to the ACTUAL modified 'D' (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {
@@ -1440,6 +1515,10 @@ class VNEngine {
                     }
                     
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                    
+                    // Track modifier keystroke for restore functionality (aa→â, oo→ô, ee→ê)
+                    // Add to the ACTUAL modified vowel (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {
@@ -1547,6 +1626,12 @@ class VNEngine {
                 for i in vowelStartIndex..<Int(index) {
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
                 }
+                
+                // Track modifier keystroke for restore functionality (w→ư/ơ for multi-vowel)
+                // Add to the FIRST modified vowel (vowelStartIndex), not the last entry
+                if hookState.code != UInt8(vDoNothing) {
+                    insertStateAt(index: vowelStartIndex, keyCode: keyCode, isCaps: isCaps)
+                }
             }
             
             return
@@ -1571,14 +1656,9 @@ class VNEngine {
                         hookState.code = UInt8(vWillProcess)
                         if key == VietnameseData.KEY_U {
                             typingWord[i] = UInt32(VietnameseData.KEY_W) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
-                            // IMPORTANT: When undoing standalone "ư" → "w", we need to decrease stateIndex
-                            // to remove the first "w" keystroke from keyStates that was converted to "ư".
-                            // Without this, restore would send "ww" instead of just "w".
-                            // Example: typing "w + w + i + t + h" would restore "wwith" instead of "with"
+                            // When undoing standalone "ư" → "w", remove the modifier from the ACTUAL entry (index i)
                             isRestoredW = true
-                            if stateIndex > 1 {
-                                stateIndex -= 1
-                            }
+                            buffer.removeLastModifier(at: i)
                         } else if key == VietnameseData.KEY_O {
                             hookState.code = UInt8(vRestore)
                             typingWord[i] = UInt32(VietnameseData.KEY_O) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
@@ -1598,6 +1678,10 @@ class VNEngine {
                     typingWord[i] &= ~VNEngine.TONE_MASK
                     logCallback?("insertW: Added TONEW_MASK to typingWord[\(i)], now=\(String(format: "0x%X", typingWord[i]))")
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                    
+                    // Track modifier keystroke for restore functionality (w→ư/ơ/ă for single vowel)
+                    // Add to the ACTUAL modified vowel (index i), not the last entry
+                    insertStateAt(index: i, keyCode: keyCode, isCaps: isCaps)
                 }
                 break
             } else {
@@ -1942,15 +2026,6 @@ class VNEngine {
         // Final decision
         tempDisableKey = !(spellingOK && spellingVowelOK)
         logCallback?("checkSpelling result: spellingOK=\(spellingOK), spellingVowelOK=\(spellingVowelOK), tempDisableKey=\(tempDisableKey)")
-    }
-    
-    func chr(_ idx: Int) -> UInt16 {
-        // Match OpenKey behavior: directly access TypingWord without bounds check
-        // This is intentional to match the original C++ implementation
-        if idx < 0 || idx >= typingWord.count {
-            return 0
-        }
-        return UInt16(typingWord[idx] & VNEngine.CHAR_MASK)
     }
 
     // MARK: - Grammar Check
@@ -2347,16 +2422,8 @@ class VNEngine {
                             hookState.extCode = 5
                             logCallback?("  → Instant restore: bs=\(hookState.backspaceCount), chars=\(hookState.newCharCount), extCode=5")
                             
-                            // IMPORTANT: Reset engine state after instant restore
-                            // The word has been restored to English (raw keystrokes) so we don't need
-                            // to track it anymore. Without this reset, the old Vietnamese buffer would
-                            // cause incorrect backspace count when user presses space.
-                            index = 0
-                            stateIndex = 0
-                            // Clear typingWord buffer
-                            for i in 0..<typingWord.count {
-                                typingWord[i] = 0
-                            }
+                            // Reset engine after instant restore
+                            buffer.clear()
                         }
                         
                         // Set tempDisableKey so subsequent keys don't get processed as Vietnamese
@@ -2659,126 +2726,95 @@ class VNEngine {
     
     // MARK: - State Management
     
+    /// Save current word to history for restore functionality
+    /// Save current word to history
     func saveWord() {
-        // Skip saving when macro replacement or restore happens
-        // For restore: the typingWord buffer still contains old Vietnamese data,
-        // but the actual output has been restored to original keystrokes
         if hookState.code == UInt8(vReplaceMacro) || hookState.code == UInt8(vRestore) {
-            logCallback?("saveWord: Skipping save because hookState.code=\(hookState.code) (macro or restore)")
+            logCallback?("saveWord: Skipping (macro or restore)")
             return
         }
-        
-        if index > 0 {
-            if !longWordHelper.isEmpty {
-                var tempData = [UInt32]()
-                for i in 0..<longWordHelper.count {
-                    if i != 0 && i % VNEngine.MAX_BUFF == 0 {
-                        typingStates.append(tempData)
-                        tempData.removeAll()
-                    }
-                    tempData.append(longWordHelper[i])
-                }
-                typingStates.append(tempData)
-                longWordHelper.removeAll()
-            }
-            
-            var tempData = [UInt32]()
-            for i in 0..<Int(index) {
-                tempData.append(typingWord[i])
-            }
-            typingStates.append(tempData)
-            logCallback?("saveWord: saved '\(getCurrentWord())' to typingStates, total=\(typingStates.count)")
-        } else {
-            logCallback?("saveWord: nothing to save (index=0)")
+
+        guard !buffer.isEmpty else {
+            logCallback?("saveWord: nothing to save (empty)")
+            return
         }
+
+        let snapshot = buffer.createSnapshot()
+        history.save(snapshot)
+        logCallback?("saveWord: saved '\(getCurrentWord())' to history, count=\(history.count)")
     }
-    
+
+    /// Save spaces to history
     func saveWord(keyCode: UInt16, count: Int) {
-        var tempData = [UInt32]()
-        for _ in 0..<count {
-            tempData.append(UInt32(keyCode))
-        }
-        typingStates.append(tempData)
+        history.saveSpaces(count: count, keyCode: keyCode)
     }
-    
+
+    /// Save special characters to history
     private func saveSpecialChar() {
-        typingStates.append(specialChar)
+        guard !specialChar.isEmpty else { return }
+
+        var entries: [CharacterEntry] = []
+        for data in specialChar {
+            entries.append(CharacterEntry(fromLegacy: data))
+        }
+        let snapshot = BufferSnapshot(entries: entries, overflow: [])
+        history.save(snapshot)
         specialChar.removeAll()
     }
-    
-    func restoreLastTypingState() {
-        logCallback?("restoreLastTypingState: typingStates.count=\(typingStates.count)")
 
-        if typingStates.isEmpty {
-            logCallback?("  → typingStates is empty, nothing to restore")
-            // Engine has lost context (no states to restore)
-            // Set cursorMovedSinceReset so next word uses AX API for spell checking
+    /// Restore last word from history
+    func restoreLastTypingState() {
+        logCallback?("restoreLastTypingState: history.count=\(history.count)")
+
+        guard let lastSnapshot = history.popLast() else {
+            logCallback?("  → history empty, nothing to restore")
             cursorMovedSinceReset = true
-            logCallback?("  → Set cursorMovedSinceReset=true (engine lost context)")
             return
         }
-        
-        let lastState = typingStates.removeLast()
-        if lastState.isEmpty {
-            logCallback?("  → lastState is empty")
+
+        guard !lastSnapshot.entries.isEmpty else {
+            logCallback?("  → snapshot empty")
             return
         }
-        
-        if lastState[0] == UInt32(VietnameseData.KEY_SPACE) {
-            spaceCount = lastState.count
-            index = 0
-            logCallback?("  → Restored space: spaceCount=\(spaceCount)")
-        } else if vietnameseData.charKeyCode.contains(UInt16(lastState[0] & VNEngine.CHAR_MASK)) {
-            index = 0
-            specialChar = lastState
+
+        let firstKeyCode = lastSnapshot.firstKeyCode ?? 0
+
+        if firstKeyCode == VietnameseData.KEY_SPACE {
+            spaceCount = lastSnapshot.count
+            buffer.clear()
+            logCallback?("  → Restored spaces: \(spaceCount)")
+        } else if vietnameseData.charKeyCode.contains(firstKeyCode) {
+            buffer.clear()
+            specialChar = lastSnapshot.allProcessedData
             if vCheckSpelling == 1 {
                 checkSpelling()
             }
-            logCallback?("  → Restored special char: count=\(specialChar.count)")
+            logCallback?("  → Restored special chars: \(specialChar.count)")
         } else {
-            for i in 0..<lastState.count {
-                typingWord[i] = lastState[i]
-                // Also restore to keyStates for checkRestoreIfWrongSpelling
-                keyStates[i] = lastState[i]
-            }
-            index = UInt8(lastState.count)
-            stateIndex = UInt8(lastState.count)
-            
-            // OpenKey behavior: After restoring a normal word, DO NOT call checkSpelling()
-            // This is intentional - it enables "free mark" feature by keeping tempDisableKey = false
-            // (which was reset by startNewSession() before calling restoreLastTypingState())
-            // This allows users to add marks to the restored word freely
-            
-            // Also reset tempDisableKey to false to ensure free mark works
-            // This is needed because startNewSession() may not have been called before this
-            // (e.g., when restoring after deleting spaces)
+            buffer.restore(from: lastSnapshot)
             tempDisableKey = false
-            logCallback?("  → Restored word: index=\(index), stateIndex=\(stateIndex), buffer=\(getCurrentWord())")
+            logCallback?("  → Restored word: count=\(buffer.count), word='\(getCurrentWord())'")
         }
     }
-    
+
+    /// Start a new typing session
     func startNewSession() {
-        let prevIndex = index
-        let prevWord = prevIndex > 0 ? getCurrentWord() : ""
-        
-        index = 0
+        let prevWord = !buffer.isEmpty ? getCurrentWord() : ""
+        let prevCount = buffer.count
+
+        buffer.clear()
+
         hookState.backspaceCount = 0
         hookState.newCharCount = 0
-        hookState.macroKey.removeAll()  // Clear macro key for new word
+        hookState.macroKey.removeAll()
+
         tempDisableKey = false
-        stateIndex = 0
         hasHandledMacro = false
         hasHandleQuickConsonant = false
-        longWordHelper.removeAll()
-        
-        // Clear typingWord array to prevent stale data (defensive measure)
-        for i in 0..<VNEngine.MAX_BUFF {
-            typingWord[i] = 0
-        }
-        
-        logCallback?("startNewSession: cleared buffer (prevIndex=\(prevIndex), prevWord='\(prevWord)')")
+
+        logCallback?("startNewSession: cleared (prev='\(prevWord)', count=\(prevCount))")
     }
-    
+
     // MARK: - Character Code Conversion
     
     /// Convert internal code to actual character code based on code table
@@ -2893,12 +2929,12 @@ class VNEngine {
     /// Reset engine to initial state
     func reset() {
         startNewSession()
-        typingStates.removeAll()
+        history.clear()
         specialChar.removeAll()
         spaceCount = 0
         vCheckSpelling = useSpellCheckingBefore ? 1 : 0
         willTempOffEngine = false
-        cursorMovedSinceReset = false  // Reset cursor moved flag
+        cursorMovedSinceReset = false
     }
 
     /// Reset engine with cursor movement flag set
@@ -2909,8 +2945,8 @@ class VNEngine {
         cursorMovedSinceReset = true
         logCallback?("resetWithCursorMoved: cursor moved flag set")
     }
-    
-    /// Get current typing word as string (for debugging)
+
+    /// Get current typing word as string (for debugging and display)
     func getCurrentWord() -> String {
         var result = ""
         for i in 0..<Int(index) {
@@ -3329,21 +3365,14 @@ extension VNEngine {
             // If we don't reset index, when space is pressed next, engine still sees
             // index=5 and tries to restore "space", deleting the opening " incorrectly.
             spaceCount = 1
-            
-            // Reset buffer but preserve macroKey (don't use startNewSession which clears macroKey)
-            index = 0
+
+            // Reset buffer but preserve macroKey
+            buffer.clear()
             hookState.backspaceCount = 0
             hookState.newCharCount = 0
             tempDisableKey = false
-            stateIndex = 0
             hasHandledMacro = false
             hasHandleQuickConsonant = false
-            longWordHelper.removeAll()
-            
-            // Clear typingWord array to prevent stale data
-            for i in 0..<VNEngine.MAX_BUFF {
-                typingWord[i] = 0
-            }
         }
         
         // Reset spell checking to original setting

@@ -361,20 +361,21 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             let hasModifierCombo = hasCommand || hasControl || hasOption || modifierCount >= 2
             
             if hasModifierCombo {
-                engine.reset()
-                
                 // Check if this is a cursor movement key
                 let keyCode = event.keyCode
                 let cursorMovementKeys: [CGKeyCode] = [0x7B, 0x7C, 0x7D, 0x7E, 0x73, 0x77, 0x74, 0x79] // Arrow keys, Home, End, Page Up/Down
                 let isCursorMovement = cursorMovementKeys.contains(keyCode)
                 
                 if isCursorMovement {
-                    // Cursor movement → set isTypingMidSentence = true
-                    // User moved cursor, so there may be text after cursor
+                    // CRITICAL FIX: Use resetWithCursorMoved() to properly set the flag
+                    // This ensures history is cleared and restore logic is skipped
+                    // Previously, engine.reset() was called which didn't set cursorMovedSinceReset
+                    engine.resetWithCursorMoved()
                     injector.markNewSession(cursorMoved: true)
                 } else {
                     // Other combos (Cmd+C/V/Z, Ctrl+K, etc.) → preserve mid-sentence state
                     // These don't move cursor position, so keep existing flag value
+                    engine.reset()
                     injector.markNewSession(preserveMidSentence: true)
                 }
                 return false
@@ -384,6 +385,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
 
         return true
+    }
+    
+    // Helper to get timestamp for debug logging
+    private func getTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter.string(from: Date())
     }
     
     func processKeyEvent(_ event: CGEvent, type: CGEventType, proxy: CGEventTapProxy) -> CGEvent? {
@@ -399,6 +407,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Handle Backspace/Delete
         if keyCode == 0x33 {
+            debugLogCallback?("[\(getTimestamp())] ⌫ BACKSPACE received (keyCode=0x33)")
             return handleBackspace(event: event, proxy: proxy)
         }
 
@@ -415,6 +424,19 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         ]
 
         if cursorMovementKeys.contains(keyCode) {
+            let keyName: String
+            switch keyCode {
+            case 0x7B: keyName = "←"
+            case 0x7C: keyName = "→"
+            case 0x7D: keyName = "↓"
+            case 0x7E: keyName = "↑"
+            case 0x73: keyName = "Home"
+            case 0x77: keyName = "End"
+            case 0x74: keyName = "PgUp"
+            case 0x79: keyName = "PgDn"
+            default: keyName = "?"
+            }
+            debugLogCallback?("[\(getTimestamp())] \(keyName) Arrow/Nav key received (keyCode=0x\(String(format: "%02X", keyCode)))")
             engine.resetWithCursorMoved()  // Use new method that sets cursor moved flag
             injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
             return event
@@ -482,6 +504,15 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
 
         if isWordBreakKey(character) {
+            // Log word break key
+            let keyName: String
+            switch character {
+            case " ": keyName = "SPACE"
+            case "\n", "\r": keyName = "ENTER"
+            default: keyName = "'\(character)'"
+            }
+            debugLogCallback?("[\(getTimestamp())] \(keyName) Word-break received (index=\(engine.index), spaceCount=\(engine.spaceCount))")
+            
             // IMPORTANT: Check if engine has buffer OR macroKey before processing word break
             // If engine buffer is empty (index == 0) AND no macroKey, it means:
             // 1. User just started typing, OR
@@ -561,7 +592,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Wait for any pending injection to complete before processing next keystroke
         // Uses semaphore synchronization to prevent race conditions
+        let waitStart = CFAbsoluteTimeGetCurrent()
         injector.waitForInjectionComplete()
+        let waitTime = (CFAbsoluteTimeGetCurrent() - waitStart) * 1000
+        if waitTime > 1.0 {
+            debugLogCallback?("[\(getTimestamp())] ⏱ Waited \(String(format: "%.1f", waitTime))ms for previous injection")
+        }
 
         // Process through engine (Vietnamese mode)
         let result = engine.processKey(
@@ -598,10 +634,20 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // In English mode with macro, only update macro buffer
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
         if isEnglishModeWithMacro {
+            debugLogCallback?("[\(getTimestamp())] ⌫ Backspace in English+Macro mode - pass through")
             engine.updateMacroBufferOnBackspace()
             return event  // Pass through
         }
 
+        // Wait for injection before processing backspace
+        let waitStart = CFAbsoluteTimeGetCurrent()
+        injector.waitForInjectionComplete()
+        let waitTime = (CFAbsoluteTimeGetCurrent() - waitStart) * 1000
+        if waitTime > 1.0 {
+            debugLogCallback?("[\(getTimestamp())] ⏱ Backspace waited \(String(format: "%.1f", waitTime))ms for injection")
+        }
+        
+        debugLogCallback?("[\(getTimestamp())] ⌫ Processing backspace (index=\(engine.index), spaceCount=\(engine.spaceCount))")
         let result = engine.processBackspace()
 
         if result.shouldConsume {

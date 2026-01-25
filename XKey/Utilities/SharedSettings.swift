@@ -59,6 +59,8 @@ enum SharedSettingsKey: String {
 
     // Debug settings
     case debugModeEnabled = "XKey.debugModeEnabled"
+    case debugHotkeyCode = "XKey.debugHotkeyCode"
+    case debugHotkeyModifiers = "XKey.debugHotkeyModifiers"
 
     // IMKit settings
     case imkitUseMarkedText = "XKey.imkitUseMarkedText"
@@ -85,6 +87,14 @@ enum SharedSettingsKey: String {
     
     // User dictionary (custom words to skip spell check)
     case userDictionaryWords = "XKey.userDictionaryWords"
+    
+    // Translation settings
+    case translationEnabled = "XKey.translationEnabled"
+    case translationHotkeyCode = "XKey.translationHotkeyCode"
+    case translationHotkeyModifiers = "XKey.translationHotkeyModifiers"
+    case translationSourceLanguage = "XKey.translationSourceLanguage"
+    case translationTargetLanguage = "XKey.translationTargetLanguage"
+    case translationReplaceOriginal = "XKey.translationReplaceOriginal"
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -471,7 +481,35 @@ class SharedSettings {
 
     var debugModeEnabled: Bool {
         get { readBool(forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
-        set { writeBool(newValue, forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.debugModeEnabled.rawValue)
+            notifyDebugSettingsChanged()
+        }
+    }
+
+    var debugHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.debugHotkeyCode.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.debugHotkeyCode.rawValue)
+            notifyDebugSettingsChanged()
+        }
+    }
+
+    var debugHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.debugHotkeyModifiers.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.debugHotkeyModifiers.rawValue)
+            notifyDebugSettingsChanged()
+        }
+    }
+
+    /// Notify that debug settings have changed
+    private func notifyDebugSettingsChanged() {
+        guard !isBatchUpdating else { return }
+        NotificationCenter.default.post(
+            name: .debugSettingsDidChange,
+            object: nil
+        )
     }
 
     // MARK: - IMKit Settings
@@ -514,6 +552,56 @@ class SharedSettings {
     var menuBarIconStyle: String {
         get { readString(forKey: SharedSettingsKey.menuBarIconStyle.rawValue) ?? "X" }
         set { writeString(newValue, forKey: SharedSettingsKey.menuBarIconStyle.rawValue) }
+    }
+
+    // MARK: - Translation Settings
+
+    var translationEnabled: Bool {
+        get { readBool(forKey: SharedSettingsKey.translationEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.translationEnabled.rawValue)
+            notifyTranslationSettingsChanged()
+        }
+    }
+
+    var translationHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.translationHotkeyCode.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.translationHotkeyCode.rawValue)
+            notifyTranslationSettingsChanged()
+        }
+    }
+
+    var translationHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.translationHotkeyModifiers.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.translationHotkeyModifiers.rawValue)
+            notifyTranslationSettingsChanged()
+        }
+    }
+
+    var translationSourceLanguage: String {
+        get { readString(forKey: SharedSettingsKey.translationSourceLanguage.rawValue) ?? "auto" }
+        set { writeString(newValue, forKey: SharedSettingsKey.translationSourceLanguage.rawValue) }
+    }
+
+    var translationTargetLanguage: String {
+        get { readString(forKey: SharedSettingsKey.translationTargetLanguage.rawValue) ?? "vi" }
+        set { writeString(newValue, forKey: SharedSettingsKey.translationTargetLanguage.rawValue) }
+    }
+
+    var translationReplaceOriginal: Bool {
+        get { readBool(forKey: SharedSettingsKey.translationReplaceOriginal.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translationReplaceOriginal.rawValue) }
+    }
+
+    /// Notify that translation settings have changed
+    private func notifyTranslationSettingsChanged() {
+        guard !isBatchUpdating else { return }
+        NotificationCenter.default.post(
+            name: .translationSettingsDidChange,
+            object: nil
+        )
     }
 
     // MARK: - Excluded Apps
@@ -853,6 +941,32 @@ class SharedSettings {
             prefs.excludedApps = apps
         }
 
+        // Translation settings
+        prefs.translationEnabled = translationEnabled
+        let transHotkeyCode = translationHotkeyCode
+        let transHotkeyModifiers = translationHotkeyModifiers
+        if transHotkeyCode != 0 || transHotkeyModifiers != 0 {
+            prefs.translationHotkey = Hotkey(
+                keyCode: transHotkeyCode,
+                modifiers: ModifierFlags(rawValue: transHotkeyModifiers)
+            )
+        }
+        // Translation language codes (stored as String)
+        prefs.translationSourceLanguageCode = translationSourceLanguage
+        prefs.translationTargetLanguageCode = translationTargetLanguage
+        prefs.translationReplaceOriginal = translationReplaceOriginal
+
+        // Debug settings
+        prefs.debugModeEnabled = debugModeEnabled
+        let dbgHotkeyCode = debugHotkeyCode
+        let dbgHotkeyModifiers = debugHotkeyModifiers
+        if dbgHotkeyCode != 0 || dbgHotkeyModifiers != 0 {
+            prefs.debugHotkey = Hotkey(
+                keyCode: dbgHotkeyCode,
+                modifiers: ModifierFlags(rawValue: dbgHotkeyModifiers)
+            )
+        }
+
         return prefs
     }
 
@@ -944,6 +1058,14 @@ class SharedSettings {
             setExcludedApps(data)
         }
 
+        // Translation settings
+        translationEnabled = prefs.translationEnabled
+        translationHotkeyCode = prefs.translationHotkey.keyCode
+        translationHotkeyModifiers = prefs.translationHotkey.modifiers.rawValue
+        translationSourceLanguage = prefs.translationSourceLanguageCode
+        translationTargetLanguage = prefs.translationTargetLanguageCode
+        translationReplaceOriginal = prefs.translationReplaceOriginal
+
         // Batch update is done - settings are already written to plist via setters
         isBatchUpdating = false
 
@@ -955,6 +1077,17 @@ class SharedSettings {
 
         // Also notify convert tool hotkey changed
         notifyConvertToolHotkeyChanged()
+
+        // Also notify translation settings changed
+        notifyTranslationSettingsChanged()
+
+        // Debug settings
+        debugModeEnabled = prefs.debugModeEnabled
+        debugHotkeyCode = prefs.debugHotkey.keyCode
+        debugHotkeyModifiers = prefs.debugHotkey.modifiers.rawValue
+
+        // Also notify debug settings changed
+        notifyDebugSettingsChanged()
     }
 }
 
@@ -972,4 +1105,10 @@ extension Notification.Name {
 
     /// Posted when convert tool hotkey changes
     static let convertToolHotkeyDidChange = Notification.Name("XKey.convertToolHotkeyDidChange")
+
+    /// Posted when translation settings change
+    static let translationSettingsDidChange = Notification.Name("XKey.translationSettingsDidChange")
+
+    /// Posted when debug settings change
+    static let debugSettingsDidChange = Notification.Name("XKey.debugSettingsDidChange")
 }

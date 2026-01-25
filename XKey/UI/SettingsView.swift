@@ -18,6 +18,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case inputSources = "Input Sources"
     case excludedApps = "Loại trừ"
     case macro = "Macro"
+    case translation = "Dịch thuật"
     case convertTool = "Chuyển đổi"
     case appearance = "Giao diện"
     case backupRestore = "Sao lưu"
@@ -33,6 +34,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .inputSources: return "globe"
         case .excludedApps: return "app.badge.fill"
         case .macro: return "text.badge.plus"
+        case .translation: return "globe.americas"
         case .convertTool: return "arrow.left.arrow.right"
         case .appearance: return "paintbrush"
         case .backupRestore: return "arrow.up.arrow.down.circle"
@@ -82,6 +84,8 @@ struct SettingsView: View {
                     ExcludedAppsSection(viewModel: viewModel)
                 case .macro:
                     MacroSection(prefsViewModel: viewModel)
+                case .translation:
+                    TranslationSection(viewModel: viewModel)
                 case .convertTool:
                     ConvertToolSection()
                 case .appearance:

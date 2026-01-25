@@ -40,7 +40,7 @@ class DebugLogger {
     }
     
     /// Whether verbose logging is enabled
-    var isVerboseLogging: Bool = false
+    var isVerboseLogging: Bool = true
     
     /// Whether logging is enabled
     var isLoggingEnabled: Bool = true

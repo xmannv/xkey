@@ -5,7 +5,7 @@
   
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
-  [![Version](https://img.shields.io/badge/version-1.2.19-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/version-1.2.20-blue.svg)](https://github.com/xmannv/xkey/releases)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -30,6 +30,7 @@ Các bộ gõ tiếng Việt hiện tại trên macOS đang gặp một số v�
 - 🔧 **Ổn định & Cập nhật thường xuyên**: Code base hiện đại, được test kỹ lưỡng với auto-update
 - 🛠️ **Debug Window**: Cửa sổ debug chuyên nghiệp giúp developer theo dõi real-time hoạt động của bộ gõ
 - 🚀 **Tính năng thông minh**: Smart Switch, Macro, Quick Typing, kiểm tra chính tả, từ điển cá nhân
+- 🌐 **Dịch thuật nhanh**: Dịch văn bản với phím tắt, hỗ trợ 30+ ngôn ngữ qua nhiều nhà cung cấp (Google, Tencent, Volcano)
 - 🎨 **Giao diện hiện đại**: Thiết kế theo phong cách Apple với SwiftUI
 - 🔒 **Bảo mật**: Chạy local, không thu thập dữ liệu người dùng
 - ⌨️ **Dual Mode**: Hỗ trợ cả CGEvent và Input Method Kit (XKeyIM)
@@ -107,14 +108,42 @@ Truy cập nhanh với phím tắt tùy chỉnh:
 - 🔍 Hỗ trợ phát hiện Spotlight/Raycast/Alfred overlay apps
 - 🔄 Tự động chuyển ngôn ngữ khi chuyển app
 
-### 9. Quản lý Input Sources
+### 9. Dịch thuật nhanh (Translation)
+
+Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh:
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Phím tắt dịch** | Chọn văn bản và nhấn phím tắt để dịch ngay lập tức |
+| **Tự động thay thế** | Thay thế văn bản gốc bằng bản dịch hoặc copy vào clipboard |
+| **Tự động nhận diện** | Nhận diện ngôn ngữ nguồn tự động |
+| **Đa ngôn ngữ** | Hỗ trợ 30+ ngôn ngữ phổ biến (Anh, Việt, Trung, Nhật, Hàn, Pháp, Đức...) |
+| **Ngôn ngữ tùy chỉnh** | Nhập mã ISO 639-1 để sử dụng bất kỳ ngôn ngữ nào |
+
+**Nhà cung cấp dịch thuật:**
+
+| Nhà cung cấp | Mô tả |
+|--------------|-------|
+| **Google Translate** | Miễn phí, hỗ trợ đa ngôn ngữ, chất lượng tốt |
+| **Tencent Transmart** | Miễn phí, tối ưu cho các ngôn ngữ Châu Á |
+| **Volcano Engine** | Miễn phí, chất lượng cao cho tiếng Trung ↔ Việt |
+
+**Tính năng nổi bật:**
+- ✅ Fallback tự động: Nếu nhà cung cấp này lỗi, tự động thử nhà cung cấp khác
+- ✅ Giữ nguyên định dạng chữ hoa/thường (ALL CAPS, Capitalize, lowercase)
+- ✅ Overlay loading hiển thị trạng thái đang dịch
+- ✅ Lấy văn bản thông minh: Accessibility API với fallback sang Clipboard
+
+**Cấu hình:** Settings → Dịch thuật
+
+### 10. Quản lý Input Sources
 
 - 📋 Xem danh sách tất cả Input Sources
 - ✅ Bật/tắt XKey cho từng Input Source cụ thể
 - 🔀 Phím tắt chuyển nhanh sang XKey/ABC
 - 🔔 Tự động phát hiện Input Sources tiếng Việt khác
 
-### 10. Hiệu chỉnh XKey Engine theo ứng dụng (Window Title Rules)
+### 11. Hiệu chỉnh XKey Engine theo ứng dụng (Window Title Rules)
 
 Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, giải quyết vấn đề gõ tiếng Việt trong các web apps:
 
@@ -152,7 +181,7 @@ Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, gi�
 
 > **💡 Lưu ý:** Nếu bạn sử dụng Google Docs/Sheets/Slides với ngôn ngữ **tiếng Việt**, tiêu đề cửa sổ sẽ hiển thị là **"Google Tài liệu"**, **"Google Trang tính"**, **"Google Trang trình bày"**. Bạn cần tạo thêm quy tắc với Title Pattern tương ứng.
 
-### 11. Tính năng khác
+### 12. Tính năng khác
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -255,12 +284,15 @@ Xem hướng dẫn chi tiết tại [XKeyIM/README.md](XKeyIM/README.md)
 XKey/
 ├── Shared/               # Shared code between XKey and XKeyIM
 │   ├── SharedSettings.swift
-│   └── AppBehaviorDetector.swift
+│   ├── AppBehaviorDetector.swift
+│   ├── DebugLogger.swift
+│   └── TranslationLanguage.swift
 ├── XKey/
 │   ├── App/              # Entry point, AppDelegate
 │   ├── Core/             # Core engine
 │   │   ├── Engine/       # Vietnamese input engine (VNEngine.swift, etc.)
-│   │   └── Models/       # Data models (Preferences, VNCharacter, etc.)
+│   │   ├── Models/       # Data models (Preferences, VNCharacter, etc.)
+│   │   └── Translation/  # Translation service with multiple providers
 │   ├── EventHandling/    # Keyboard event handling, EventTap
 │   ├── InputMethod/      # Input source management
 │   ├── UI/               # SwiftUI views and settings sections
