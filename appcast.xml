@@ -6,28 +6,40 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260125)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125</link>
-      <sparkle:version>20260125</sparkle:version>
+      <title>Version 1.2.20 (Build 20260125.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125.1</link>
+      <sparkle:version>20260125.1</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>docs: Update README with Translation feature and new version 1.2.20</p>
+<p>feat: Add Translation feature with multiple providers</p>
+<p>Translation Feature:</p>
 <ul>
-<li>Update version badge from 1.2.19 to 1.2.20</li>
-<li>Add new Translation feature section (Section 9)</li>
-<li>Document 3 translation providers: Google, Tencent Transmart, Volcano Engine</li>
-<li>Add Translation to highlights with 30+ supported languages</li>
-<li>Update project structure to include Translation/ directory</li>
-<li>Update section numbering (Input Sources → 10, Window Rules → 11, Others → 12)</li>
-<li>Add new files: DebugLogger.swift, TranslationLanguage.swift to Shared</li>
-<li>Fix broken emoji characters</li>
+<li>Add Translation hotkey to translate selected text instantly</li>
+<li>Support 30+ languages with auto-detect source language</li>
+<li>3 translation providers: Google Translate, Tencent Transmart, Volcano Engine</li>
+<li>Auto fallback when a provider fails</li>
+<li>Preserve text case (ALL CAPS, Capitalize, lowercase)</li>
+<li>Loading overlay with status indicator</li>
+<li>Smart text retrieval via Accessibility API with Clipboard fallback</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125">Xem chi tiết trên GitHub</a></p>
+<p>UI Improvements:</p>
+<ul>
+<li>Add Translation settings section</li>
+<li>Add GitHub and Bug Report icons to About section</li>
+<li>Optimize state management and focus detection</li>
+</ul>
+<p>Documentation:</p>
+<ul>
+<li>Update README with Translation feature documentation</li>
+<li>Update version to 1.2.20</li>
+<li>Update project structure with Translation directory</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260125.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 25 Jan 2026 09:16:22 +0000</pubDate>
+      <pubDate>Sun, 25 Jan 2026 12:48:00 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260125/XKey.dmg" sparkle:version="20260125" sparkle:shortVersionString="1.2.20" length="11111921" type="application/octet-stream" sparkle:edSignature="/77dquX/CWBF/Z1xYs9OBAWoM3+YgJfEZNH3HFgkVDn9ndNhIfkonNtRyGE5DKQFkV400+nZSOXA0tr+45ldDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260125.1/XKey.dmg" sparkle:version="20260125.1" sparkle:shortVersionString="1.2.20" length="11112352" type="application/octet-stream" sparkle:edSignature="al+RvN5zHfxOCGL4YTdK/YSfSSQLm9K79a6QHgqgK/SWzDpydBaSgk66GZZT7IJeChYpqqa225ziWh7KqWuDAg==" />
     </item>
   </channel>
 </rss>
