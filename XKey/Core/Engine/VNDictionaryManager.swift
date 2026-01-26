@@ -83,7 +83,11 @@ class VNDictionaryManager {
         DebugLogger.shared.log("[VNDict] Starting download from: \(urlString)")
         DebugLogger.shared.log("[VNDict] Target directory: \(dictionaryDirectory.path)")
 
-        let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+        // Use URLRequest with cache policy to always fetch fresh data from server
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
 
             if let error = error {

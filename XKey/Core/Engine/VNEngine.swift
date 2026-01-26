@@ -174,6 +174,12 @@ class VNEngine {
     /// at word break to detect and handle desync.
     var focusChangedDuringTyping = false
 
+    /// Flag to track when buffer-screen desync was detected via AX
+    /// When true, spelling check and restore are disabled until new session starts.
+    /// This prevents incorrect restore when engine doesn't have full context (e.g., user
+    /// clicked mid-word and continued typing, or backspaced across word boundary).
+    var bufferDesyncDetected = false
+
     
     // MARK: - Logging
 
@@ -427,24 +433,34 @@ class VNEngine {
             specialChar.removeLast()
             logCallback?("  → Removed special char, remaining=\(specialChar.count)")
             if specialChar.isEmpty {
-                // Verify before restore to prevent desync issues
-                if verifyBufferMatchesScreen() {
-                    restoreLastTypingState()
+                // Only verify AX when there's indication of desync (focus/cursor change)
+                // Normal backspace: trust history - AX has race condition (returns stale data)
+                if cursorMovedSinceReset || focusChangedDuringTyping {
+                    if verifyBufferMatchesScreen() {
+                        restoreLastTypingState()
+                    } else {
+                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
+                        clearWithoutRestore()
+                    }
                 } else {
-                    logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
-                    clearWithoutRestore()
+                    restoreLastTypingState()
                 }
             }
         } else if spaceCount > 0 {
             spaceCount -= 1
             logCallback?("  → Removed space, remaining=\(spaceCount)")
             if spaceCount == 0 {
-                // Verify before restore to prevent desync issues
-                if verifyBufferMatchesScreen() {
-                    restoreLastTypingState()
+                // Only verify AX when there's indication of desync (focus/cursor change)
+                // Normal backspace: trust history - AX has race condition (returns stale data)
+                if cursorMovedSinceReset || focusChangedDuringTyping {
+                    if verifyBufferMatchesScreen() {
+                        restoreLastTypingState()
+                    } else {
+                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
+                        clearWithoutRestore()
+                    }
                 } else {
-                    logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
-                    clearWithoutRestore()
+                    restoreLastTypingState()
                 }
             }
         } else {
@@ -475,16 +491,24 @@ class VNEngine {
                 if cursorMovedSinceReset {
                     logCallback?("  → SKIP restore: cursor was moved, history may be stale")
                     history.clear()
-                } else {
-                    // Layer 2: Verify with AX if buffer actually matches screen
-                    // This catches desync cases that cursorMovedSinceReset misses
-                    // (e.g., app autocomplete, undo, programmatic text changes)
+                } else if focusChangedDuringTyping {
+                    // Layer 2: Focus changed during typing - verify with AX
+                    // This catches desync when suggestion popups steal keystrokes
                     if verifyBufferMatchesScreen() {
                         restoreLastTypingState()
                     } else {
-                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
-                        history.clear()  // Clear stale history
+                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch (focus changed)")
+                        history.clear()
+                        bufferDesyncDetected = true
                     }
+                } else {
+                    // Layer 3: Normal backspace - trust history without AX verify
+                    // REASON: AX query has race condition - it may return stale data
+                    // because we process backspace event BEFORE OS updates the screen.
+                    // When user is backspacing continuously without focus/cursor change,
+                    // history is reliable and we should restore directly.
+                    logCallback?("  → Normal backspace: restoring from history (no AX verify - timing issue)")
+                    restoreLastTypingState()
                 }
             } else {
                 checkGrammar(deltaBackSpace: 1)
@@ -499,7 +523,9 @@ class VNEngine {
         history.clear()
         specialChar.removeAll()
         spaceCount = 0
-        logCallback?("clearWithoutRestore: Session cleared due to desync")
+        // Set desync flag to disable spellcheck/restore until new session
+        bufferDesyncDetected = true
+        logCallback?("clearWithoutRestore: Session cleared due to desync, bufferDesyncDetected=true")
     }
     
 
@@ -2902,6 +2928,8 @@ class VNEngine {
         tempDisableKey = false
         hasHandledMacro = false
         hasHandleQuickConsonant = false
+        // Reset desync flag on new session - fresh start
+        bufferDesyncDetected = false
 
         logCallback?("startNewSession: cleared (prev='\(prevWord)', count=\(prevCount))")
     }
@@ -3280,11 +3308,20 @@ extension VNEngine {
             // Check if we should proceed with restore check
             var shouldCheckRestore = true
             
+            // CASE 0: Buffer-screen desync was previously detected
+            // This happens when AX detected mismatch during backspace operations
+            // Engine doesn't have full context, so disable restore to prevent wrong output
+            // Example: Screen has "tu", buffer="" after mismatch, user types "ij" → buffer="ụi"
+            // Without this check, "ụi" would be restored to "uij" instead of keeping "tụi"
+            if bufferDesyncDetected {
+                logCallback?("processWordBreak: bufferDesyncDetected=true, skipping restore (engine lacks full context)")
+                shouldCheckRestore = false
+            }
             // CASE 1: Cursor was moved (mouse click, arrow keys, etc.)
             // Buffer was reset and doesn't have full context of existing word on screen
             // Example: Screen has "ch", user types "ính" → buffer="ính" but screen="chính"
             // Restoring "ính" would produce "chinhs" which is wrong!
-            if cursorMovedSinceReset {
+            else if cursorMovedSinceReset {
                 logCallback?("processWordBreak: cursorMovedSinceReset=true, skipping restore (buffer doesn't have full context)")
                 shouldCheckRestore = false
             }

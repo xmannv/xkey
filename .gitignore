@@ -57,3 +57,4 @@ Release/
 # Appcast is auto-generated and deployed to GitHub Pages
 appcast.json
 appcast.xml
+.agent/
