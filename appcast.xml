@@ -6,27 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260126)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126</link>
-      <sparkle:version>20260126</sparkle:version>
+      <title>Version 1.2.20 (Build 20260126.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.1</link>
+      <sparkle:version>20260126.1</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Add Translation Toolbar UI and improve debug logging</p>
+<p>refactor: Remove unused AX queries for macro standalone checking</p>
 <ul>
-<li>Add TranslationToolbar with floating UI for translation feature</li>
-<li>Add TranslationNetworkManager for centralized network handling</li>
-<li>Enable verbose logging by default in Debug window</li>
-<li>Add detailed logging to TypingBuffer for debugging</li>
-<li>Improve TempOffToolbar styling and behavior</li>
-<li>Fix settings persistence for translation toolbar visibility</li>
-<li>Version 1.2.20 build 20260126</li>
+<li>Remove getTextBeforeCursor, isMacroStandalone functions from CharacterInjector</li>
+<li>Remove getWordBeforeCursorCallback and isMacroStandaloneCallback from Engine</li>
+<li>Clean up related code in VNEngine.swift and KeyboardEventHandler.swift</li>
+<li>Bump build version to 20260126.1</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 25 Jan 2026 17:32:30 +0000</pubDate>
+      <pubDate>Mon, 26 Jan 2026 04:57:54 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260126/XKey.dmg" sparkle:version="20260126" sparkle:shortVersionString="1.2.20" length="11319410" type="application/octet-stream" sparkle:edSignature="oX5YQfAM4cdTnsAA6NdIt2K+JeWzYuVdb78SBcZO1c+xU3KwCuMSUQoRQ4HVdqZFEhu7lk5Ytg0Ljkbl+1SmDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260126.1/XKey.dmg" sparkle:version="20260126.1" sparkle:shortVersionString="1.2.20" length="11270069" type="application/octet-stream" sparkle:edSignature="3Aq+vYDzuDMjr1i8r6P7xJAj7rgmcujA3jGZ3lUmum5svbs8JggCJ5eRz1ti/8q59tZvqsH+bmfBip6of9UGAA==" />
     </item>
   </channel>
 </rss>
