@@ -6,24 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260126.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.1</link>
-      <sparkle:version>20260126.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260126.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.2</link>
+      <sparkle:version>20260126.2</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: Remove unused AX queries for macro standalone checking</p>
+<p>feat: Add keystroke sequence tracking and AX-based buffer verification</p>
 <ul>
-<li>Remove getTextBeforeCursor, isMacroStandalone functions from CharacterInjector</li>
-<li>Remove getWordBeforeCursorCallback and isMacroStandaloneCallback from Engine</li>
-<li>Clean up related code in VNEngine.swift and KeyboardEventHandler.swift</li>
-<li>Bump build version to 20260126.1</li>
+<li>TypingBuffer: Add keystrokeSequence to track exact typing order for word break restore</li>
+<li>VNEngine: Add verifyBufferMatchesScreen() to detect buffer-screen desync via Accessibility API</li>
+<li>VNEngine: Add focusChangedDuringTyping flag to track when focus shifts during typing</li>
+<li>CharacterInjector: Add getLastWordCallback for AX-based screen content verification</li>
+<li>Skip restore operations when AX detects buffer doesn't match screen content</li>
+<li>Add comprehensive unit tests for keystroke sequence tracking</li>
+<li>Bump build to 20260126.2</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 26 Jan 2026 04:57:54 +0000</pubDate>
+      <pubDate>Mon, 26 Jan 2026 14:59:42 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260126.1/XKey.dmg" sparkle:version="20260126.1" sparkle:shortVersionString="1.2.20" length="11270069" type="application/octet-stream" sparkle:edSignature="3Aq+vYDzuDMjr1i8r6P7xJAj7rgmcujA3jGZ3lUmum5svbs8JggCJ5eRz1ti/8q59tZvqsH+bmfBip6of9UGAA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260126.2/XKey.dmg" sparkle:version="20260126.2" sparkle:shortVersionString="1.2.20" length="11286499" type="application/octet-stream" sparkle:edSignature="hKDMLMMESo5LigehNpaQemYBw0QDa+mYHoUohTLnW4h9YzHIQXh982h8qfap16kywRysddBs6slSn/s6nkkNAw==" />
     </item>
   </channel>
 </rss>
