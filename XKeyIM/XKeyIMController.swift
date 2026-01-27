@@ -194,7 +194,10 @@ class XKeyIMController: IMKInputController {
         // Case 2: Has composing text - compare with markedTextStartLocation + composingText length
         var cursorMoved = false
         
-        if lastKnownSelectionLocation != NSNotFound {
+        // CRITICAL FIX: Skip cursor movement detection for overlay apps (Spotlight, Raycast, Alfred)
+        // These apps have autocomplete that changes cursor/selection unpredictably after each keystroke
+        // Without this fix, engine resets after every character, breaking Vietnamese composition
+        if !isOverlay && lastKnownSelectionLocation != NSNotFound {
             if composingText.isEmpty {
                 // Not composing - check if cursor jumped more than 1 position
                 if actualLocation != expectedLocation && actualLocation != expectedLocation + 1 {
@@ -245,8 +248,10 @@ class XKeyIMController: IMKInputController {
         // - markedTextStartLocation = NSNotFound (cleared by system)
         // - BUT engine buffer still has old content!
         // We detect this by checking if engine has buffer content but our composingText is empty
+        // NOTE: Only apply this check in marked text mode. In direct mode (overlay apps),
+        // composingText is always empty but engine has valid buffer - this is expected.
         let engineWord = engine.getCurrentWord()
-        if composingText.isEmpty && !engineWord.isEmpty {
+        if effectiveUseMarkedText && composingText.isEmpty && !engineWord.isEmpty {
 
             engine.resetWithCursorMoved()
             currentWordLength = 0
@@ -382,6 +387,80 @@ class XKeyIMController: IMKInputController {
                 engine.resetWithCursorMoved()
             }
             return false // Let arrow key pass through for cursor movement
+
+        case 0x7E: // Arrow Up
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // Arrow moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                // No composition, but still mark cursor as moved
+                engine.resetWithCursorMoved()
+            }
+            return false // Let arrow key pass through for cursor movement
+
+        case 0x7D: // Arrow Down
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // Arrow moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                // No composition, but still mark cursor as moved
+                engine.resetWithCursorMoved()
+            }
+            return false // Let arrow key pass through for cursor movement
+
+        case 0x73: // Home
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // Home moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                engine.resetWithCursorMoved()
+            }
+            return false // Let Home key pass through
+
+        case 0x77: // End
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // End moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                engine.resetWithCursorMoved()
+            }
+            return false // Let End key pass through
+
+        case 0x74: // Page Up
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // Page Up moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                engine.resetWithCursorMoved()
+            }
+            return false // Let Page Up key pass through
+
+        case 0x79: // Page Down
+            // Commit composition to prevent losing the typed word when moving cursor
+            if !composingText.isEmpty {
+                commitComposition(client)
+                engine.resetWithCursorMoved()  // Page Down moves cursor
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            } else {
+                engine.resetWithCursorMoved()
+            }
+            return false // Let Page Down key pass through
 
         case 0x35: // Escape
             // Check for content: in marked text mode use composingText, in direct mode use currentWordLength
@@ -634,6 +713,13 @@ class XKeyIMController: IMKInputController {
                     currentWordLength = currentWord.utf16.count
                     IMKitDebugger.shared.log("Direct mode: pass-through, tracking length = \(currentWordLength)", category: "DIRECT")
                 }
+                // CRITICAL FIX for Spotlight: Update cursor tracking BEFORE returning false
+                // When we return false, the system will insert the character and cursor moves +1
+                // If we don't update lastKnownSelectionLocation, next keystroke will think
+                // cursor moved unexpectedly and reset the engine (clearing our buffer!)
+                let currentSelection = client.selectedRange()
+                lastKnownSelectionLocation = currentSelection.location + 1  // Predict cursor after insert
+                
                 // Let the character pass through to be inserted by the system
                 return false
             }
@@ -796,6 +882,27 @@ class XKeyIMController: IMKInputController {
         }
 
         // Direct mode or no marked text (including after Space)
+        // For overlay apps: Skip complex backspace handling entirely
+        // Spotlight/Raycast/Alfred should handle backspace natively to avoid "word jumping" bug
+        // when user presses backspace after space (which would trigger word restore from history)
+        if !effectiveUseMarkedText {
+            // In direct mode (overlay apps), pass backspace through but KEEP ENGINE IN SYNC
+            // If we don't update engine buffer, it will be out of sync with what's on screen
+            // causing Vietnamese composition to fail after backspace
+            if currentWordLength > 0 {
+                // Decrement word length to match what Spotlight will delete
+                currentWordLength -= 1
+                // Also update engine buffer to stay in sync
+                _ = engine.processBackspace()
+                IMKitDebugger.shared.log("Direct mode backspace: wordLen now \(currentWordLength)", category: "BACKSPACE")
+            } else {
+                // After space or at word boundary - reset engine to prevent stale state
+                engine.reset()
+                IMKitDebugger.shared.log("Direct mode backspace: at boundary, engine reset", category: "BACKSPACE")
+            }
+            return false  // Let Spotlight handle backspace natively
+        }
+        
         let result = engine.processBackspace()
 
         if result.shouldConsume {
