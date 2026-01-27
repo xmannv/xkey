@@ -6,35 +6,29 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260127)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260127</link>
-      <sparkle:version>20260127</sparkle:version>
+      <title>Version 1.2.20 (Build 20260128)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128</link>
+      <sparkle:version>20260128</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix backspace restore and Vietnamese processing after undo</p>
-<p>Changes:</p>
+<p>fix: Spotlight/overlay apps input & navigation keys handling</p>
 <ul>
-<li>VNEngine: Reset tempDisableKey on backspace to allow tone marks after undo</li>
-<li>XKeyIMController: Improve backspace restore for Input Method mode</li>
+<li>Skip cursor movement detection for overlay apps (Spotlight, Raycast, Alfred)</li>
 </ul>
-<p>  - Track cursor position for proper word restoration</p>
-<p>  - Delete trailing space and re-mark text when restoring</p>
-<p>  - Use resetWithCursorMoved on app switch</p>
+<p>  to prevent engine reset after each keystroke</p>
 <ul>
-<li>AppBehaviorDetector: Add new behavior detection rules</li>
-<li>CharacterInjector: Update injection logic</li>
+<li>Add handlers for Arrow Up/Down, Home, End, Page Up/Page Down keys</li>
 </ul>
-<p>Tests:</p>
+<p>  to commit composition before cursor movement</p>
 <ul>
-<li>Add unit tests for undo+backspace+retype scenarios (tone marks and DD)</li>
-<li>Verify tempDisableKey reset works correctly</li>
+<li>Update build version to 20260128</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260127">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 27 Jan 2026 13:43:12 +0000</pubDate>
+      <pubDate>Tue, 27 Jan 2026 18:50:38 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260127/XKey.dmg" sparkle:version="20260127" sparkle:shortVersionString="1.2.20" length="11323614" type="application/octet-stream" sparkle:edSignature="uoFY7Qdi16jiK7GE67VJeuHZiUxBIkqIA3Fkh0Oe9rfYmJ9Tw4+yGwjidu9pDMqxnoFByU3T+m34b8yltQQdAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260128/XKey.dmg" sparkle:version="20260128" sparkle:shortVersionString="1.2.20" length="11033326" type="application/octet-stream" sparkle:edSignature="I0jeXS0HL9xIaqWqnJzBBIYxgDvrmCAQq5ud8+mlI7GzJjuSMj9QRIO+Hxt9l0jAC8iTP/0eHJ8jTCNBB4DfCA==" />
     </item>
   </channel>
 </rss>
