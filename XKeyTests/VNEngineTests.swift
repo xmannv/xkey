@@ -1000,6 +1000,64 @@ class VNEngineTests: XCTestCase {
         XCTAssertEqual(engine.getCurrentWord(), "dd", "Third 'd' should undo the stroke")
     }
     
+    /// Test that after undo + backspace, Vietnamese processing works again
+    /// Bug fix test: tempDisableKey should be reset when user backspaces
+    /// Scenario: "nhầm" → "f" (undo) → "nhâmf" → BACKSPACE → "nhâm" → "f" → should be "nhầm"
+    func testTelex_UndoBackspaceRetype_ToneMark() {
+        engine.reset()
+        engine.vFreeMark = 1  // Free Mark ON
+        
+        // Step 1: Type "nhâm" (n-h-a-a-m)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)  // aa → â
+        _ = engine.processKey(character: "m", keyCode: VietnameseData.KEY_M, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "nhâm", "Step 1: n-h-a-a-m should produce 'nhâm'")
+        
+        // Step 2: Add tone mark "f" → "nhầm"
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "nhầm", "Step 2: Adding 'f' should produce 'nhầm'")
+        
+        // Step 3: Undo tone mark by pressing "f" again → "nhâmf"
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "nhâmf", "Step 3: Second 'f' should undo to 'nhâmf'")
+        
+        // Step 4: Backspace to remove the raw "f" → "nhâm"
+        _ = engine.processBackspace()
+        XCTAssertEqual(engine.getCurrentWord(), "nhâm", "Step 4: Backspace should remove 'f' to get 'nhâm'")
+        
+        // Step 5: Type "f" again → should produce "nhầm" (Vietnamese processing should work)
+        // BUG FIX: Before fix, this would produce "nhâmf" because tempDisableKey was still true
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "nhầm", "Step 5: After backspace, 'f' should add tone mark to produce 'nhầm'")
+    }
+    
+    /// Similar test for DD → D undo + backspace + retype
+    func testTelex_UndoBackspaceRetype_DD() {
+        engine.reset()
+        
+        // Step 1: Type "d" → "d"
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "d")
+        
+        // Step 2: Type "d" again → "đ"
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "đ", "Step 2: d-d should produce 'đ'")
+        
+        // Step 3: Undo by pressing "d" again → "dd"
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "dd", "Step 3: Third 'd' should undo to 'dd'")
+        
+        // Step 4: Backspace to remove one "d" → "d"
+        _ = engine.processBackspace()
+        XCTAssertEqual(engine.getCurrentWord(), "d", "Step 4: Backspace should remove one 'd'")
+        
+        // Step 5: Type "d" again → should produce "đ" (Vietnamese processing should work)
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "đ", "Step 5: After backspace, d-d should produce 'đ'")
+    }
+    
     /// Test engine reset clears buffer properly
     func testReset_ClearsBuffer() {
         engine.reset()

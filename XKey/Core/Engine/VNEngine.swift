@@ -468,6 +468,17 @@ class VNEngine {
                 buffer.removeLast()
                 logCallback?("  → Removed char, count=\(buffer.count)")
 
+                // CRITICAL FIX: Reset tempDisableKey when user backspaces
+                // This fixes bug where Vietnamese processing is skipped after:
+                // 1. User types mark key twice to undo (e.g., "nhầm" + "f" → "nhâmf")
+                //    → tempDisableKey = true is set during undo
+                // 2. User backspaces to remove the raw key (e.g., "nhâmf" → "nhâm")
+                // 3. User types mark key again (e.g., "f")
+                //    → Without this fix, tempDisableKey is still true
+                //    → Vietnamese processing is skipped, resulting in "nhâmf" instead of "nhầm"
+                tempDisableKey = false
+                logCallback?("  → Reset tempDisableKey=false (allow Vietnamese processing after backspace)")
+
                 if vCheckSpelling == 1 {
                     checkSpelling()
                 }

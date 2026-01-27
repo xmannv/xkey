@@ -142,7 +142,8 @@ class CharacterInjector {
                 // Forward Delete is only used for .autocomplete method
                 // For slow/fast methods, just send backspaces
                 
-                // SPECIAL CASE: Microsoft Office (Excel/Word/PowerPoint)
+                // SPECIAL CASE: Apps with AutoComplete suggestions
+                // (Microsoft Office, Google Sheets/Docs/Slides in browsers)
                 // Send Forward Delete before backspaces to clear AutoComplete suggestions
                 // Forward Delete clears any highlighted suggestion text after cursor
                 // Note: We use Forward Delete instead of Escape because:
@@ -152,16 +153,16 @@ class CharacterInjector {
                 // IMPORTANT: Only send Forward Delete when there's NO real text after cursor.
                 // If user clicked into middle of existing text, Forward Delete would delete
                 // real characters. AutoComplete suggestions are not counted as "real text" by AX API.
-                let isMicrosoftOffice = AppBehaviorDetector.shared.detect() == .microsoftOffice
-                if isMicrosoftOffice && backspaceCount > 0 {
+                let needsForwardDelete = AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck
+                if needsForwardDelete && backspaceCount > 0 {
                     // Check if there's real text after cursor using Accessibility API
                     let hasRealTextAfter = hasTextAfterCursor() ?? false
                     if !hasRealTextAfter {
-                        debugCallback?("    → MS Office: sending Forward Delete to clear AutoComplete")
+                        debugCallback?("    → AutoComplete app: sending Forward Delete to clear suggestion")
                         sendForwardDelete(proxy: proxy)
                         usleep(2000)  // 2ms delay after Forward Delete
                     } else {
-                        debugCallback?("    → MS Office: skipping Forward Delete (real text after cursor)")
+                        debugCallback?("    → AutoComplete app: skipping Forward Delete (real text after cursor)")
                     }
                 }
 
