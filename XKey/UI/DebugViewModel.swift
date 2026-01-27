@@ -1788,12 +1788,11 @@ class DebugViewModel: ObservableObject {
     /// IMPORTANT: Do NOT set Unicode string - just use keycode like a real keyboard
     /// This allows EventTap to intercept and VNEngine to process the keys
     private func simulateKeyPress(_ char: Character) {
-        // Use .hidSystemState to mimic real keyboard input
-        // This is more realistic than .privateState
-        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+        // Create a fresh event source for each keystroke to avoid state leakage
+        guard let source = CGEventSource(stateID: .privateState) else { return }
         
-        // Get keycode for the character
-        let keyCode = getKeyCode(for: char)
+        // Get keycode for the character (and check if it needs Shift)
+        let (keyCode, needsShift) = getKeyCodeAndShiftState(for: char)
         
         // Only simulate keys we have keycodes for
         guard keyCode != 0xFF else {
@@ -1801,28 +1800,55 @@ class DebugViewModel: ObservableObject {
             return
         }
         
-        // Create key down event - do NOT set Unicode string
-        // This makes it behave like a real keyboard press
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
-            return
+        // Shift keycode is 0x38
+        let shiftKeyCode: CGKeyCode = 0x38
+        
+        // For uppercase letters, simulate actual Shift key press/release
+        // This is more reliable than just setting flags
+        if needsShift {
+            // Press Shift
+            if let shiftDown = CGEvent(keyboardEventSource: source, virtualKey: shiftKeyCode, keyDown: true) {
+                shiftDown.post(tap: .cghidEventTap)
+                usleep(500)
+            }
         }
         
-        // Do NOT set Unicode string - let the system (and XKey EventTap) handle it
-        // If we set Unicode string, EventTap might not process it correctly
+        // Create and post the main key event
+        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+           let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
+            
+            // Set Shift flag on the key events too (for apps that check flags)
+            if needsShift {
+                keyDown.flags = .maskShift
+                keyUp.flags = .maskShift
+            }
+            
+            // Do NOT set Unicode string - let the system (and XKey EventTap) handle it
+            // If we set Unicode string, EventTap might not process it correctly
+            
+            // Do NOT set the XKey marker - we want EventTap to process these as real keystrokes
+            
+            // Post the key events
+            keyDown.post(tap: .cghidEventTap)
+            usleep(500)  // Brief delay between down and up
+            keyUp.post(tap: .cghidEventTap)
+        }
         
-        // Do NOT set the XKey marker - we want EventTap to process these as real keystrokes
-        
-        // Post events to HID level so EventTap sees them
-        keyDown.post(tap: .cghidEventTap)
-        usleep(1000)  // 1ms between down and up
-        keyUp.post(tap: .cghidEventTap)
+        // For uppercase letters, release Shift after the key
+        if needsShift {
+            usleep(500)
+            if let shiftUp = CGEvent(keyboardEventSource: source, virtualKey: shiftKeyCode, keyDown: false) {
+                shiftUp.post(tap: .cghidEventTap)
+            }
+        }
     }
     
-    /// Get virtual key code for a character
-    /// Returns 0xFF if no keycode found (character should be skipped)
-    private func getKeyCode(for char: Character) -> CGKeyCode {
-        let charLower = char.lowercased()
+    /// Get virtual key code for a character and whether Shift is needed
+    /// Returns (0xFF, false) if no keycode found (character should be skipped)
+    private func getKeyCodeAndShiftState(for char: Character) -> (CGKeyCode, Bool) {
+        // Check if character is uppercase
+        let isUppercase = char.isUppercase
+        let charLower = Character(char.lowercased())
         
         // Common key codes for US keyboard layout
         let keyCodes: [Character: CGKeyCode] = [
@@ -1837,12 +1863,12 @@ class DebugViewModel: ObservableObject {
             "\n": 0x24
         ]
         
-        if let code = keyCodes[Character(charLower)] {
-            return code
+        if let code = keyCodes[charLower] {
+            return (code, isUppercase)
         }
         
         // Return 0xFF for unknown characters - they will be skipped
-        return 0xFF
+        return (0xFF, false)
     }
     
     /// Get text from currently focused element

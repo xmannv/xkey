@@ -678,6 +678,8 @@ class AppBehaviorDetector {
         
         // Google Sheets (all browsers, English + Vietnamese UI)
         // Matches: "Google Sheets", "Google Trang tính"
+        // Note: Uses fast method with chunked text sending (same as Excel)
+        // Forward Delete is handled in CharacterInjector with AX check (like Excel)
         WindowTitleRule(
             name: "Google Sheets",
             bundleIdPattern: "",  // Match all browsers
@@ -686,10 +688,10 @@ class AppBehaviorDetector {
             useMarkedText: false,
             hasMarkedTextIssues: true,
             commitDelay: 5000,
-            injectionMethod: .slow,
-            injectionDelays: [5000, 10000, 8000],
-            textSendingMethod: .oneByOne,
-            description: "Google Sheets (all browsers) - one-by-one text sending"
+            injectionMethod: .fast,
+            injectionDelays: [2000, 5000, 2000],  // Same as Excel
+            textSendingMethod: .chunked,          // Same as Excel
+            description: "Google Sheets (all browsers) - fast method like Excel"
         ),
     ]
     
@@ -1911,6 +1913,31 @@ extension AppBehaviorDetector {
     /// Check if current app needs slow injection (for CharacterInjector)
     var needsSlowInjection: Bool {
         return detectInjectionMethod().method == .slow
+    }
+    
+    /// Check if current context needs Forward Delete with AX check before backspaces
+    /// This applies to apps with autocomplete suggestions that can interfere with backspace:
+    /// - Microsoft Office (Excel, Word, PowerPoint)
+    /// - Google Workspace in browsers (Sheets, Docs, Slides)
+    /// The AX check ensures we only send Forward Delete when there's no real text after cursor
+    var needsForwardDeleteWithAXCheck: Bool {
+        // Check Microsoft Office apps
+        if detect() == .microsoftOffice {
+            return true
+        }
+        
+        // Check Google Workspace apps via Window Title Rules
+        // These rules are matched by window title pattern "Google (Sheets|Docs|Slides|...)"
+        if let ruleName = activeWindowTitleRuleName {
+            let googleWorkspaceRules = ["Google Sheets"]
+            for googleRule in googleWorkspaceRules {
+                if ruleName.contains(googleRule) {
+                    return true
+                }
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Window Title Rule Convenience

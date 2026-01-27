@@ -45,6 +45,10 @@ class XKeyIMController: IMKInputController {
     /// Effective useMarkedText value for current client
     /// This is false for overlay apps (Spotlight, Raycast, Alfred) to avoid "Enter twice" issue
     private var effectiveUseMarkedText: Bool = true
+    
+    /// Last known cursor selection location for detecting cursor movement
+    /// When cursor moves (mouse click, arrow keys from other sources), we reset with cursorMoved flag
+    private var lastKnownSelectionLocation: Int = NSNotFound
 
     // MARK: - Initialization
 
@@ -173,6 +177,80 @@ class XKeyIMController: IMKInputController {
         
         // Log the first time we see a new bundle ID to debug overlay detection
         IMKitDebugger.shared.log("Client: \(bundleId), isOverlay=\(isOverlay), settings.useMarkedText=\(settings.useMarkedText), effective=\(effectiveUseMarkedText)", category: "OVERLAY")
+        
+        // CURSOR MOVEMENT DETECTION:
+        // Detect if cursor has moved since last keystroke (mouse click, programmatic cursor move, etc.)
+        // This is important because:
+        // 1. User may click in middle of text and start typing - we shouldn't assume previous context
+        // 2. Autocomplete/restore should not run when we don't have full context
+        let currentSelection = client.selectedRange()
+        let expectedLocation = lastKnownSelectionLocation
+        let actualLocation = currentSelection.location
+        
+
+        
+        // Check if cursor moved unexpectedly
+        // Case 1: No composing text - straightforward comparison
+        // Case 2: Has composing text - compare with markedTextStartLocation + composingText length
+        var cursorMoved = false
+        
+        if lastKnownSelectionLocation != NSNotFound {
+            if composingText.isEmpty {
+                // Not composing - check if cursor jumped more than 1 position
+                if actualLocation != expectedLocation && actualLocation != expectedLocation + 1 {
+                    cursorMoved = true
+                }
+            } else {
+                // Currently composing - check if cursor is outside expected marked text range
+                // Expected: cursor should be at markedTextStartLocation + composingText.length
+                if markedTextStartLocation != NSNotFound {
+                    let expectedEnd = markedTextStartLocation + composingText.utf16.count
+                    // If cursor is not at expected end, user clicked somewhere else
+                    if actualLocation != expectedEnd && actualLocation != expectedEnd + 1 {
+                        cursorMoved = true
+                    }
+                }
+            }
+        }
+        
+        if cursorMoved {
+
+            
+            // If we had composing text, we need to commit it first at its original location
+            // BEFORE resetting, otherwise the marked text will be lost
+            if !composingText.isEmpty && effectiveUseMarkedText {
+                // Commit the current marked text at its original location
+                let markedRange = client.markedRange()
+                if markedRange.location != NSNotFound && markedRange.length > 0 {
+                    client.insertText(composingText, replacementRange: markedRange)
+                } else if markedTextStartLocation != NSNotFound {
+                    let replaceRange = NSRange(location: markedTextStartLocation, length: composingText.utf16.count)
+                    client.insertText(composingText, replacementRange: replaceRange)
+                }
+            }
+            
+            engine.resetWithCursorMoved()
+            composingText = ""
+            currentWordLength = 0
+            markedTextStartLocation = NSNotFound
+        }
+        
+        // Update last known location for next comparison
+        lastKnownSelectionLocation = currentSelection.location
+        
+        // CRITICAL SYNC CHECK:
+        // When user clicks elsewhere while having marked text, IMKit/system may auto-cancel the marked text
+        // without notifying us. This causes a desync:
+        // - composingText = "" (cleared by system)
+        // - markedTextStartLocation = NSNotFound (cleared by system)
+        // - BUT engine buffer still has old content!
+        // We detect this by checking if engine has buffer content but our composingText is empty
+        let engineWord = engine.getCurrentWord()
+        if composingText.isEmpty && !engineWord.isEmpty {
+
+            engine.resetWithCursorMoved()
+            currentWordLength = 0
+        }
 
         // Get character info
         guard let characters = event.characters,
@@ -262,7 +340,7 @@ class XKeyIMController: IMKInputController {
             
             // Commit any marked text first
             commitComposition(client)
-            engine.reset()
+            engine.resetWithCursorMoved()  // Enter moves cursor to new line
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
             
@@ -274,7 +352,7 @@ class XKeyIMController: IMKInputController {
 
         case 0x30: // Tab
             commitComposition(client)
-            engine.reset()
+            engine.resetWithCursorMoved()  // Tab moves cursor
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
             return false
@@ -283,9 +361,12 @@ class XKeyIMController: IMKInputController {
             // Commit composition like spacebar - accept the current word
             if !composingText.isEmpty {
                 commitComposition(client)
-                engine.reset()
+                engine.resetWithCursorMoved()  // Arrow moves cursor
                 currentWordLength = 0
                 markedTextStartLocation = NSNotFound
+            } else {
+                // No composition, but still mark cursor as moved
+                engine.resetWithCursorMoved()
             }
             return false // Let arrow key pass through for cursor movement
 
@@ -293,9 +374,12 @@ class XKeyIMController: IMKInputController {
             // Also commit composition to prevent losing the typed word
             if !composingText.isEmpty {
                 commitComposition(client)
-                engine.reset()
+                engine.resetWithCursorMoved()  // Arrow moves cursor
                 currentWordLength = 0
                 markedTextStartLocation = NSNotFound
+            } else {
+                // No composition, but still mark cursor as moved
+                engine.resetWithCursorMoved()
             }
             return false // Let arrow key pass through for cursor movement
 
@@ -417,7 +501,9 @@ class XKeyIMController: IMKInputController {
                     setMarkedText(restoredText, client: client)
                     commitComposition(client)
 
-                    engine.reset()
+                    // NOTE: Do NOT call engine.reset() here!
+                    // processWordBreak() already calls saveWord() and startNewSession()
+                    // Calling reset() would clear history, breaking backspace restore feature
                     currentWordLength = 0
                     markedTextStartLocation = NSNotFound
                     return true  // Consume Space - don't insert extra space after restore
@@ -428,13 +514,17 @@ class XKeyIMController: IMKInputController {
                     commitComposition(client)
                 }
 
-                engine.reset()
+                // NOTE: Do NOT call engine.reset() here!
+                // processWordBreak() already handles state management:
+                // - Saves word to history (for backspace restore)
+                // - Sets spaceCount = 1
+                // - Calls startNewSession() to clear buffer
+                // Calling reset() would clear history and spaceCount, breaking backspace restore
                 currentWordLength = 0
                 markedTextStartLocation = NSNotFound
             } else {
-                // No composing text or tracked word - just reset engine and let space pass through
-                // This prevents restoring autocompleted text (like emojis)
-                engine.reset()
+                // No composing text or tracked word - just let space pass through
+                // Don't reset engine - there's nothing to reset and we want to preserve history
                 currentWordLength = 0
             }
             return false // Let space pass through
@@ -613,6 +703,10 @@ class XKeyIMController: IMKInputController {
         // Update tracked length for next character
         // Use UTF-16 count because NSRange uses UTF-16 code units
         currentWordLength = newText.utf16.count
+        
+        // Update cursor tracking for direct mode
+        let newSelection = client.selectedRange()
+        lastKnownSelectionLocation = newSelection.location
     }
     
     /// Set marked text (with underline) - Option 1
@@ -658,6 +752,12 @@ class XKeyIMController: IMKInputController {
         )
 
         composingText = text
+        
+        // Update cursor tracking: cursor is now at end of marked text
+        // markedTextStartLocation + text length = expected cursor position
+        if markedTextStartLocation != NSNotFound {
+            lastKnownSelectionLocation = markedTextStartLocation + text.utf16.count
+        }
     }
     
     /// Handle backspace
@@ -695,12 +795,73 @@ class XKeyIMController: IMKInputController {
             return true
         }
 
-        // Direct mode or no marked text
+        // Direct mode or no marked text (including after Space)
         let result = engine.processBackspace()
 
         if result.shouldConsume {
             handleResult(result, client: client)
             return true
+        }
+        
+        // IMPORTANT: Check if engine restored a word from history (backspace after space)
+        // In this case, engine has restored the previous word but result.shouldConsume is false
+        // We need to show the restored word as marked text so user can continue editing it
+        let restoredWord = engine.getCurrentWord()
+        if effectiveUseMarkedText && !restoredWord.isEmpty && composingText.isEmpty {
+
+            
+            // At this point:
+            // - Screen still has: "previous_text word " (with trailing space)
+            // - Cursor is after the space (position = end of text)
+            // - Engine has restored "word" in buffer
+            // - We need to: delete the space, then mark "word" as editable
+            
+            let currentSelection = client.selectedRange()
+            let wordLength = restoredWord.utf16.count
+            
+            // Calculate where the word starts:
+            // currentSelection.location = position after trailing space
+            // We need to subtract 1 (for the space) + wordLength (for the word)
+            // Example: "thử dấu " where cursor is at 8
+            //   - Space is at position 7
+            //   - Word "dấu" is at positions 4-6
+            //   - markedTextStartLocation = 8 - 1 - 3 = 4 ✓
+            let spacePosition = currentSelection.location - 1
+            markedTextStartLocation = spacePosition - wordLength
+            
+            if markedTextStartLocation >= 0 && currentSelection.location > wordLength {
+
+                
+                // Step 1: Delete the trailing space
+                // Replace the space with empty string
+                let spaceRange = NSRange(location: spacePosition, length: 1)
+                client.insertText("", replacementRange: spaceRange)
+                
+                // Step 2: Now select the word and set as marked text
+                // After deleting space, the word is at the same position
+                let wordRange = NSRange(location: markedTextStartLocation, length: wordLength)
+                
+                // Set as marked text with underline
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .underlineColor: NSColor.secondaryLabelColor
+                ]
+                let attributedText = NSAttributedString(string: restoredWord, attributes: attributes)
+                
+                client.setMarkedText(
+                    attributedText,
+                    selectionRange: NSRange(location: wordLength, length: 0),
+                    replacementRange: wordRange
+                )
+                
+                composingText = restoredWord
+                currentWordLength = wordLength
+                // Cursor is now at end of marked text (markedStart + wordLength)
+                lastKnownSelectionLocation = markedTextStartLocation + wordLength
+                
+
+                return true  // Consume backspace - we handled the restore
+            }
         }
 
         // If engine doesn't handle, reset tracking and let it pass through
@@ -716,7 +877,7 @@ class XKeyIMController: IMKInputController {
 
         currentWordLength = 0
         markedTextStartLocation = NSNotFound
-        engine.reset()
+        // Don't reset engine here - we want to preserve history for multiple backspaces
         return false
     }
     
@@ -755,6 +916,10 @@ class XKeyIMController: IMKInputController {
         }
 
         markedTextStartLocation = NSNotFound
+        
+        // Update cursor tracking after commit
+        let newSelection = client.selectedRange()
+        lastKnownSelectionLocation = newSelection.location
     }
     
     /// Cancel composition (private helper)
@@ -784,10 +949,11 @@ class XKeyIMController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         reloadSettings()
-        engine.reset()
+        engine.resetWithCursorMoved()  // App switch - we don't know cursor context
         composingText = ""
         currentWordLength = 0
         markedTextStartLocation = NSNotFound
+        lastKnownSelectionLocation = NSNotFound  // Reset cursor tracking for new session
         NSLog("XKeyIMController: Activated")
     }
 
