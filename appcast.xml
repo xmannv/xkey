@@ -6,26 +6,35 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260126.3)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.3</link>
-      <sparkle:version>20260126.3</sparkle:version>
+      <title>Version 1.2.20 (Build 20260127)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260127</link>
+      <sparkle:version>20260127</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: Improve backspace restore reliability and dictionary download</p>
+<p>Fix backspace restore and Vietnamese processing after undo</p>
+<p>Changes:</p>
 <ul>
-<li>Add bufferDesyncDetected flag to track buffer-screen mismatch</li>
-<li>Skip restore when desync detected (engine lacks full context)</li>
-<li>Only verify AX when focus/cursor changed (avoid AX race condition)</li>
-<li>Normal backspace now trusts history without AX verify</li>
-<li>Dictionary download: use reloadIgnoringLocalCacheData for fresh data</li>
-<li>Add unit tests for VNEngine backspace restore scenarios</li>
+<li>VNEngine: Reset tempDisableKey on backspace to allow tone marks after undo</li>
+<li>XKeyIMController: Improve backspace restore for Input Method mode</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260126.3">Xem chi tiết trên GitHub</a></p>
+<p>  - Track cursor position for proper word restoration</p>
+<p>  - Delete trailing space and re-mark text when restoring</p>
+<p>  - Use resetWithCursorMoved on app switch</p>
+<ul>
+<li>AppBehaviorDetector: Add new behavior detection rules</li>
+<li>CharacterInjector: Update injection logic</li>
+</ul>
+<p>Tests:</p>
+<ul>
+<li>Add unit tests for undo+backspace+retype scenarios (tone marks and DD)</li>
+<li>Verify tempDisableKey reset works correctly</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260127">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 26 Jan 2026 17:19:22 +0000</pubDate>
+      <pubDate>Tue, 27 Jan 2026 13:43:12 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260126.3/XKey.dmg" sparkle:version="20260126.3" sparkle:shortVersionString="1.2.20" length="11319750" type="application/octet-stream" sparkle:edSignature="eq4+f3/ajmWnXz+KyswceKtL/2FsUyz+7Yi016tnVK9gFmqmqeJktJ+IRKYpr67ieAppOxhiuSMD0kXlGdy/BQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260127/XKey.dmg" sparkle:version="20260127" sparkle:shortVersionString="1.2.20" length="11323614" type="application/octet-stream" sparkle:edSignature="uoFY7Qdi16jiK7GE67VJeuHZiUxBIkqIA3Fkh0Oe9rfYmJ9Tw4+yGwjidu9pDMqxnoFByU3T+m34b8yltQQdAw==" />
     </item>
   </channel>
 </rss>
