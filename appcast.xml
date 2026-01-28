@@ -6,10 +6,10 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version $(MARKETING_VERSION) (Build $(CURRENT_PROJECT_VERSION))</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v%24(MARKETING_VERSION)-%24(CURRENT_PROJECT_VERSION)</link>
-      <sparkle:version>$(CURRENT_PROJECT_VERSION)</sparkle:version>
-      <sparkle:shortVersionString>$(MARKETING_VERSION)</sparkle:shortVersionString>
+      <title>Version 1.2.20 (Build 20260128.2)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128.2</link>
+      <sparkle:version>20260128.2</sparkle:version>
+      <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
 <p>feat: Centralize version management with xcconfig</p>
@@ -19,11 +19,11 @@
 <li>Add debug logging for cursor tracking and desync detection in XKeyIMController</li>
 <li>Improve startup logging with version info in XKeyIM</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v%24(MARKETING_VERSION)-%24(CURRENT_PROJECT_VERSION)">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128.2">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 28 Jan 2026 11:42:21 +0000</pubDate>
+      <pubDate>Wed, 28 Jan 2026 11:53:13 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v%24%28MARKETING_VERSION%29-%24%28CURRENT_PROJECT_VERSION%29/XKey.dmg" sparkle:version="$(CURRENT_PROJECT_VERSION)" sparkle:shortVersionString="$(MARKETING_VERSION)" length="11328154" type="application/octet-stream" sparkle:edSignature="8KelS/9S4HaqhhAbYAuSTGhnJlmjSg1Z8CbucNAXugqYAiwzAg9FY1760OtYAzgL69sTSeedQ4tQ7ETUaGtwAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260128.2/XKey.dmg" sparkle:version="20260128.2" sparkle:shortVersionString="1.2.20" length="11328089" type="application/octet-stream" sparkle:edSignature="mijLmXYq2tkARmVVd2TDSa9oyAueKrmwjtr3Z8zGJlIrhx8AB/8a5ApedYkacIHSKoUFLdtmCvyuiOTgi24UDw==" />
     </item>
   </channel>
 </rss>
