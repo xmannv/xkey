@@ -6,22 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260128.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128.1</link>
-      <sparkle:version>20260128.1</sparkle:version>
-      <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
+      <title>Version $(MARKETING_VERSION) (Build $(CURRENT_PROJECT_VERSION))</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v%24(MARKETING_VERSION)-%24(CURRENT_PROJECT_VERSION)</link>
+      <sparkle:version>$(CURRENT_PROJECT_VERSION)</sparkle:version>
+      <sparkle:shortVersionString>$(MARKETING_VERSION)</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: Prevent forward delete from deleting text in Google Sheets</p>
-<p>When AX API fails to get focused element (common in web apps like</p>
-<p>Google Sheets), default to assuming text exists after cursor instead</p>
-<p>of assuming no text. This prevents Forward Delete from accidentally</p>
-<p>deleting real characters.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260128.1">Xem chi tiết trên GitHub</a></p>
+<p>feat: Centralize version management with xcconfig</p>
+<ul>
+<li>Add Version.xcconfig to manage MARKETING<em>VERSION and CURRENT</em>PROJECT_VERSION in one place</li>
+<li>Update Info.plist files to use $(MARKETING<em>VERSION) and $(CURRENT</em>PROJECT_VERSION) variables</li>
+<li>Add debug logging for cursor tracking and desync detection in XKeyIMController</li>
+<li>Improve startup logging with version info in XKeyIM</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v%24(MARKETING_VERSION)-%24(CURRENT_PROJECT_VERSION)">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 28 Jan 2026 08:28:26 +0000</pubDate>
+      <pubDate>Wed, 28 Jan 2026 11:42:21 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260128.1/XKey.dmg" sparkle:version="20260128.1" sparkle:shortVersionString="1.2.20" length="11325016" type="application/octet-stream" sparkle:edSignature="m+Ur+BkQwJS53xD4yCZ7tB0WVjStgcQNSwjklFFlmK4DV07WzjctHiT1s90zObfxUFe73knY0ahPGKV1ZuHYBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v%24%28MARKETING_VERSION%29-%24%28CURRENT_PROJECT_VERSION%29/XKey.dmg" sparkle:version="$(CURRENT_PROJECT_VERSION)" sparkle:shortVersionString="$(MARKETING_VERSION)" length="11328154" type="application/octet-stream" sparkle:edSignature="8KelS/9S4HaqhhAbYAuSTGhnJlmjSg1Z8CbucNAXugqYAiwzAg9FY1760OtYAzgL69sTSeedQ4tQ7ETUaGtwAw==" />
     </item>
   </channel>
 </rss>
