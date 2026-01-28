@@ -21,9 +21,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.18</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>20260109.2</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>InputMethodConnectionName</key>
 	<string>XKeyIM_Connection</string>
 	<key>InputMethodServerControllerClass</key>
