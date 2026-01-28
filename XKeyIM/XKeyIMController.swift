@@ -186,9 +186,10 @@ class XKeyIMController: IMKInputController {
         let currentSelection = client.selectedRange()
         let expectedLocation = lastKnownSelectionLocation
         let actualLocation = currentSelection.location
-        
 
-        
+        // DEBUG: Log cursor tracking state
+        IMKitDebugger.shared.log("Cursor check: actual=\(actualLocation), expected=\(expectedLocation), composing='\(composingText)', markedStart=\(markedTextStartLocation)", category: "CURSOR")
+
         // Check if cursor moved unexpectedly
         // Case 1: No composing text - straightforward comparison
         // Case 2: Has composing text - compare with markedTextStartLocation + composingText length
@@ -217,8 +218,14 @@ class XKeyIMController: IMKInputController {
         }
         
         if cursorMoved {
+            // DEBUG: Log why cursor was detected as moved
+            if composingText.isEmpty {
+                IMKitDebugger.shared.log("CURSOR MOVED (no composing): actual=\(actualLocation) != expected=\(expectedLocation) or +1", category: "CURSOR")
+            } else {
+                let expectedEnd = markedTextStartLocation + composingText.utf16.count
+                IMKitDebugger.shared.log("CURSOR MOVED (composing): actual=\(actualLocation) != expectedEnd=\(expectedEnd) or +1, markedStart=\(markedTextStartLocation)", category: "CURSOR")
+            }
 
-            
             // If we had composing text, we need to commit it first at its original location
             // BEFORE resetting, otherwise the marked text will be lost
             if !composingText.isEmpty && effectiveUseMarkedText {
@@ -252,7 +259,8 @@ class XKeyIMController: IMKInputController {
         // composingText is always empty but engine has valid buffer - this is expected.
         let engineWord = engine.getCurrentWord()
         if effectiveUseMarkedText && composingText.isEmpty && !engineWord.isEmpty {
-
+            // DEBUG: Log desync detection
+            IMKitDebugger.shared.log("DESYNC detected! composingText empty but engine has '\(engineWord)'. Resetting.", category: "CURSOR")
             engine.resetWithCursorMoved()
             currentWordLength = 0
         }

@@ -38,6 +38,15 @@ DMG_VOLUME_NAME="XKey"
 REPO_URL="https://github.com/xmannv/xkey"
 SPARKLE_BIN="/tmp/Sparkle-2.8.1/bin"
 
+# Read version from Version.xcconfig (centralized version management)
+XCCONFIG_FILE="$(pwd)/Version.xcconfig"
+if [ -f "$XCCONFIG_FILE" ]; then
+    CURRENT_VERSION=$(grep "^MARKETING_VERSION" "$XCCONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+    BUILD_NUMBER=$(grep "^CURRENT_PROJECT_VERSION" "$XCCONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+else
+    echo "❌ Error: Version.xcconfig not found"
+    exit 1
+fi
 
 
 echo "🚀 Building XKey (Release configuration)..."
@@ -607,9 +616,7 @@ if [ "$ENABLE_GITHUB_RELEASE" = true ]; then
         exit 1
     fi
 
-    # Get current version and build number from Info.plist
-    CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    BUILD_NUMBER=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleVersion)
+    # Version already read from Version.xcconfig at the top of the script
     RELEASE_TAG="v$CURRENT_VERSION-$BUILD_NUMBER"
 
     echo "📋 Release details:"
@@ -623,7 +630,7 @@ if [ "$ENABLE_GITHUB_RELEASE" = true ]; then
         echo "   Options:"
         echo "   1. Delete existing release: gh release delete $RELEASE_TAG"
         echo "   2. Skip auto-release: ENABLE_GITHUB_RELEASE=false"
-        echo "   3. Update CFBundleVersion in XKey/Info.plist"
+        echo "   3. Update version in Version.xcconfig"
         exit 1
     fi
 
@@ -776,13 +783,11 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ -n "$SPARKLE_SIGNATURE" ]; then
 fi
 
 if [ "$ENABLE_GITHUB_RELEASE" = true ]; then
-    DISPLAY_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    DISPLAY_BUILD=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleVersion)
     echo "🚀 GitHub Release: CREATED"
-    echo "   Version: $DISPLAY_VERSION"
-    echo "   Build: $DISPLAY_BUILD"
-    echo "   Tag: v$DISPLAY_VERSION-$DISPLAY_BUILD"
-    echo "   URL: $REPO_URL/releases/tag/v$DISPLAY_VERSION-$DISPLAY_BUILD"
+    echo "   Version: $CURRENT_VERSION"
+    echo "   Build: $BUILD_NUMBER"
+    echo "   Tag: v$CURRENT_VERSION-$BUILD_NUMBER"
+    echo "   URL: $REPO_URL/releases/tag/v$CURRENT_VERSION-$BUILD_NUMBER"
 fi
 
 echo ""
@@ -807,14 +812,12 @@ echo "   (Or it will be retrieved from Keychain automatically)"
 if [ "$ENABLE_GITHUB_RELEASE" != true ]; then
     echo ""
     echo "📋 Next steps for manual release:"
-    DISPLAY_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    DISPLAY_BUILD=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleVersion)
     echo "   1. Create GitHub Release (include version.json + signature.txt for auto-update):"
     echo "      # Create version.json first:"
-    echo "      echo '{\"version\": \"$DISPLAY_VERSION\", \"build\": \"$DISPLAY_BUILD\"}' > Release/version.json"
+    echo "      echo '{\"version\": \"$CURRENT_VERSION\", \"build\": \"$BUILD_NUMBER\"}' > Release/version.json"
     echo ""
-    echo "      gh release create v$DISPLAY_VERSION-$DISPLAY_BUILD Release/XKey.dmg Release/version.json Release/signature.txt \\"
-    echo "         --title \"XKey v$DISPLAY_VERSION (Build $DISPLAY_BUILD)\" \\"
+    echo "      gh release create v$CURRENT_VERSION-$BUILD_NUMBER Release/XKey.dmg Release/version.json Release/signature.txt \\"
+    echo "         --title \"XKey v$CURRENT_VERSION (Build $BUILD_NUMBER)\" \\"
     echo "         --notes \"Your release notes here\""
     echo ""
     echo "   2. Or enable automatic release:"

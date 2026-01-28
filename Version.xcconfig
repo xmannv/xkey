@@ -1,0 +1,9 @@
+// Version.xcconfig
+// Centralized version configuration for XKey and XKeyIM
+//
+// To update version, modify these values and both targets will use them.
+// MARKETING_VERSION = CFBundleShortVersionString (displayed version like "1.2.20")
+// CURRENT_PROJECT_VERSION = CFBundleVersion (build number like "20260128.1")
+
+MARKETING_VERSION = 1.2.20
+CURRENT_PROJECT_VERSION = 20260128.2

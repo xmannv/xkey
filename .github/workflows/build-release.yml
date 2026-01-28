@@ -425,18 +425,19 @@ jobs:
       - name: Get Version Info
         id: version
         run: |
-          CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" XKey/Info.plist)
-          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" XKey/Info.plist)
+          # Read version from Version.xcconfig (centralized version management)
+          CURRENT_VERSION=$(grep "^MARKETING_VERSION" Version.xcconfig | cut -d'=' -f2 | tr -d ' ')
+          BUILD_NUMBER=$(grep "^CURRENT_PROJECT_VERSION" Version.xcconfig | cut -d'=' -f2 | tr -d ' ')
           RELEASE_TAG="v$CURRENT_VERSION-$BUILD_NUMBER"
-          
+
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "build=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-          
+
           echo "📋 Version: $CURRENT_VERSION"
           echo "📋 Build: $BUILD_NUMBER"
           echo "📋 Tag: $RELEASE_TAG"
-          
+
           # Create version.json
           cat > "Release/version.json" << EOF
           {
