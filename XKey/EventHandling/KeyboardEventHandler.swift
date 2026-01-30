@@ -23,6 +23,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// Only turn on for debugging specific issues
     var verboseEngineLogging: Bool = false
     
+    /// Flag to skip updateEngineSettings() during batch updates
+    /// This prevents multiple redundant engine updates when applying all settings at once
+    private var isBatchUpdating = false
 
     // Settings
     @Published var inputMethod: InputMethod = .telex {
@@ -669,6 +672,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // MARK: - Settings Update
     
     private func updateEngineSettings() {
+        // Skip if we're in batch update mode (prevents 16+ redundant updates)
+        guard !isBatchUpdating else { return }
+        
         var settings = VNEngine.EngineSettings()
         settings.inputMethod = inputMethod
         settings.codeTable = codeTable
@@ -702,6 +708,58 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Update macro manager
         macroManager.setCodeTable(codeTable.rawValue)
         macroManager.setAutoCapsMacro(autoCapsMacro)
+    }
+    
+    /// Apply all settings at once (batch update) - only calls updateEngineSettings() once at the end
+    /// This prevents multiple redundant log messages when applying preferences at startup
+    func applyAllSettings(
+        inputMethod: InputMethod,
+        codeTable: CodeTable,
+        modernStyle: Bool,
+        spellCheckEnabled: Bool,
+        quickTelexEnabled: Bool,
+        quickStartConsonantEnabled: Bool,
+        quickEndConsonantEnabled: Bool,
+        upperCaseFirstChar: Bool,
+        restoreIfWrongSpelling: Bool,
+        allowConsonantZFWJ: Bool,
+        freeMarkEnabled: Bool,
+        macroEnabled: Bool,
+        macroInEnglishMode: Bool,
+        autoCapsMacro: Bool,
+        addSpaceAfterMacro: Bool,
+        smartSwitchEnabled: Bool,
+        excludedApps: [ExcludedApp],
+        undoTypingEnabled: Bool
+    ) {
+        // Enable batch mode to skip individual updateEngineSettings() calls
+        isBatchUpdating = true
+        
+        // Set all properties (didSet won't trigger updateEngineSettings due to flag)
+        self.inputMethod = inputMethod
+        self.codeTable = codeTable
+        self.modernStyle = modernStyle
+        self.spellCheckEnabled = spellCheckEnabled
+        self.quickTelexEnabled = quickTelexEnabled
+        self.quickStartConsonantEnabled = quickStartConsonantEnabled
+        self.quickEndConsonantEnabled = quickEndConsonantEnabled
+        self.upperCaseFirstChar = upperCaseFirstChar
+        self.restoreIfWrongSpelling = restoreIfWrongSpelling
+        self.allowConsonantZFWJ = allowConsonantZFWJ
+        self.freeMarkEnabled = freeMarkEnabled
+        self.macroEnabled = macroEnabled
+        self.macroInEnglishMode = macroInEnglishMode
+        self.autoCapsMacro = autoCapsMacro
+        self.addSpaceAfterMacro = addSpaceAfterMacro
+        self.smartSwitchEnabled = smartSwitchEnabled
+        self.excludedApps = excludedApps
+        self.undoTypingEnabled = undoTypingEnabled
+        
+        // Disable batch mode
+        isBatchUpdating = false
+        
+        // Now call updateEngineSettings() once
+        updateEngineSettings()
     }
     
     // MARK: - Macro Management

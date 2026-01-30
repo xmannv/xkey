@@ -53,9 +53,10 @@ class StatusBarViewModel: ObservableObject {
         log("Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
         
         // Play beep sound if enabled
+        // Using AudioManager to handle wake-from-sleep audio routing issues
         let prefs = SharedSettings.shared.loadPreferences()
         if prefs.beepOnToggle {
-            NSSound.beep()
+            AudioManager.shared.playBeep()
         }
         
         // Save language for current app (Smart Switch)

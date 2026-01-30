@@ -339,6 +339,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Load Vietnamese dictionary if spell checking is enabled
         setupSpellCheckDictionary()
 
+        // Initialize AudioManager to handle wake-from-sleep audio issues
+        // This must be done at startup to register for system sleep/wake notifications
+        _ = AudioManager.shared
+        debugWindowController?.logEvent("AudioManager initialized for wake-from-sleep handling")
+
         debugWindowController?.updateStatus("XKey started successfully")
         debugWindowController?.logEvent("XKey started successfully")
     }
@@ -672,32 +677,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func applyPreferences(_ preferences: Preferences) {
-        // Apply basic settings
-        keyboardHandler?.inputMethod = preferences.inputMethod
-        keyboardHandler?.codeTable = preferences.codeTable
-        keyboardHandler?.modernStyle = preferences.modernStyle
-        keyboardHandler?.spellCheckEnabled = preferences.spellCheckEnabled
-        
-        // Apply advanced features
-        keyboardHandler?.quickTelexEnabled = preferences.quickTelexEnabled
-        keyboardHandler?.quickStartConsonantEnabled = preferences.quickStartConsonantEnabled
-        keyboardHandler?.quickEndConsonantEnabled = preferences.quickEndConsonantEnabled
-        keyboardHandler?.upperCaseFirstChar = preferences.upperCaseFirstChar
-        keyboardHandler?.restoreIfWrongSpelling = preferences.restoreIfWrongSpelling
-        keyboardHandler?.allowConsonantZFWJ = preferences.allowConsonantZFWJ
-        keyboardHandler?.freeMarkEnabled = preferences.freeMarkEnabled
-        
-        // Apply macro settings
-        keyboardHandler?.macroEnabled = preferences.macroEnabled
-        keyboardHandler?.macroInEnglishMode = preferences.macroInEnglishMode
-        keyboardHandler?.autoCapsMacro = preferences.autoCapsMacro
-        keyboardHandler?.addSpaceAfterMacro = preferences.addSpaceAfterMacro
-        
-        // Apply smart switch
-        keyboardHandler?.smartSwitchEnabled = preferences.smartSwitchEnabled
-        
-        // Apply excluded apps
-        keyboardHandler?.excludedApps = preferences.excludedApps
+        // Apply all engine settings at once (batch update - only 1 log message instead of 16+)
+        keyboardHandler?.applyAllSettings(
+            inputMethod: preferences.inputMethod,
+            codeTable: preferences.codeTable,
+            modernStyle: preferences.modernStyle,
+            spellCheckEnabled: preferences.spellCheckEnabled,
+            quickTelexEnabled: preferences.quickTelexEnabled,
+            quickStartConsonantEnabled: preferences.quickStartConsonantEnabled,
+            quickEndConsonantEnabled: preferences.quickEndConsonantEnabled,
+            upperCaseFirstChar: preferences.upperCaseFirstChar,
+            restoreIfWrongSpelling: preferences.restoreIfWrongSpelling,
+            allowConsonantZFWJ: preferences.allowConsonantZFWJ,
+            freeMarkEnabled: preferences.freeMarkEnabled,
+            macroEnabled: preferences.macroEnabled,
+            macroInEnglishMode: preferences.macroInEnglishMode,
+            autoCapsMacro: preferences.autoCapsMacro,
+            addSpaceAfterMacro: preferences.addSpaceAfterMacro,
+            smartSwitchEnabled: preferences.smartSwitchEnabled,
+            excludedApps: preferences.excludedApps,
+            undoTypingEnabled: preferences.undoTypingEnabled
+        )
         
         // Apply debug mode (toggle debug window)
         // Keep debug window open if either debugModeEnabled OR openDebugOnLaunch is true
@@ -723,8 +723,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update switch XKey hotkey
         setupSwitchXKeyHotkey(with: preferences.switchToXKeyHotkey)
         
-        // Update undo typing
-        keyboardHandler?.undoTypingEnabled = preferences.undoTypingEnabled
+        // Update undo typing hotkey
         setupUndoTypingHotkey(with: preferences.undoTypingHotkey, enabled: preferences.undoTypingEnabled)
         
         if preferences.undoTypingEnabled {
@@ -740,6 +739,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         debugWindowController?.logEvent("Preferences applied (including advanced features)")
     }
+
     
     // MARK: - Debug Window Management
 

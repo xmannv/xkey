@@ -989,6 +989,12 @@ class XKeyIMController: IMKInputController {
         currentWordLength = 0
         markedTextStartLocation = NSNotFound
         lastKnownSelectionLocation = NSNotFound  // Reset cursor tracking for new session
+        
+        // Log version to debug window when XKeyIM is activated
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        IMKitDebugger.shared.log("XKeyIM v\(version) (build \(build)) activated", category: "ACTIVATE")
+        
         NSLog("XKeyIMController: Activated")
     }
 
