@@ -225,8 +225,8 @@ struct MacroSection: View {
             return
         }
         
-        guard trimmedText.count >= 2 else {
-            showErrorMessage("Từ viết tắt phải có ít nhất 2 ký tự")
+        guard trimmedText.count >= 1 else {
+            showErrorMessage("Từ viết tắt phải có ít nhất 1 ký tự")
             return
         }
         
@@ -516,8 +516,8 @@ struct EditMacroSheet: View {
             return
         }
         
-        guard trimmedText.count >= 2 else {
-            showErrorMessage("Từ viết tắt phải có ít nhất 2 ký tự")
+        guard trimmedText.count >= 1 else {
+            showErrorMessage("Từ viết tắt phải có ít nhất 1 ký tự")
             return
         }
         
