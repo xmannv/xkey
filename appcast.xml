@@ -6,24 +6,22 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260130)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260130</link>
-      <sparkle:version>20260130</sparkle:version>
+      <title>Version 1.2.20 (Build 20260201)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260201</link>
+      <sparkle:version>20260201</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix audio beep not working after Mac wakes from sleep</p>
+<p>Reduce macro minimum length from 2 to 1 character</p>
 <ul>
-<li>Add AudioManager utility for robust audio management</li>
-<li>Handle system sleep/wake events and audio device changes</li>
-<li>Add version logging for XKeyIM when input source switches</li>
-<li>Improve settings sync logging behavior</li>
+<li>Update MacroSection.swift: Allow single character macros</li>
+<li>Bump build version to 20260201</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260130">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260201">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 30 Jan 2026 08:34:28 +0000</pubDate>
+      <pubDate>Sun, 01 Feb 2026 13:02:27 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260130/XKey.dmg" sparkle:version="20260130" sparkle:shortVersionString="1.2.20" length="11348993" type="application/octet-stream" sparkle:edSignature="pf2QyY86aEXcAUrskMTHpmRQY5zu8wz33wzrT4qcpsVRhZMzidhLR032wTODilIJMaXBgi9wXl1qk20VvS3eBA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260201/XKey.dmg" sparkle:version="20260201" sparkle:shortVersionString="1.2.20" length="11349057" type="application/octet-stream" sparkle:edSignature="ZaQyS0/0TEk32slG9uea+UZj3cQlRc5f7JZOGtXbrjQX6e3OhkdnWbVIoZhE839e05O4I5un2JRQoFfiLMOXDg==" />
     </item>
   </channel>
 </rss>
