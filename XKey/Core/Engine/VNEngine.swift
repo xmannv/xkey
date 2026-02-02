@@ -3236,7 +3236,8 @@ extension VNEngine {
             if macroFound {
                 logCallback?("processWordBreak: Macro found, replacing")
                 let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
-                // Reset after macro replacement
+                // Reset after macro replacement - clears history because macro output
+                // can be very large (code snippets, templates) and shouldn't be stored
                 reset()
                 return result
             }
@@ -3342,6 +3343,8 @@ extension VNEngine {
                                         logCallback?("processWordBreak: Macro found after restore! Using backspaceCount=\(originalBackspaceCount)")
 
                                         let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
+                                        // Reset after macro replacement - clears history because macro output
+                                        // can be very large and shouldn't be stored
                                         reset()
                                         return result
                                     }
@@ -3351,10 +3354,34 @@ extension VNEngine {
                             // No macro found, return restore result
                             logCallback?("processWordBreak: No macro, returning restore result")
                             let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
-                            // Reset after restore - use reset() instead of just startNewSession()
-                            // This clears typingStates to prevent old words from appearing when backspacing
-                            // Without this, backspacing after restore would bring back old words from typingStates
-                            reset()
+                            
+                            // FIX: Save the RESTORED word to history for proper backspace support
+                            // The restored word (plain text like "bieet") is what's now on screen.
+                            // If user backspaces, we need to restore this word into buffer to stay in sync.
+                            //
+                            // Previous bug: reset() was called which clears history, so backspace
+                            // had nothing to restore, causing desync.
+                            //
+                            // Solution: Save restored word to history, then use startNewSession()
+                            // instead of reset() to preserve history.
+                            //
+                            // Note: We save the RESTORED keyStates, not the Vietnamese buffer,
+                            // because that's what was injected to screen.
+                            if stateIndex > 0 {
+                                // Create a snapshot from keyStates (the restored characters)
+                                var restoredBuffer = TypingBuffer()
+                                for i in 0..<Int(stateIndex) {
+                                    let keyCode = UInt16(keyStates[i] & 0xFF)
+                                    let isCaps = (keyStates[i] & VNEngine.CAPS_MASK) != 0
+                                    _ = restoredBuffer.append(keyCode: keyCode, isCaps: isCaps)
+                                }
+                                let snapshot = restoredBuffer.createSnapshot()
+                                history.save(snapshot)
+                                logCallback?("  → Saved restored word to history (count=\(stateIndex))")
+                            }
+                            
+                            // Use startNewSession() to clear buffer but preserve history
+                            startNewSession()
                             spaceCount = 1
                             return result
                         }
@@ -3362,6 +3389,27 @@ extension VNEngine {
                         // User manually restored via toggle key (e.g., 'd' to revert 'đ' to 'd')
                         // Word is now plain text, no need to restore again
                         logCallback?("processWordBreak: Skipping restore - word has no Vietnamese processing (manually restored)")
+                        
+                        // FIX: Save current word to history for proper backspace restore
+                        // 
+                        // Problem: saveWord() skips when hookState.code == vRestore (set during undo)
+                        // This causes the current word to NOT be saved, leaving old unrelated words
+                        // in history. When user backspaces, the old word gets restored → DESYNC!
+                        //
+                        // Solution: Manually save the current buffer to history here.
+                        // The word is valid (just plain text without Vietnamese), and user expects
+                        // backspace to restore it properly.
+                        //
+                        // Example with this fix:
+                        // 1. User types "biete" (undo circumflex) → plain "biete" on screen
+                        // 2. User presses space → "biete" SAVED to history ← NEW!
+                        // 3. User backspaces → restores "biete" into buffer
+                        // 4. Buffer = "biete", Screen = "biete" → SYNC!
+                        if !buffer.isEmpty {
+                            let snapshot = buffer.createSnapshot()
+                            history.save(snapshot)
+                            logCallback?("  → Saved '\(getCurrentWord())' to history for backspace restore")
+                        }
                     }
                 }
             }
