@@ -6,25 +6,28 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260202)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202</link>
-      <sparkle:version>20260202</sparkle:version>
+      <title>Version 1.2.20 (Build 20260202.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202.1</link>
+      <sparkle:version>20260202.1</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Add search functionality to macro management</p>
+<p>refactor: Remove AX verification, skip restore on potential desync</p>
+<p>Remove Accessibility API verification for buffer-screen matching due to</p>
+<p>race condition issues (AX returns stale data during rapid backspacing).</p>
+<p>Instead of querying AX to verify, simply skip restore when cursor moved</p>
+<p>or focus changed during typing - this is safer and more reliable.</p>
 <ul>
-<li>Add search field to filter macros by abbreviation or content</li>
-<li>Show "Add macro" button when search yields no results</li>
-<li>Auto-fill macro form with search text and scroll to form</li>
-<li>Auto-focus content field after scrolling</li>
-<li>Scroll to results section when typing in search</li>
+<li>Remove getLastWordCallback and verifyBufferMatchesScreen from VNEngine</li>
+<li>Remove getLastWordBeforeCursor from CharacterInjector</li>
+<li>Remove AX callback wiring from KeyboardEventHandler</li>
+<li>Update tests to match new skip-restore behavior</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 02 Feb 2026 09:14:21 +0000</pubDate>
+      <pubDate>Mon, 02 Feb 2026 15:32:39 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260202/XKey.dmg" sparkle:version="20260202" sparkle:shortVersionString="1.2.20" length="11389802" type="application/octet-stream" sparkle:edSignature="TKAIZ1xu21KSiQ4rshiiNSKPfS02tV7MSYVvAKpPAsEHgPDWXluwRHjgVGitu7/0pr4Ut6G94Xl2gB4KSGUkDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260202.1/XKey.dmg" sparkle:version="20260202.1" sparkle:shortVersionString="1.2.20" length="11376084" type="application/octet-stream" sparkle:edSignature="KF4RHhxi1gX/FIEZaMHz2JfuehF2mK8WJsBQVL1bXXwNUIyuCP+spkjE0YSUu+j7/kruqKlsL+5HuAWRprrABA==" />
     </item>
   </channel>
 </rss>
