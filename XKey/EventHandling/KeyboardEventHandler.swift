@@ -127,13 +127,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             self.debugLogCallback?("Injector: \(message)")
         }
 
-        // Wire up AX callback for buffer-screen verification
-        // This allows VNEngine to query screen content before restore operations
-        // to prevent desync issues (buffer doesn't match screen)
-        self.engine.getLastWordCallback = { [weak self] in
-            return self?.injector.getLastWordBeforeCursor()
-        }
-
         // Share managers with VNEngine
 
         VNEngine.setSharedMacroManager(macroManager)

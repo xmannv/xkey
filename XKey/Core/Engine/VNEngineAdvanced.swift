@@ -158,8 +158,6 @@ extension VNEngine {
     // MARK: - Restore If Wrong Spelling
 
     /// Check and restore if word has wrong spelling
-    /// NOTE: Caller (processWordBreak) is responsible for verifying buffer matches screen
-    /// before calling this function. Do NOT add duplicate verify here.
     @discardableResult
     func checkRestoreIfWrongSpelling(handleCode: Int) -> Bool {
         guard tempDisableKey else { return false }
@@ -169,9 +167,6 @@ extension VNEngine {
             logCallback?("Restore Wrong Spelling: Skipping (special pattern)")
             return false
         }
-
-        // NOTE: AX verification is done by caller (processWordBreak/handleDelete)
-        // Do not duplicate the check here to avoid double AX queries
 
         // Get keystrokes in ACTUAL typing order (not per-entry modifier order)
         // This ensures restore produces correct character sequence

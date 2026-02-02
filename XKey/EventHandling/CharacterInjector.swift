@@ -811,28 +811,6 @@ class CharacterInjector {
         return resultText
     }
 
-    /// Get the last word before cursor using Accessibility API
-    /// Returns: The last word (text after last whitespace), nil if AX not supported or no text
-    /// This is used for verifying buffer matches screen content
-    func getLastWordBeforeCursor() -> String? {
-        // Query only 10 chars - Vietnamese words are typically 2-7 chars
-        // This minimizes AX overhead while still being sufficient for verification
-        guard let textBeforeCursor = getTextBeforeCursor(length: 10) else {
-            return nil  // AX not supported
-        }
-        
-        guard !textBeforeCursor.isEmpty else {
-            return ""  // No text before cursor
-        }
-        
-        // Find the last word (after last whitespace)
-        let components = textBeforeCursor.components(separatedBy: .whitespacesAndNewlines)
-        let lastWord = components.last ?? ""
-        
-        debugCallback?("  [AX] getLastWordBeforeCursor: '\(lastWord)'")
-        return lastWord
-    }
-
 
     /// Determine if Forward Delete should be sent for autocomplete method (Firefox/Safari address bar)
     /// Unlike shouldSendForwardDelete(), this doesn't check fixAutocomplete setting

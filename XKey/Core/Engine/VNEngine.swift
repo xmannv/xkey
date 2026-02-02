@@ -170,11 +170,11 @@ class VNEngine {
 
     /// Flag to track when focus change occurred during typing session
     /// This can happen when suggestion popups appear, causing keystrokes to go to popup
-    /// instead of target input, causing buffer desync. When true, AX verify is used
-    /// at word break to detect and handle desync.
+    /// instead of target input, causing buffer desync. When true, restore is skipped
+    /// at word break/backspace to avoid incorrect output.
     var focusChangedDuringTyping = false
 
-    /// Flag to track when buffer-screen desync was detected via AX
+    /// Flag to track when buffer-screen desync was detected
     /// When true, spelling check and restore are disabled until new session starts.
     /// This prevents incorrect restore when engine doesn't have full context (e.g., user
     /// clicked mid-word and continued typing, or backspaced across word boundary).
@@ -185,51 +185,6 @@ class VNEngine {
 
     /// Logging callback
     var logCallback: ((String) -> Void)?
-
-    /// Callback to get last word before cursor from screen via Accessibility API
-    /// Returns: The last word on screen, or nil if AX not supported
-    /// Used for verifying buffer matches screen content before restore operations
-    var getLastWordCallback: (() -> String?)?
-
-    /// Verify if buffer content matches screen content
-    /// Returns true if:
-    /// 1. AX is not supported (fallback to trust buffer - many apps don't support AX)
-    /// 2. AX works and screen content matches buffer
-    /// Returns false if:
-    /// - AX works but screen content doesn't match buffer (desync detected)
-    func verifyBufferMatchesScreen() -> Bool {
-        // If no callback configured, assume match (fallback behavior)
-        guard let getLastWord = getLastWordCallback else {
-            logCallback?("verifyBufferMatchesScreen: No callback, assuming match")
-            return true
-        }
-        
-        // Query screen via AX
-        guard let screenWord = getLastWord() else {
-            // AX not supported - assume match (as per user's requirement)
-            logCallback?("verifyBufferMatchesScreen: AX not supported, assuming match")
-            return true
-        }
-        
-        // Get expected word from buffer
-        let bufferWord = getCurrentWord()
-        
-        // Compare
-        if screenWord == bufferWord {
-            logCallback?("verifyBufferMatchesScreen: MATCH - screen='\(screenWord)', buffer='\(bufferWord)'")
-            return true
-        } else if screenWord.hasSuffix(bufferWord) && !bufferWord.isEmpty {
-            // Screen has more text (e.g., "thừa" on screen, "ừa" in buffer)
-            // This means user clicked mid-word and buffer doesn't have full info
-            // DO NOT allow restore as we can't restore correctly
-            logCallback?("verifyBufferMatchesScreen: PARTIAL MATCH - screen='\(screenWord)' ends with buffer='\(bufferWord)' - SKIPPING restore (incomplete buffer)")
-            return false
-        } else {
-            logCallback?("verifyBufferMatchesScreen: MISMATCH - screen='\(screenWord)', buffer='\(bufferWord)'")
-            return false
-        }
-    }
-
 
     // MARK: - Hook State (result to send back)
     
@@ -433,15 +388,11 @@ class VNEngine {
             specialChar.removeLast()
             logCallback?("  → Removed special char, remaining=\(specialChar.count)")
             if specialChar.isEmpty {
-                // Only verify AX when there's indication of desync (focus/cursor change)
-                // Normal backspace: trust history - AX has race condition (returns stale data)
+                // Skip restore if cursor was moved or focus changed (potential desync)
+                // This is safer than trying to verify via slow AX calls
                 if cursorMovedSinceReset || focusChangedDuringTyping {
-                    if verifyBufferMatchesScreen() {
-                        restoreLastTypingState()
-                    } else {
-                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
-                        clearWithoutRestore()
-                    }
+                    logCallback?("  → SKIP restore: cursor/focus changed, clearing history")
+                    clearWithoutRestore()
                 } else {
                     restoreLastTypingState()
                 }
@@ -450,15 +401,11 @@ class VNEngine {
             spaceCount -= 1
             logCallback?("  → Removed space, remaining=\(spaceCount)")
             if spaceCount == 0 {
-                // Only verify AX when there's indication of desync (focus/cursor change)
-                // Normal backspace: trust history - AX has race condition (returns stale data)
+                // Skip restore if cursor was moved or focus changed (potential desync)
+                // This is safer than trying to verify via slow AX calls
                 if cursorMovedSinceReset || focusChangedDuringTyping {
-                    if verifyBufferMatchesScreen() {
-                        restoreLastTypingState()
-                    } else {
-                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch")
-                        clearWithoutRestore()
-                    }
+                    logCallback?("  → SKIP restore: cursor/focus changed, clearing history")
+                    clearWithoutRestore()
                 } else {
                     restoreLastTypingState()
                 }
@@ -496,29 +443,20 @@ class VNEngine {
                 logCallback?("  → Buffer empty, checking restore conditions...")
                 startNewSession()
                 specialChar.removeAll()
-                
-                // CRITICAL: Multi-layer check before restore
-                // Layer 1: Check if cursor was moved (basic desync indicator)
-                if cursorMovedSinceReset {
-                    logCallback?("  → SKIP restore: cursor was moved, history may be stale")
+
+                // Skip restore if cursor was moved or focus changed (potential desync)
+                // This is safer than trying to verify via slow AX calls
+                if cursorMovedSinceReset || focusChangedDuringTyping {
+                    logCallback?("  → SKIP restore: cursor/focus changed, clearing history")
                     history.clear()
-                } else if focusChangedDuringTyping {
-                    // Layer 2: Focus changed during typing - verify with AX
-                    // This catches desync when suggestion popups steal keystrokes
-                    if verifyBufferMatchesScreen() {
-                        restoreLastTypingState()
-                    } else {
-                        logCallback?("  → SKIP restore: AX detected buffer-screen mismatch (focus changed)")
-                        history.clear()
-                        bufferDesyncDetected = true
-                    }
+                    bufferDesyncDetected = true
                 } else {
-                    // Layer 3: Normal backspace - trust history without AX verify
+                    // Normal backspace - trust history without AX verify
                     // REASON: AX query has race condition - it may return stale data
                     // because we process backspace event BEFORE OS updates the screen.
                     // When user is backspacing continuously without focus/cursor change,
                     // history is reliable and we should restore directly.
-                    logCallback?("  → Normal backspace: restoring from history (no AX verify - timing issue)")
+                    logCallback?("  → Normal backspace: restoring from history")
                     restoreLastTypingState()
                 }
             } else {
@@ -3079,12 +3017,12 @@ class VNEngine {
     
     /// Notify engine that focus changed during typing session
     /// This can happen when suggestion popups appear - keystrokes may go to popup
-    /// causing buffer desync. AX verify will be used at next word break.
+    /// causing buffer desync. Restore will be skipped at next word break/backspace.
     func notifyFocusChanged() {
         // Only set flag if we're currently typing (have content in buffer)
         if !buffer.isEmpty {
             focusChangedDuringTyping = true
-            logCallback?("notifyFocusChanged: focus changed during typing, will verify with AX")
+            logCallback?("notifyFocusChanged: focus changed during typing, will skip restore")
         }
     }
 
@@ -3310,11 +3248,11 @@ extension VNEngine {
         // Also skip if spelling is temporarily off via toolbar
         // Trigger restore on space, comma, or period
         //
-        // AX VERIFY OPTIMIZATION:
-        // Only call AX verify when potentially desynced:
-        // 1. cursorMovedSinceReset=true (user clicked/moved cursor)
-        // 2. focusChangedDuringTyping=true (suggestion popup stole focus)
-        // Normal typing: no AX call needed - buffer is guaranteed correct
+        // Skip restore when potentially desynced:
+        // 1. bufferDesyncDetected=true (previous desync was detected)
+        // 2. cursorMovedSinceReset=true (user clicked/moved cursor)
+        // 3. focusChangedDuringTyping=true (suggestion popup stole focus)
+        // Normal typing: buffer is correct, proceed with restore check
         if isRestoreTrigger && vCheckSpelling == 1 && vRestoreIfWrongSpelling == 1 && vTempOffSpelling == 0 {
             // Check if we should proceed with restore check
             var shouldCheckRestore = true
@@ -3337,20 +3275,14 @@ extension VNEngine {
                 shouldCheckRestore = false
             }
             // CASE 2: Focus changed during typing (suggestion popup scenario)
-            // Use AX to verify buffer matches screen before restoring
+            // Skip restore to avoid potential desync issues - safer than slow AX calls
             else if focusChangedDuringTyping {
-                // Use AX to verify buffer matches screen
-                if verifyBufferMatchesScreen() {
-                    logCallback?("processWordBreak: AX verified buffer matches screen after focus change, allowing restore check")
-                    shouldCheckRestore = true
-                } else {
-                    logCallback?("processWordBreak: AX detected mismatch after focus change, skipping restore")
-                    shouldCheckRestore = false
-                }
-                // Reset flag after verification
+                logCallback?("processWordBreak: focusChangedDuringTyping=true, skipping restore")
+                shouldCheckRestore = false
+                // Reset flag
                 focusChangedDuringTyping = false
             }
-            // CASE 3: Normal typing - no AX needed, buffer is correct
+            // CASE 3: Normal typing - buffer is correct
 
             
             if shouldCheckRestore {

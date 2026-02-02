@@ -3,7 +3,6 @@
 //  XKeyTests
 //
 //  Tests for backspace handling and history restore functionality.
-//  These tests cover the race condition fix where AX query may return stale data.
 //
 
 import XCTest
@@ -14,13 +13,11 @@ import XCTest
 class VNEngineBackspaceRestoreTests: XCTestCase {
 
     var engine: VNEngine!
-    var axCallCount: Int = 0
 
     override func setUp() {
         super.setUp()
         engine = VNEngine()
         engine.reset()
-        axCallCount = 0
     }
 
     override func tearDown() {
@@ -146,33 +143,21 @@ class VNEngineBackspaceRestoreTests: XCTestCase {
         // (spaceCount restore doesn't pop, but further backspaces do)
     }
 
-    // MARK: - Normal Backspace (No AX Verify) Tests
+    // MARK: - Normal Backspace Tests
 
-    func testNormalBackspaceDoesNotQueryAX() {
-        // Setup mock AX callback that counts calls
-        engine.getLastWordCallback = { [weak self] in
-            self?.axCallCount += 1
-            return ""
-        }
-
+    func testNormalBackspaceRestoresFromHistory() {
         typeWord("abc")
-        
-        // Reset count after typing
-        axCallCount = 0
-        
-        // Normal backspace - should NOT query AX
+
+        // Normal backspace - should trust history without needing AX verify
         typeBackspace()
         typeBackspace()
-        
+
         // Since cursorMovedSinceReset = false and focusChangedDuringTyping = false,
-        // should trust history without AX verify
-        // However, AX is only queried when buffer becomes empty
-        // So we delete all to trigger the empty buffer path
+        // should trust history
         typeBackspace()
-        
-        // After fix: Normal backspace should NOT query AX
-        // (AX callback should NOT be called because we trust history)
-        XCTAssertEqual(axCallCount, 0, "Normal backspace should not query AX due to race condition fix")
+
+        // Buffer should be empty, history is used for restore
+        XCTAssertTrue(engine.buffer.isEmpty)
     }
 
     // MARK: - Cursor Moved Tests
@@ -215,75 +200,55 @@ class VNEngineBackspaceRestoreTests: XCTestCase {
 
     // MARK: - Focus Changed Tests
 
-    func testFocusChangedTriggersAXVerify() {
-        // Setup mock AX callback
-        engine.getLastWordCallback = { [weak self] in
-            self?.axCallCount += 1
-            return "abc"  // Return matching content
-        }
-
+    func testFocusChangedSkipsRestore() {
         typeWord("abc")
-        
+
         // Notify focus changed
         engine.notifyFocusChanged()
         XCTAssertTrue(engine.focusChangedDuringTyping)
-        
-        // Reset count
-        axCallCount = 0
-        
+
         // Delete all characters to trigger buffer empty path
         typeBackspace()
         typeBackspace()
         typeBackspace()
-        
-        // With focusChangedDuringTyping = true, should query AX
-        XCTAssertGreaterThan(axCallCount, 0, "Focus changed should trigger AX verify")
+
+        // With focusChangedDuringTyping = true, should skip restore and set desync flag
+        XCTAssertTrue(engine.bufferDesyncDetected, "Focus changed should skip restore and set desync flag")
     }
 
-    func testFocusChangedMismatchClearsHistory() {
-        // Setup mock AX callback that returns mismatched content
-        engine.getLastWordCallback = { [weak self] in
-            self?.axCallCount += 1
-            return "different"  // Return mismatched content
-        }
-
+    func testFocusChangedClearsHistory() {
         typeWord("abc")
         processSpace()  // Save to history
         typeWord("def")
-        
+
         // Notify focus changed
         engine.notifyFocusChanged()
-        
-        // Delete all to trigger verify
+
+        // Delete all to trigger buffer empty path
         for _ in 0..<3 {
             typeBackspace()
         }
-        
-        // With mismatch, bufferDesyncDetected should be set
-        // (depends on AX returning mismatched content)
+
+        // With focusChangedDuringTyping = true, history should be cleared
+        XCTAssertTrue(engine.history.isEmpty, "Focus changed should clear history on backspace")
     }
 
     // MARK: - Buffer Desync Detection Tests
 
-    func testBufferDesyncFlagSetOnMismatch() {
+    func testBufferDesyncFlagSetOnFocusChange() {
         // Initially should be false
         XCTAssertFalse(engine.bufferDesyncDetected)
-        
-        // Setup mock AX callback that returns mismatch
-        engine.getLastWordCallback = {
-            return "wrong"
-        }
 
         typeWord("abc")
-        engine.notifyFocusChanged()  // Enable AX verify
-        
+        engine.notifyFocusChanged()  // Mark focus changed
+
         // Delete to trigger buffer empty
         for _ in 0..<3 {
             typeBackspace()
         }
         
-        // bufferDesyncDetected should be set if mismatch detected
-        // (depends on implementation path)
+        // bufferDesyncDetected should be set when focus changed during typing
+        XCTAssertTrue(engine.bufferDesyncDetected, "Focus change should set desync flag")
     }
 
     func testBufferDesyncFlagClearedOnNewSession() {
@@ -483,62 +448,44 @@ class VNEngineRaceConditionFixTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Test that normal backspace does NOT query AX
-    /// This is the main fix for the race condition bug
+    /// Test that normal backspace restores from history
     func testNormalBackspaceBypassesAXVerify() {
-        var axQueryCount = 0
-        
-        engine.getLastWordCallback = {
-            axQueryCount += 1
-            return ""
-        }
-
         // Type word
         _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
         _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
         _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
-        
-        axQueryCount = 0  // Reset after typing
-        
+
         // Ensure no desync flags
         XCTAssertFalse(engine.cursorMovedSinceReset)
         XCTAssertFalse(engine.focusChangedDuringTyping)
-        
+
         // Delete all - buffer becomes empty
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
-        
-        // CRITICAL: AX should NOT be queried because we trust history in normal backspace
-        XCTAssertEqual(axQueryCount, 0, "Race condition fix: Normal backspace should NOT query AX")
+
+        // Buffer should be empty, restore works from history
+        XCTAssertTrue(engine.buffer.isEmpty)
     }
 
-    /// Test that AX IS queried when focus changed
-    func testFocusChangedDoesQueryAX() {
-        var axQueryCount = 0
-        
-        engine.getLastWordCallback = {
-            axQueryCount += 1
-            return "abc"  // Match to allow restore
-        }
-
+    /// Test that focus changed skips restore and sets desync flag
+    func testFocusChangedSkipsRestoreAndSetsDesync() {
         // Type word
         _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
         _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
         _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
-        
+
         // Notify focus changed
         engine.notifyFocusChanged()
-        
-        axQueryCount = 0  // Reset
-        
+        XCTAssertTrue(engine.focusChangedDuringTyping)
+
         // Delete all
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
         _ = engine.processKey(character: "\u{8}", keyCode: VietnameseData.KEY_DELETE, isUppercase: false)
-        
-        // AX SHOULD be queried because focus changed
-        XCTAssertGreaterThan(axQueryCount, 0, "Focus changed should trigger AX verify")
+
+        // Focus changed should skip restore and set desync flag
+        XCTAssertTrue(engine.bufferDesyncDetected, "Focus changed should set desync flag")
     }
 
     /// Test that cursor moved skips restore entirely
