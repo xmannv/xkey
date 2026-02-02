@@ -33,126 +33,165 @@ struct MacroSection: View {
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     @State private var editingMacro: MacroItem? = nil
+    @State private var searchText: String = ""
+    @FocusState private var isContentFieldFocused: Bool
+
+    private var filteredMacros: [MacroItem] {
+        if searchText.isEmpty {
+            return viewModel.macros
+        }
+        let query = searchText.lowercased()
+        return viewModel.macros.filter { macro in
+            macro.text.lowercased().contains(query) ||
+            macro.content.lowercased().contains(query)
+        }
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Settings Group
-                SettingsGroup(title: "Cài đặt Macro") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Toggle("Bật Macro", isOn: $prefsViewModel.preferences.macroEnabled)
-                        
-                        if prefsViewModel.preferences.macroEnabled {
-                            Toggle("Dùng macro trong chế độ tiếng Anh", isOn: $prefsViewModel.preferences.macroInEnglishMode)
-                                .padding(.leading, 20)
-                            Toggle("Tự động viết hoa macro", isOn: $prefsViewModel.preferences.autoCapsMacro)
-                                .padding(.leading, 20)
-                            Toggle("Thêm dấu cách sau macro", isOn: $prefsViewModel.preferences.addSpaceAfterMacro)
-                                .padding(.leading, 20)
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Settings Group
+                    SettingsGroup(title: "Cài đặt Macro") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Toggle("Bật Macro", isOn: $prefsViewModel.preferences.macroEnabled)
+
+                            if prefsViewModel.preferences.macroEnabled {
+                                Toggle("Dùng macro trong chế độ tiếng Anh", isOn: $prefsViewModel.preferences.macroInEnglishMode)
+                                    .padding(.leading, 20)
+                                Toggle("Tự động viết hoa macro", isOn: $prefsViewModel.preferences.autoCapsMacro)
+                                    .padding(.leading, 20)
+                                Toggle("Thêm dấu cách sau macro", isOn: $prefsViewModel.preferences.addSpaceAfterMacro)
+                                    .padding(.leading, 20)
+                            }
                         }
                     }
-                }
-                // Add new macro
-                SettingsGroup(title: "Thêm macro mới") {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Abbreviation field with inline label
-                        HStack(alignment: .center, spacing: 8) {
-                            Text("Từ viết tắt:")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            TextField("vd: btw, ưa, việt", text: $newMacroText)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 150)
-                                .onChange(of: newMacroText) { newValue in
-                                    let filtered = filterMacroAbbreviation(newValue)
-                                    if filtered != newValue {
-                                        newMacroText = filtered
-                                    }
-                                }
-                            Text("(hỗ trợ tiếng Việt, không cách)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                        
-                        // Content field (auto-expanding)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Nội dung thay thế:")
-                                .font(.body)
-                                .foregroundColor(.primary)
-                            
-                            ZStack(alignment: .topLeading) {
-                                // Hidden text to measure height
-                                Text(newMacroContent.isEmpty ? " " : newMacroContent)
+                    // Add new macro
+                    SettingsGroup(title: "Thêm macro mới") {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Abbreviation field with inline label
+                            HStack(alignment: .center, spacing: 8) {
+                                Text("Từ viết tắt:")
                                     .font(.body)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 8)
-                                    .opacity(0)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                                // Placeholder
-                                if newMacroContent.isEmpty {
-                                    Text("Nhập nội dung (Enter để xuống dòng)")
-                                        .foregroundColor(.secondary.opacity(0.5))
+                                    .foregroundColor(.primary)
+                                TextField("vd: btw, ưa, việt", text: $newMacroText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 150)
+                                    .onChange(of: newMacroText) { newValue in
+                                        let filtered = filterMacroAbbreviation(newValue)
+                                        if filtered != newValue {
+                                            newMacroText = filtered
+                                        }
+                                    }
+                                Text("(hỗ trợ tiếng Việt, không cách)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+
+                            // Content field (auto-expanding)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Nội dung thay thế:")
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+
+                                ZStack(alignment: .topLeading) {
+                                    // Hidden text to measure height
+                                    Text(newMacroContent.isEmpty ? " " : newMacroContent)
                                         .font(.body)
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 8)
+                                        .opacity(0)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                                    // Placeholder
+                                    if newMacroContent.isEmpty {
+                                        Text("Nhập nội dung (Enter để xuống dòng)")
+                                            .foregroundColor(.secondary.opacity(0.5))
+                                            .font(.body)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 8)
+                                    }
+
+                                    // TextEditor
+                                    TextEditor(text: $newMacroContent)
+                                        .font(.body)
+                                        .textEditorBackgroundCompat()
+                                        .focused($isContentFieldFocused)
                                 }
-                                
-                                // TextEditor
-                                TextEditor(text: $newMacroContent)
-                                    .font(.body)
-                                    .textEditorBackgroundCompat()
+                                .frame(minHeight: 36, maxHeight: 150)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                                .background(Color(NSColor.textBackgroundColor))
+                                .cornerRadius(6)
                             }
-                            .frame(minHeight: 36, maxHeight: 150)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
-                            .background(Color(NSColor.textBackgroundColor))
-                            .cornerRadius(6)
-                        }
-                        
-                        // Error message
-                        if showError {
-                            Text(errorMessage)
-                                .foregroundColor(.red)
-                                .font(.caption)
-                        }
-                        
-                        // Add button - right aligned
-                        HStack {
-                            Spacer()
-                            Button {
-                                addMacro()
-                            } label: {
-                                Text("Thêm macro")
-                                    .fontWeight(.medium)
+
+                            // Error message
+                            if showError {
+                                Text(errorMessage)
+                                    .foregroundColor(.red)
+                                    .font(.caption)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
+
+                            // Add button - right aligned
+                            HStack {
+                                Spacer()
+                                Button {
+                                    addMacro()
+                                } label: {
+                                    Text("Thêm macro")
+                                        .fontWeight(.medium)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
+                            }
                         }
                     }
-                }
-                
+                    .id("addMacroSection")
+
                 // Macro list
                 SettingsGroup(title: "Danh sách macro (\(viewModel.macros.count))") {
                     VStack(alignment: .leading, spacing: 12) {
-                        // Action buttons
+                        // Search field and action buttons on same row
                         HStack(spacing: 12) {
+                            // Search field
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.secondary)
+                                TextField("Tìm kiếm...", text: $searchText)
+                                    .textFieldStyle(.plain)
+                                    .onChange(of: searchText) { _ in
+                                        withAnimation {
+                                            scrollProxy.scrollTo("macroListSection", anchor: .top)
+                                        }
+                                    }
+                                if !searchText.isEmpty {
+                                    Button(action: { searchText = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(8)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(8)
+
+                            Spacer()
+
                             Button(action: viewModel.importMacros) {
                                 Label("Import", systemImage: "square.and.arrow.down")
                             }
                             .buttonStyle(.bordered)
-                            
+
                             Button(action: viewModel.exportMacros) {
                                 Label("Export", systemImage: "square.and.arrow.up")
                             }
                             .buttonStyle(.bordered)
-                            
-                            Spacer()
-                            
+
                             if !viewModel.macros.isEmpty {
                                 Button(role: .destructive) {
                                     viewModel.clearAll()
@@ -162,11 +201,11 @@ struct MacroSection: View {
                                 .buttonStyle(.bordered)
                             }
                         }
-                        
+
                         Divider()
-                        
+
                         // Macro list
-                        if viewModel.macros.isEmpty {
+                        if viewModel.macros.isEmpty && searchText.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: "text.badge.plus")
                                     .font(.system(size: 32))
@@ -179,9 +218,32 @@ struct MacroSection: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 20)
+                        } else if filteredMacros.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.secondary)
+                                Text("Không tìm thấy macro '\(searchText)'")
+                                    .foregroundColor(.secondary)
+                                Button {
+                                    newMacroText = searchText
+                                    searchText = ""
+                                    withAnimation {
+                                        scrollProxy.scrollTo("addMacroSection", anchor: .top)
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        isContentFieldFocused = true
+                                    }
+                                } label: {
+                                    Label("Thêm macro '\(searchText)'", systemImage: "plus.circle.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
                         } else {
                             LazyVStack(spacing: 8) {
-                                ForEach(viewModel.macros) { macro in
+                                ForEach(filteredMacros) { macro in
                                     MacroRowView(
                                         macro: macro,
                                         onEdit: {
@@ -196,6 +258,7 @@ struct MacroSection: View {
                         }
                     }
                 }
+                .id("macroListSection")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -212,6 +275,7 @@ struct MacroSection: View {
         }
         .onAppear {
             viewModel.loadMacros()
+        }
         }
     }
     
