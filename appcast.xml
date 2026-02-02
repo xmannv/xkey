@@ -6,28 +6,56 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260202.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202.1</link>
-      <sparkle:version>20260202.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260203)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260203</link>
+      <sparkle:version>20260203</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: Remove AX verification, skip restore on potential desync</p>
-<p>Remove Accessibility API verification for buffer-screen matching due to</p>
-<p>race condition issues (AX returns stale data during rapid backspacing).</p>
-<p>Instead of querying AX to verify, simply skip restore when cursor moved</p>
-<p>or focus changed during typing - this is safer and more reliable.</p>
+<p>fix: preserve history after restore to prevent desync on backspace</p>
+<p>PROBLEM:</p>
 <ul>
-<li>Remove getLastWordCallback and verifyBufferMatchesScreen from VNEngine</li>
-<li>Remove getLastWordBeforeCursor from CharacterInjector</li>
-<li>Remove AX callback wiring from KeyboardEventHandler</li>
-<li>Update tests to match new skip-restore behavior</li>
+<li>When restore wrong spelling occurred, reset() was called which cleared history</li>
+<li>When user backspaced after restore, nothing was in history to restore</li>
+<li>This caused buffer to be empty while screen still had the restored word</li>
+<li>Result: severe desync between buffer and screen content</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260202.1">Xem chi tiết trên GitHub</a></p>
+<p>ROOT CAUSE:</p>
+<ul>
+<li>reset() calls history.clear() which wipes all saved words</li>
+<li>After restore, user expects backspace to restore the word they just typed</li>
+<li>But history was empty, so buffer stayed empty → DESYNC!</li>
+</ul>
+<p>FIXES:</p>
+<ol>
+<li>Restore success (no macro): Save restored keyStates to history, then use</li>
+</ol>
+<p>   startNewSession() instead of reset() to preserve history</p>
+<ol>
+<li>Skip restore (no VN processing): Manually save current buffer to history</li>
+</ol>
+<p>   when hookState.code == vRestore would cause saveWord() to skip</p>
+<ol>
+<li>Macro cases: Keep reset() because macro output can be very large</li>
+</ol>
+<p>   (code snippets, templates) and shouldn't be stored in history</p>
+<p>CHANGES:</p>
+<ul>
+<li>processWordBreak: After successful restore, create TypingBuffer from</li>
+</ul>
+<p>  keyStates and save to history before calling startNewSession()</p>
+<ul>
+<li>processWordBreak: When skipping restore due to no VN processing,</li>
+</ul>
+<p>  manually save buffer to history since saveWord() would skip</p>
+<ul>
+<li>Added detailed logging for debugging restore/history operations</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260203">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 02 Feb 2026 15:32:39 +0000</pubDate>
+      <pubDate>Mon, 02 Feb 2026 18:32:21 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260202.1/XKey.dmg" sparkle:version="20260202.1" sparkle:shortVersionString="1.2.20" length="11376084" type="application/octet-stream" sparkle:edSignature="KF4RHhxi1gX/FIEZaMHz2JfuehF2mK8WJsBQVL1bXXwNUIyuCP+spkjE0YSUu+j7/kruqKlsL+5HuAWRprrABA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260203/XKey.dmg" sparkle:version="20260203" sparkle:shortVersionString="1.2.20" length="11378859" type="application/octet-stream" sparkle:edSignature="LtkndSplv9qPU/i8wGiVRYqTJ3XKMpfxzXXb5QVkMPTeISQX4ePvL9USBU61FFM0FvzDXgC67eKZ05d7UyytBg==" />
     </item>
   </channel>
 </rss>
