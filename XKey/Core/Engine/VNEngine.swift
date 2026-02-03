@@ -3014,7 +3014,14 @@ class VNEngine {
         cursorMovedSinceReset = true
         logCallback?("resetWithCursorMoved: cursor moved flag set")
     }
-    
+
+    /// Clear history (for terminal apps after Enter key)
+    /// This prevents backspace from restoring words from previous command lines
+    func clearHistory() {
+        history.clear()
+        logCallback?("clearHistory: history cleared for terminal")
+    }
+
     /// Notify engine that focus changed during typing session
     /// This can happen when suggestion popups appear - keystrokes may go to popup
     /// causing buffer desync. Restore will be skipped at next word break/backspace.
