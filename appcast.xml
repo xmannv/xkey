@@ -6,18 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260203.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260203.1</link>
-      <sparkle:version>20260203.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260204)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204</link>
+      <sparkle:version>20260204</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Exclude Simulator from VN typing</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260203.1">Xem chi tiết trên GitHub</a></p>
+<p>feat: Clear history on Enter key in terminal apps</p>
+<p>   Add clearHistory() method to VNEngine to clear typing history</p>
+<p>   when Enter is pressed in terminal applications. This prevents</p>
+<p>   backspace from restoring words from previous command lines.</p>
+<p>   - VNEngine.swift: Add clearHistory() method</p>
+<p>   - KeyboardEventHandler.swift: Check isTerminal on Enter and clear history</p>
+<p>   - Version.xcconfig: Bump build version to 20260204</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 03 Feb 2026 15:34:05 +0000</pubDate>
+      <pubDate>Tue, 03 Feb 2026 17:39:39 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260203.1/XKey.dmg" sparkle:version="20260203.1" sparkle:shortVersionString="1.2.20" length="11383370" type="application/octet-stream" sparkle:edSignature="B/RxYAC0fBulFykmu/PVjXij2tj257QluM3rR2wSgbZbs+0w0eri4rdxZ/6b3RfYd6kM723Vj8ppZ2WwO+IqBA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260204/XKey.dmg" sparkle:version="20260204" sparkle:shortVersionString="1.2.20" length="11384454" type="application/octet-stream" sparkle:edSignature="MjYTYNQ+GWpbsWQODpougs/X+tsDAVUjCO8J6r+MW1r/k31Zi6IMKZcbju1BbLZqCUWmNCWz4RyGaPjjX7MDAQ==" />
     </item>
   </channel>
 </rss>
