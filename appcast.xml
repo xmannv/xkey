@@ -6,24 +6,52 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260204)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204</link>
-      <sparkle:version>20260204</sparkle:version>
+      <title>Version 1.2.20 (Build 20260204.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204.1</link>
+      <sparkle:version>20260204.1</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: Clear history on Enter key in terminal apps</p>
-<p>   Add clearHistory() method to VNEngine to clear typing history</p>
-<p>   when Enter is pressed in terminal applications. This prevents</p>
-<p>   backspace from restoring words from previous command lines.</p>
-<p>   - VNEngine.swift: Add clearHistory() method</p>
-<p>   - KeyboardEventHandler.swift: Check isTerminal on Enter and clear history</p>
-<p>   - Version.xcconfig: Bump build version to 20260204</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204">Xem chi tiết trên GitHub</a></p>
+<p>Fix VNI/Telex Shift+number key handling for symbols like @, #, $</p>
+<p>Problem:</p>
+<ul>
+<li>VNI mode: Typing 'o' + Shift+2 resulted in 'ò' instead of 'o@'</li>
+<li>After fixing VNI, backspace couldn't restore word for continued editing</li>
+<li>Telex mode: Same issue with non-Vietnamese characters</li>
+</ul>
+<p>Root causes:</p>
+<ol>
+<li>isUppercase was incorrectly calculated for Shift+number keys</li>
+</ol>
+<p>   (based on character case, '@' has no uppercase → false)</p>
+<ol>
+<li>engine.reset() was called which clears history</li>
+<li>cursorMovedSinceReset flag wasn't reset after word break</li>
+</ol>
+<p>Fixes:</p>
+<ol>
+<li>XKeyIMController: Set isUppercase=true for Shift+number keys</li>
+</ol>
+<p>   so VNEngine treats them as word breaks</p>
+<ol>
+<li>XKeyIMController: Use processWordBreak() for non-Vietnamese</li>
+</ol>
+<p>   characters to properly save word to history</p>
+<ol>
+<li>XKeyIMController: Commit marked text before inserting symbols</li>
+<li>VNEngine: Reset cursorMovedSinceReset after handleWordBreak()</li>
+</ol>
+<p>   to allow backspace restore</p>
+<p>Test scenarios:</p>
+<ul>
+<li>VNI: 'o' + Shift+2 → 'o@' → backspace → 'o' → '2' → 'ò'</li>
+<li>Telex: 'o' + Shift+2 → 'o@' → backspace → 'o' → 'f' → 'ò'</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 03 Feb 2026 17:39:39 +0000</pubDate>
+      <pubDate>Wed, 04 Feb 2026 09:30:47 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260204/XKey.dmg" sparkle:version="20260204" sparkle:shortVersionString="1.2.20" length="11384454" type="application/octet-stream" sparkle:edSignature="MjYTYNQ+GWpbsWQODpougs/X+tsDAVUjCO8J6r+MW1r/k31Zi6IMKZcbju1BbLZqCUWmNCWz4RyGaPjjX7MDAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260204.1/XKey.dmg" sparkle:version="20260204.1" sparkle:shortVersionString="1.2.20" length="11385278" type="application/octet-stream" sparkle:edSignature="NnpzO2a+65gVxpl7caFI1H3VLasUNra3WovgS9sYyEVvkLU43+e+4oFlZiCf6rbFptvxkdo4oaK0mnd01H0lDw==" />
     </item>
   </channel>
 </rss>
