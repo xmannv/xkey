@@ -361,6 +361,12 @@ class VNEngine {
             buffer.clear()
         }
         
+        // IMPORTANT: Reset cursorMovedSinceReset after word break
+        // This allows backspace to restore words from history even if user clicked before typing
+        // The user has now typed a complete word (saved to history), so backspace should work
+        // Same logic as processWordBreak() at the end
+        cursorMovedSinceReset = false
+        
         // Upper case first char
         if vUpperCaseFirstChar == 1 {
             if keyCode == VietnameseData.KEY_DOT {

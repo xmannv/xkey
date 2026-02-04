@@ -288,10 +288,18 @@ class XKeyIMController: IMKInputController {
         // - If CapsLock is OFF and Shift is ON → uppercase
         // - If both ON or both OFF → lowercase
         // But only for letters - non-letters follow the character as-is
+        // SPECIAL CASE: For number keys with Shift (Shift+2 for "@", etc.),
+        // we set isUppercase=true so VNEngine treats it as a word break
+        // This enables proper save/restore behavior for backspace
+        let isNumberKey = (keyCode >= 0x12 && keyCode <= 0x1D && keyCode != 0x1B) // 0x1B is minus key
         let isUppercase: Bool
         if isLetter {
             // For letters: CapsLock XOR Shift = uppercase
             isUppercase = hasCapsLock != hasShift
+        } else if isNumberKey && hasShift {
+            // For number keys with Shift: signal to VNEngine that this is a shifted symbol
+            // This makes VNEngine call handleWordBreak() instead of handleMarkKey()
+            isUppercase = true
         } else {
             // For non-letters: use character's actual case
             isUppercase = character.isUppercase
@@ -540,6 +548,9 @@ class XKeyIMController: IMKInputController {
             break
         }
 
+        // NOTE: Shift+number keys (like Shift+2 for "@") are now handled by VNEngine
+        // because we set isUppercase=true for these keys earlier, triggering handleWordBreak()
+
         // Check if this is a printable character
         // Use baseChar to check letter status (important for CapsLock)
         // IMPORTANT: Include isSymbol and isMathSymbol for characters like <, >, +, -, =
@@ -571,14 +582,14 @@ class XKeyIMController: IMKInputController {
             if !composingText.isEmpty {
                 // Commit the marked text first
                 commitComposition(client)
-                engine.reset()
                 currentWordLength = 0
                 markedTextStartLocation = NSNotFound
-            } else {
-                // Even if no composing text, reset engine to clear buffer
-                engine.reset()
-                currentWordLength = 0
             }
+            
+            // Use processWordBreak to properly handle word break
+            // This saves current word to history and tracks the special character
+            // so backspace can restore the word correctly
+            _ = engine.processWordBreak(character: character)
             
             // CRITICAL FIX: Insert the special character ourselves
             // Don't rely on "return false" which may cause the character to be lost
@@ -626,6 +637,16 @@ class XKeyIMController: IMKInputController {
                     setMarkedText(String(character), client: client)
                     return true
                 }
+            } else if !composingText.isEmpty {
+                // Non-letter character (like @, #, $) with marked text outstanding
+                // Engine treated this as word break - commit marked text before passing through
+                // This ensures "o" is committed when typing "o@"
+                IMKitDebugger.shared.log("Word break: committing '\(composingText)' before inserting '\(character)'", category: "WORDBREAK")
+                commitComposition(client)
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+                // Let the system insert the character
+                return false
             }
         } else {
             // Direct insertion mode - only consume when engine says so
