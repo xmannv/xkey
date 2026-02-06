@@ -6,52 +6,23 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260204.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204.1</link>
-      <sparkle:version>20260204.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260206)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206</link>
+      <sparkle:version>20260206</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Fix VNI/Telex Shift+number key handling for symbols like @, #, $</p>
-<p>Problem:</p>
+<p>fix: prevent duplicate history saves in VNEngine</p>
 <ul>
-<li>VNI mode: Typing 'o' + Shift+2 resulted in 'ò' instead of 'o@'</li>
-<li>After fixing VNI, backspace couldn't restore word for continued editing</li>
-<li>Telex mode: Same issue with non-Vietnamese characters</li>
+<li>Add wordAlreadySavedToHistory flag to track if word was already saved</li>
+<li>Skip saveWord() if already saved during "Skipping restore" block</li>
+<li>Bump build version to 20260206</li>
 </ul>
-<p>Root causes:</p>
-<ol>
-<li>isUppercase was incorrectly calculated for Shift+number keys</li>
-</ol>
-<p>   (based on character case, '@' has no uppercase → false)</p>
-<ol>
-<li>engine.reset() was called which clears history</li>
-<li>cursorMovedSinceReset flag wasn't reset after word break</li>
-</ol>
-<p>Fixes:</p>
-<ol>
-<li>XKeyIMController: Set isUppercase=true for Shift+number keys</li>
-</ol>
-<p>   so VNEngine treats them as word breaks</p>
-<ol>
-<li>XKeyIMController: Use processWordBreak() for non-Vietnamese</li>
-</ol>
-<p>   characters to properly save word to history</p>
-<ol>
-<li>XKeyIMController: Commit marked text before inserting symbols</li>
-<li>VNEngine: Reset cursorMovedSinceReset after handleWordBreak()</li>
-</ol>
-<p>   to allow backspace restore</p>
-<p>Test scenarios:</p>
-<ul>
-<li>VNI: 'o' + Shift+2 → 'o@' → backspace → 'o' → '2' → 'ò'</li>
-<li>Telex: 'o' + Shift+2 → 'o@' → backspace → 'o' → 'f' → 'ò'</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260204.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 04 Feb 2026 09:30:47 +0000</pubDate>
+      <pubDate>Fri, 06 Feb 2026 08:07:23 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260204.1/XKey.dmg" sparkle:version="20260204.1" sparkle:shortVersionString="1.2.20" length="11385278" type="application/octet-stream" sparkle:edSignature="NnpzO2a+65gVxpl7caFI1H3VLasUNra3WovgS9sYyEVvkLU43+e+4oFlZiCf6rbFptvxkdo4oaK0mnd01H0lDw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260206/XKey.dmg" sparkle:version="20260206" sparkle:shortVersionString="1.2.20" length="11386196" type="application/octet-stream" sparkle:edSignature="UafPIEeP/IYQcXD4w6m2UmFNE8XQ/5XOySKlhy0Vh0wmZLXjrPWIECWPL8TUZZAXs9DgJmb5yIWuh9OTvK8PCQ==" />
     </item>
   </channel>
 </rss>
