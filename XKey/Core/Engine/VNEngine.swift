@@ -3384,6 +3384,16 @@ extension VNEngine {
                             //
                             // Note: We save the RESTORED keyStates, not the Vietnamese buffer,
                             // because that's what was injected to screen.
+                            //
+                            // History is a stack (LIFO), so we need:
+                            //   Bottom: [..., previous_word, space, current_word] :Top
+                            // When restoring, we pop: current_word first, then space, then previous_word
+                            if spaceCount > 0 {
+                                saveWord(keyCode: VietnameseData.KEY_SPACE, count: spaceCount)
+                                spaceCount = 0
+                                logCallback?("  → Saved preceding space to history first")
+                            }
+                            
                             if stateIndex > 0 {
                                 // Create a snapshot from keyStates (the restored characters)
                                 var restoredBuffer = TypingBuffer()
@@ -3422,6 +3432,16 @@ extension VNEngine {
                         // 2. User presses space → "biete" SAVED to history ← NEW!
                         // 3. User backspaces → restores "biete" into buffer
                         // 4. Buffer = "biete", Screen = "biete" → SYNC!
+                        //
+                        // History is a stack (LIFO), so we need:
+                        //   Bottom: [..., previous_word, space, current_word] :Top
+                        // When restoring, we pop: current_word first, then space, then previous_word
+                        if spaceCount > 0 {
+                            saveWord(keyCode: VietnameseData.KEY_SPACE, count: spaceCount)
+                            spaceCount = 0
+                            logCallback?("  → Saved preceding space to history first")
+                        }
+                        
                         if !buffer.isEmpty {
                             let snapshot = buffer.createSnapshot()
                             history.save(snapshot)

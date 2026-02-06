@@ -496,6 +496,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
 
         if isWordBreakKey(character) {
+            // Wait for any pending injection to complete before processing word break
+            // This prevents race conditions where injection operations overlap.
+            injector.waitForInjectionComplete()
+            
             // Log word break key
             let keyName: String
             switch character {
