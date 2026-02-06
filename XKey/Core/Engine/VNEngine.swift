@@ -3233,6 +3233,10 @@ extension VNEngine {
         // User needs to press space to trigger macro replacement
         let isSpace = (character == " ")
         
+        // Flag to track if word was already saved to history during this function
+        // This prevents duplicate saves (e.g., in "Skipping restore" block + saveWord())
+        var wordAlreadySavedToHistory = false
+        
         // Restore trigger: space, comma, or period
         // These are the characters that will trigger spell check restore
         let isRestoreTrigger = isSpace || character == "," || character == "."
@@ -3421,6 +3425,7 @@ extension VNEngine {
                         if !buffer.isEmpty {
                             let snapshot = buffer.createSnapshot()
                             history.save(snapshot)
+                            wordAlreadySavedToHistory = true
                             logCallback?("  → Saved '\(getCurrentWord())' to history for backspace restore")
                         }
                     }
@@ -3458,10 +3463,10 @@ extension VNEngine {
             spaceCount = 0
         }
 
-        // Save current word
-        saveWord()
-        
-
+        // Save current word (skip if already saved earlier in this function)
+        if !wordAlreadySavedToHistory {
+            saveWord()
+        }
 
         // Only reset session and clear macroKey for SPACE
         // For other special characters (!, @, #, etc.), we preserve macroKey
