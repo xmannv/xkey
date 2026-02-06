@@ -6,23 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260206)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206</link>
-      <sparkle:version>20260206</sparkle:version>
+      <title>Version 1.2.20 (Build 20260206.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206.1</link>
+      <sparkle:version>20260206.1</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: prevent duplicate history saves in VNEngine</p>
+<p>fix: correct history LIFO order for space and word saves</p>
 <ul>
-<li>Add wordAlreadySavedToHistory flag to track if word was already saved</li>
-<li>Skip saveWord() if already saved during "Skipping restore" block</li>
-<li>Bump build version to 20260206</li>
+<li>VNEngine: Save space to history BEFORE word in plain text and restore paths</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206">Xem chi tiết trên GitHub</a></p>
+<p>  to ensure correct restore order (pop word first, then space)</p>
+<ul>
+<li>KeyboardEventHandler: Add waitForInjectionComplete() before word break</li>
+</ul>
+<p>  processing to prevent race conditions</p>
+<ul>
+<li>Add comprehensive tests for history order fix (VNEngineHistoryOrderFixTests)</li>
+<li>Bump build version to 20260206.1</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260206.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 06 Feb 2026 08:07:23 +0000</pubDate>
+      <pubDate>Fri, 06 Feb 2026 10:12:35 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260206/XKey.dmg" sparkle:version="20260206" sparkle:shortVersionString="1.2.20" length="11386196" type="application/octet-stream" sparkle:edSignature="UafPIEeP/IYQcXD4w6m2UmFNE8XQ/5XOySKlhy0Vh0wmZLXjrPWIECWPL8TUZZAXs9DgJmb5yIWuh9OTvK8PCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260206.1/XKey.dmg" sparkle:version="20260206.1" sparkle:shortVersionString="1.2.20" length="11385966" type="application/octet-stream" sparkle:edSignature="N04QP7BSpPfMNEsvdqOC/6j+ybzcizQpWUhvCoOKOPEScGDA5K0g20nQmHwfWOra9W2IHhItWXIZqiR5iXSgDw==" />
     </item>
   </channel>
 </rss>
