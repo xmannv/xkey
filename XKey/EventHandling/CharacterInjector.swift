@@ -220,7 +220,7 @@ class CharacterInjector {
     
     /// Internal: Send backspace key (no semaphore)
     private func sendBackspaceKey(codeTable: CodeTable, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
-        let deleteKeyCode: CGKeyCode = 0x33
+        let deleteKeyCode: CGKeyCode = VietnameseData.KEY_DELETE
         let backspaceCount = codeTable.requiresDoubleBackspace ? 2 : 1
         for _ in 0..<backspaceCount {
             sendKeyPress(deleteKeyCode, proxy: proxy, useDirectPost: useDirectPost)
@@ -250,7 +250,7 @@ class CharacterInjector {
             debugCallback?("    → Skipped Forward Delete (mid-sentence)")
         }
         for i in 0..<count {
-            sendKeyPress(0x33, proxy: proxy)
+            sendKeyPress(VietnameseData.KEY_DELETE, proxy: proxy)
             usleep(delays.backspace > 0 ? delays.backspace : 1000)
             debugCallback?("    → Backspace \(i + 1)/\(count)")
         }
@@ -421,50 +421,12 @@ class CharacterInjector {
     
     /// Internal: Send Return key (for newline in macros)
     private func sendReturnKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
-        guard let source = eventSource else { return }
-        
-        let returnKeyCode: CGKeyCode = 0x24  // Return key
-        
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false) else {
-            return
-        }
-        
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        
-        if useDirectPost {
-            keyDown.post(tap: .cgSessionEventTap)
-            keyUp.post(tap: .cgSessionEventTap)
-        } else {
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-        }
+        sendKeyPress(0x24, proxy: proxy, useDirectPost: useDirectPost)  // Return key
     }
     
     /// Internal: Send Tab key (for tab in macros)
     private func sendTabKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
-        guard let source = eventSource else { return }
-        
-        let tabKeyCode: CGKeyCode = 0x30  // Tab key
-        
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: tabKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: tabKeyCode, keyDown: false) else {
-            return
-        }
-        
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        
-        if useDirectPost {
-            keyDown.post(tap: .cgSessionEventTap)
-            keyUp.post(tap: .cgSessionEventTap)
-        } else {
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-        }
+        sendKeyPress(0x30, proxy: proxy, useDirectPost: useDirectPost)  // Tab key
     }
     
     // MARK: - Public Methods
@@ -566,7 +528,7 @@ class CharacterInjector {
         
         // Backspaces remove typed characters
         for i in 0..<count {
-            sendKeyPress(0x33, proxy: proxy)  // Backspace
+            sendKeyPress(VietnameseData.KEY_DELETE, proxy: proxy)  // Backspace
             usleep(delays.backspace > 0 ? delays.backspace : 1000)
             debugCallback?("    → Backspace \(i + 1)/\(count)")
         }
@@ -618,49 +580,63 @@ class CharacterInjector {
         usleep(settleTime)
     }
 
-    /// Check if there is text after cursor using Accessibility API
-    /// Returns: true if there's text after cursor, false if at end of text, nil if AX not supported
-    private func hasTextAfterCursor() -> Bool? {
+    // MARK: - AX Helpers (shared boilerplate for cursor queries)
+    
+    /// Get the currently focused AXUIElement from the system-wide element.
+    /// Returns nil if Accessibility is not available or no focused element exists.
+    private func getFocusedAXElement(caller: String = #function) -> AXUIElement? {
         let systemWideElement = AXUIElementCreateSystemWide()
-
         var focusedElement: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
-            debugCallback?("  [AX] hasTextAfterCursor: Failed to get focused element")
-            return nil  // AX not supported
+            debugCallback?("  [AX] \(caller): Failed to get focused element")
+            return nil
         }
-
-        let element = focusedElement as! AXUIElement
-
-        // Get selected text range (cursor position)
+        // Note: forced downcast always succeeds for AXUIElement (CF type bridging)
+        return focusedElement as! AXUIElement
+    }
+    
+    /// Get cursor position and selection length from the focused element's selected text range.
+    /// Returns nil if the selected range attribute is not available.
+    private func getCursorInfo(element: AXUIElement, caller: String = #function) -> (position: Int, selectionLength: Int)? {
         var selectedRange: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
-            debugCallback?("  [AX] hasTextAfterCursor: Failed to get selected range")
-            return nil  // AX not supported
+            debugCallback?("  [AX] \(caller): Failed to get selected range")
+            return nil
         }
-
-        // Extract cursor position AND selection length
         var rangeValue = CFRange(location: 0, length: 0)
         guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
-            debugCallback?("  [AX] hasTextAfterCursor: Failed to extract range value")
-            return nil  // AX not supported
+            debugCallback?("  [AX] \(caller): Failed to extract range value")
+            return nil
         }
-
-        let cursorPosition = rangeValue.location
-        let selectionLength = rangeValue.length
-
-        // Get total text length
+        return (rangeValue.location, rangeValue.length)
+    }
+    
+    /// Get total character count of the text in the focused element.
+    /// Returns nil if the attribute is not available.
+    private func getTotalLength(element: AXUIElement, caller: String = #function) -> Int? {
         var numberOfCharacters: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &numberOfCharacters) == .success,
               let totalLength = numberOfCharacters as? Int else {
-            debugCallback?("  [AX] hasTextAfterCursor: Failed to get total length")
-            return nil  // AX not supported
+            debugCallback?("  [AX] \(caller): Failed to get total length")
+            return nil
         }
+        return totalLength
+    }
+    
+    // MARK: - AX Cursor Query Methods
+
+    /// Check if there is text after cursor using Accessibility API
+    /// Returns: true if there's text after cursor, false if at end of text, nil if AX not supported
+    private func hasTextAfterCursor() -> Bool? {
+        guard let element = getFocusedAXElement(caller: "hasTextAfterCursor") else { return nil }
+        guard let cursor = getCursorInfo(element: element, caller: "hasTextAfterCursor") else { return nil }
+        guard let totalLength = getTotalLength(element: element, caller: "hasTextAfterCursor") else { return nil }
 
         // If there's a selection (highlighted text), it's likely AutoComplete suggestion
         // In this case, we consider it as "no real text after cursor" because
         // the selected text will be replaced when user continues typing
-        let hasRealTextAfter = cursorPosition + selectionLength < totalLength
-        debugCallback?("  [AX] hasTextAfterCursor: cursor=\(cursorPosition), selection=\(selectionLength), total=\(totalLength), hasRealTextAfter=\(hasRealTextAfter)")
+        let hasRealTextAfter = cursor.position + cursor.selectionLength < totalLength
+        debugCallback?("  [AX] hasTextAfterCursor: cursor=\(cursor.position), selection=\(cursor.selectionLength), total=\(totalLength), hasRealTextAfter=\(hasRealTextAfter)")
 
         return hasRealTextAfter
     }
@@ -670,42 +646,12 @@ class CharacterInjector {
     ///          nil if at end of text, followed by whitespace, or AX not supported
     /// This is used for context-aware macro checking
     func getCharacterAfterCursor() -> Character? {
-        let systemWideElement = AXUIElementCreateSystemWide()
-
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
-            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get focused element")
-            return nil
-        }
-
-        let element = focusedElement as! AXUIElement
-
-        // Get selected text range (cursor position)
-        var selectedRange: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
-            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get selected range")
-            return nil
-        }
-
-        var rangeValue = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
-            debugCallback?("  [AX] getCharacterAfterCursor: Failed to extract range value")
-            return nil
-        }
-
-        let cursorPosition = rangeValue.location
-        let selectionLength = rangeValue.length
-
-        // Get total text length
-        var numberOfCharacters: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &numberOfCharacters) == .success,
-              let totalLength = numberOfCharacters as? Int else {
-            debugCallback?("  [AX] getCharacterAfterCursor: Failed to get total length")
-            return nil
-        }
+        guard let element = getFocusedAXElement(caller: "getCharacterAfterCursor") else { return nil }
+        guard let cursor = getCursorInfo(element: element, caller: "getCharacterAfterCursor") else { return nil }
+        guard let totalLength = getTotalLength(element: element, caller: "getCharacterAfterCursor") else { return nil }
 
         // Check if there's text after cursor (accounting for selection)
-        let positionAfterCursor = cursorPosition + selectionLength
+        let positionAfterCursor = cursor.position + cursor.selectionLength
         guard positionAfterCursor < totalLength else {
             debugCallback?("  [AX] getCharacterAfterCursor: At end of text")
             return nil
@@ -749,30 +695,10 @@ class CharacterInjector {
     /// Returns: String of text before cursor (up to specified length), nil if AX not supported
     /// This is used for verifying buffer matches screen content before restore operations
     func getTextBeforeCursor(length: Int = 50) -> String? {
-        let systemWideElement = AXUIElementCreateSystemWide()
+        guard let element = getFocusedAXElement(caller: "getTextBeforeCursor") else { return nil }
+        guard let cursor = getCursorInfo(element: element, caller: "getTextBeforeCursor") else { return nil }
 
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
-            debugCallback?("  [AX] getTextBeforeCursor: Failed to get focused element")
-            return nil
-        }
-
-        let element = focusedElement as! AXUIElement
-
-        // Get selected text range (cursor position)
-        var selectedRange: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
-            debugCallback?("  [AX] getTextBeforeCursor: Failed to get selected range")
-            return nil
-        }
-
-        var rangeValue = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
-            debugCallback?("  [AX] getTextBeforeCursor: Failed to extract range value")
-            return nil
-        }
-
-        let cursorPosition = rangeValue.location
+        let cursorPosition = cursor.position
 
         // Ensure cursor position is valid
         guard cursorPosition > 0 else {
@@ -869,7 +795,7 @@ class CharacterInjector {
     // MARK: - Private Methods
 
     private func sendBackspace(codeTable: CodeTable, proxy: CGEventTapProxy) {
-        let deleteKeyCode: CGKeyCode = 0x33 // Delete/Backspace key
+        let deleteKeyCode: CGKeyCode = VietnameseData.KEY_DELETE // Delete/Backspace key
 
         // For VNI and Unicode Compound, some characters require double backspace
         let backspaceCount = codeTable.requiresDoubleBackspace ? 2 : 1
@@ -881,33 +807,34 @@ class CharacterInjector {
         }
     }
 
-    private func sendKeyPress(_ keyCode: CGKeyCode, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    /// Unified method for sending a single key press (key down + key up) with optional modifiers.
+    /// All other send key methods delegate to this to avoid duplicated CGEvent creation/posting logic.
+    private func sendKeyPress(_ keyCode: CGKeyCode, proxy: CGEventTapProxy, useDirectPost: Bool = false, modifiers: CGEventFlags? = nil) {
         guard let source = eventSource else { return }
 
-        // Create key down event
-        if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true) {
-            // Mark as XKey-injected event to prevent re-processing by event tap
-            keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            
-            // For slow method (terminals), post directly to session event tap
-            // This avoids race conditions where tapPostEvent can cause timing issues
-            if useDirectPost {
-                keyDown.post(tap: .cgSessionEventTap)
-            } else {
-                keyDown.tapPostEvent(proxy)
-            }
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
+            return
         }
 
-        // Create key up event
-        if let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
-            // Mark as XKey-injected event to prevent re-processing by event tap
-            keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            
-            if useDirectPost {
-                keyUp.post(tap: .cgSessionEventTap)
-            } else {
-                keyUp.tapPostEvent(proxy)
-            }
+        // Apply modifier keys if specified (e.g., Shift for Shift+Left Arrow)
+        if let mods = modifiers {
+            keyDown.flags.insert(mods)
+            keyUp.flags.insert(mods)
+        }
+
+        // Mark as XKey-injected event to prevent re-processing by event tap
+        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+
+        // For slow method (terminals), post directly to session event tap
+        // This avoids race conditions where tapPostEvent can cause timing issues
+        if useDirectPost {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        } else {
+            keyDown.tapPostEvent(proxy)
+            keyUp.tapPostEvent(proxy)
         }
     }
     
@@ -943,65 +870,19 @@ class CharacterInjector {
     
     /// Send Right Arrow key to move cursor to end (deselect autocomplete in Spotlight)
     private func sendRightArrow(proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-        
-        let rightArrowKeyCode: CGKeyCode = 0x7C  // Right Arrow key
-        
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: rightArrowKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: rightArrowKeyCode, keyDown: false) else {
-            return
-        }
-        
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
-        
+        sendKeyPress(CGKeyCode(VietnameseData.KEY_RIGHT), proxy: proxy)  // Right Arrow key
         debugCallback?("    → Sent Right Arrow to deselect autocomplete")
     }
     
     /// Send Forward Delete (Fn+Delete) to delete text after cursor (clear autocomplete suggestion)
     private func sendForwardDelete(proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-        
-        // Forward Delete key code is 0x75 (117)
-        let forwardDeleteKeyCode: CGKeyCode = 0x75
-        
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: forwardDeleteKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: forwardDeleteKeyCode, keyDown: false) else {
-            return
-        }
-        
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
-        
+        sendKeyPress(CGKeyCode(VietnameseData.KEY_FORWARD_DELETE), proxy: proxy)  // Forward Delete key
         debugCallback?("    → Sent Forward Delete to clear autocomplete suggestion")
     }
     
     /// Send Escape key to dismiss autocomplete suggestions (for Spotlight)
     private func sendEscapeKey(proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-        
-        let escapeKeyCode: CGKeyCode = 0x35  // Escape key
-        
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: escapeKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: escapeKeyCode, keyDown: false) else {
-            return
-        }
-        
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
-        
+        sendKeyPress(CGKeyCode(VietnameseData.KEY_ESC), proxy: proxy)  // Escape key
         debugCallback?("    → Sent Escape key to dismiss autocomplete")
     }
 
@@ -1030,25 +911,7 @@ class CharacterInjector {
 
     /// Send Shift+Left Arrow to select text (for Chromium browsers)
     private func sendShiftLeftArrow(proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-
-        let leftArrowKeyCode: CGKeyCode = 0x7B  // Left Arrow key
-
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: leftArrowKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: leftArrowKeyCode, keyDown: false) else {
-            return
-        }
-
-        // Add Shift modifier
-        keyDown.flags.insert(.maskShift)
-        keyUp.flags.insert(.maskShift)
-
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
+        sendKeyPress(CGKeyCode(VietnameseData.KEY_LEFT), proxy: proxy, modifiers: .maskShift)  // Shift + Left Arrow key
     }
 
     /// Check if current frontmost app is a Chromium-based browser

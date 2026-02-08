@@ -31,8 +31,8 @@ class VNEngine {
     static let STANDALONE_MASK: UInt32     = 0x1000000
     static let CHAR_CODE_MASK: UInt32      = 0x2000000
     static let PURE_CHARACTER_MASK: UInt32 = 0x80000000
-    static let END_CONSONANT_MASK: UInt32  = 0x4000
-    static let CONSONANT_ALLOW_MASK: UInt32 = 0x8000
+    // Note: END_CONSONANT_MASK and CONSONANT_ALLOW_MASK are defined in VietnameseData (as UInt16)
+    // and are the canonical source used throughout the codebase.
     
     /// Convert macOS virtual key code to printable character for logging
     static func keyCodeToChar(_ keyCode: UInt16) -> Character? {
@@ -616,7 +616,6 @@ class VNEngine {
         
         // Insert or replace key for macro
         if vUseMacro == 1 {
-            let macroKeyBefore = hookState.macroKey
             if hookState.code == UInt8(vDoNothing) {
                 hookState.macroKey.append(UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0))
             } else if hookState.code == UInt8(vWillProcess) || hookState.code == UInt8(vRestore) {
@@ -1626,7 +1625,7 @@ class VNEngine {
     }
     
     private func insertW(keyCode: UInt16, isCaps: Bool) {
-        var isRestoredW = false
+        // Note: W restoration is tracked by hookState.code (vRestore/vWillProcess) and tempDisableKey
         
         findAndCalculateVowel()
         logCallback?("insertW: vowelCount=\(vowelCount), vowelStartIndex=\(vowelStartIndex), vowelEndIndex=\(vowelEndIndex)")
@@ -1658,7 +1657,7 @@ class VNEngine {
                     typingWord[i] &= ~VNEngine.TONEW_MASK
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i]) & ~VNEngine.STANDALONE_MASK
                 }
-                isRestoredW = true
+                // W was restored (tracked by hookState.code = vRestore above)
                 tempDisableKey = true
             } else {
                 hookState.code = UInt8(vWillProcess)
@@ -1728,19 +1727,19 @@ class VNEngine {
                         if key == VietnameseData.KEY_U {
                             typingWord[i] = UInt32(VietnameseData.KEY_W) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
                             // When undoing standalone "ư" → "w", remove the modifier from the ACTUAL entry (index i)
-                            isRestoredW = true
+                            // W was restored
                             buffer.removeLastModifier(at: i)
                         } else if key == VietnameseData.KEY_O {
                             hookState.code = UInt8(vRestore)
                             typingWord[i] = UInt32(VietnameseData.KEY_O) | ((typingWord[i] & VNEngine.CAPS_MASK) != 0 ? VNEngine.CAPS_MASK : 0)
-                            isRestoredW = true
+                            // W was restored
                         }
                         hookState.charData[Int(index) - 1 - i] = typingWord[i]
                     } else {
                         hookState.code = UInt8(vRestore)
                         typingWord[i] &= ~VNEngine.TONEW_MASK
                         hookState.charData[Int(index) - 1 - i] = typingWord[i]
-                        isRestoredW = true
+                        // W was restored
                     }
                     
                     tempDisableKey = true
@@ -2015,7 +2014,7 @@ class VNEngine {
                 k += 1
             }
         }
-        let vowelEndIdx = k
+        // vowelEndIdx is now at position k
         
         // ============================================
         // Check end consonant (with endConsonantTable)
@@ -2894,7 +2893,7 @@ class VNEngine {
     /// Convert internal code to actual character code based on code table
     func getCharacterCode(_ data: UInt32) -> UInt32 {
         let capsElem = (data & VNEngine.CAPS_MASK) != 0 ? 0 : 1
-        var key = data & VNEngine.CHAR_MASK
+        let key = data & VNEngine.CHAR_MASK
         
         // Build lookup key with tone/horn flags
         var lookupKey: UInt32 = key
@@ -2928,7 +2927,7 @@ class VNEngine {
             //   For marks on vowels WITH circumflex/breve AND mark, no offset needed
             // - KEY_O | 0x80000: [Ó, ó, Ò, ò, Ỏ, ỏ, Õ, õ, Ọ, ọ] - 10 elements
             //   For marks on PLAIN vowels (no circumflex/horn), no offset needed
-            let keyCode = UInt16(key)
+            // keyCode derived from key for potential diagnostic use
             var markLookupKey = lookupKey
             
             if (data & VNEngine.TONE_MASK) != 0 || (data & VNEngine.TONEW_MASK) != 0 {
@@ -3074,49 +3073,9 @@ class VNEngine {
     }
     
     /// Convert macOS key code to character (for debugging)
+    /// Delegates to the static keyCodeToChar method to avoid duplicating the mapping.
     private func keyCodeToCharacter(_ keyCode: UInt16) -> Character? {
-        switch keyCode {
-        case VietnameseData.KEY_A: return "a"
-        case VietnameseData.KEY_B: return "b"
-        case VietnameseData.KEY_C: return "c"
-        case VietnameseData.KEY_D: return "d"
-        case VietnameseData.KEY_E: return "e"
-        case VietnameseData.KEY_F: return "f"
-        case VietnameseData.KEY_G: return "g"
-        case VietnameseData.KEY_H: return "h"
-        case VietnameseData.KEY_I: return "i"
-        case VietnameseData.KEY_J: return "j"
-        case VietnameseData.KEY_K: return "k"
-        case VietnameseData.KEY_L: return "l"
-        case VietnameseData.KEY_M: return "m"
-        case VietnameseData.KEY_N: return "n"
-        case VietnameseData.KEY_O: return "o"
-        case VietnameseData.KEY_P: return "p"
-        case VietnameseData.KEY_Q: return "q"
-        case VietnameseData.KEY_R: return "r"
-        case VietnameseData.KEY_S: return "s"
-        case VietnameseData.KEY_T: return "t"
-        case VietnameseData.KEY_U: return "u"
-        case VietnameseData.KEY_V: return "v"
-        case VietnameseData.KEY_W: return "w"
-        case VietnameseData.KEY_X: return "x"
-        case VietnameseData.KEY_Y: return "y"
-        case VietnameseData.KEY_Z: return "z"
-        case VietnameseData.KEY_0: return "0"
-        case VietnameseData.KEY_1: return "1"
-        case VietnameseData.KEY_2: return "2"
-        case VietnameseData.KEY_3: return "3"
-        case VietnameseData.KEY_4: return "4"
-        case VietnameseData.KEY_5: return "5"
-        case VietnameseData.KEY_6: return "6"
-        case VietnameseData.KEY_7: return "7"
-        case VietnameseData.KEY_8: return "8"
-        case VietnameseData.KEY_9: return "9"
-        case VietnameseData.KEY_SPACE: return " "
-        case VietnameseData.KEY_LEFT_BRACKET: return "["
-        case VietnameseData.KEY_RIGHT_BRACKET: return "]"
-        default: return nil
-        }
+        return Self.keyCodeToChar(keyCode)
     }
 }
 
@@ -3396,7 +3355,7 @@ extension VNEngine {
                             
                             if stateIndex > 0 {
                                 // Create a snapshot from keyStates (the restored characters)
-                                var restoredBuffer = TypingBuffer()
+                                let restoredBuffer = TypingBuffer()
                                 for i in 0..<Int(stateIndex) {
                                     let keyCode = UInt16(keyStates[i] & 0xFF)
                                     let isCaps = (keyStates[i] & VNEngine.CAPS_MASK) != 0

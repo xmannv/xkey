@@ -275,8 +275,8 @@ class TranslationService {
         // Simulate Cmd+C - use combinedSessionState for better compatibility
         let source = CGEventSource(stateID: .combinedSessionState)
         
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) else {
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_C), keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_C), keyDown: false) else {
             log("Clipboard fallback: failed to create CGEvent")
             return nil
         }
@@ -452,8 +452,8 @@ class TranslationService {
         
         // If selectAllFirst is true, perform Cmd+A first
         if selectAllFirst {
-            guard let selectAllDown = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: true),
-                  let selectAllUp = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: false) else {
+            guard let selectAllDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_A), keyDown: true),
+                  let selectAllUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_A), keyDown: false) else {
                 log("Failed to create Cmd+A event")
                 return false
             }
@@ -471,14 +471,14 @@ class TranslationService {
         }
         
         // Key down V with Command
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) else {
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_V), keyDown: true) else {
             log("Failed to create keyDown event")
             return false
         }
         keyDown.flags = .maskCommand
         
         // Key up V with Command
-        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
+        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_V), keyDown: false) else {
             log("Failed to create keyUp event")
             return false
         }

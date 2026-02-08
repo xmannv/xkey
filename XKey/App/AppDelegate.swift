@@ -948,7 +948,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("Undo typing hotkey configured: \(hotkey.displayString)")
         } else {
             // Use default Esc key - set a default Esc hotkey
-            let defaultEscHotkey = Hotkey(keyCode: 0x35, modifiers: [], isModifierOnly: false)
+            let defaultEscHotkey = Hotkey(keyCode: VietnameseData.KEY_ESC, modifiers: [], isModifierOnly: false)
             eventTapManager?.undoTypingHotkey = defaultEscHotkey
             eventTapManager?.onUndoTypingHotkey = { [weak self] in
                 guard let handler = self?.keyboardHandler else { return false }
@@ -1114,7 +1114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             // Local monitor for flagsChanged
-            switchXKeyFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            switchXKeyFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
                 handleFlagsChanged(event)
                 return event  // Pass through flagsChanged events
             }
@@ -1733,41 +1733,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debugWindowController?.logEvent(message)
         }
         
-        do {
-            // Initialize Sparkle updater controller with our delegate
-            // This will automatically check for updates based on Info.plist settings:
-            // - SUFeedURL: appcast feed URL
-            // - SUPublicEDKey: public key for signature verification
-            // - SUEnableAutomaticChecks: enable automatic update checks
-            // - SUScheduledCheckInterval: check interval in seconds (86400 = 24 hours)
-            updaterController = SPUStandardUpdaterController(
-                startingUpdater: true,
-                updaterDelegate: sparkleUpdateDelegate,
-                userDriverDelegate: sparkleUpdateDelegate  // Also use as user driver delegate to bring update dialog to front
-            )
+        // Initialize Sparkle updater controller with our delegate
+        // This will automatically check for updates based on Info.plist settings:
+        // - SUFeedURL: appcast feed URL
+        // - SUPublicEDKey: public key for signature verification
+        // - SUEnableAutomaticChecks: enable automatic update checks
+        // - SUScheduledCheckInterval: check interval in seconds (86400 = 24 hours)
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: sparkleUpdateDelegate,
+            userDriverDelegate: sparkleUpdateDelegate  // Also use as user driver delegate to bring update dialog to front
+        )
+        
+        debugWindowController?.logEvent("Sparkle auto-update initialized")
+        debugWindowController?.logEvent("   Feed URL: \(Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "Not configured")")
+        debugWindowController?.logEvent("   Auto-check: \(Bundle.main.object(forInfoDictionaryKey: "SUEnableAutomaticChecks") as? Bool ?? false)")
+        debugWindowController?.logEvent("   Update delegate: SparkleUpdateDelegate (settings will be saved before restart)")
+        
+        // Check for updates immediately on app launch (silently in background)
+        // This ensures updates are always checked at startup, not just on schedule
+        // The dialog will only appear if a new update is found
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let updater = self?.updaterController?.updater else { return }
             
-            debugWindowController?.logEvent("Sparkle auto-update initialized")
-            debugWindowController?.logEvent("   Feed URL: \(Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "Not configured")")
-            debugWindowController?.logEvent("   Auto-check: \(Bundle.main.object(forInfoDictionaryKey: "SUEnableAutomaticChecks") as? Bool ?? false)")
-            debugWindowController?.logEvent("   Update delegate: SparkleUpdateDelegate (settings will be saved before restart)")
-            
-            // Check for updates immediately on app launch (silently in background)
-            // This ensures updates are always checked at startup, not just on schedule
-            // The dialog will only appear if a new update is found
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                guard let updater = self?.updaterController?.updater else { return }
-                
-                // Use background check - won't show UI if no update available
-                if updater.canCheckForUpdates {
-                    self?.debugWindowController?.logEvent("Checking for updates in background (startup check)...")
-                    updater.checkForUpdatesInBackground()
-                } else {
-                    self?.debugWindowController?.logEvent("Skipping startup update check (already checking or in progress)")
-                }
+            // Use background check - won't show UI if no update available
+            if updater.canCheckForUpdates {
+                self?.debugWindowController?.logEvent("Checking for updates in background (startup check)...")
+                updater.checkForUpdatesInBackground()
+            } else {
+                self?.debugWindowController?.logEvent("Skipping startup update check (already checking or in progress)")
             }
-            
-        } catch {
-            debugWindowController?.logEvent("Failed to initialize Sparkle: \(error)")
         }
     }
 
@@ -1781,7 +1776,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Always install bundled XKeyIM after a short delay
         // This ensures XKeyIM is always in sync with XKey app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             XKeyIMUpdateManager.shared.installBundledXKeyIM(showNotification: false)
         }
     }

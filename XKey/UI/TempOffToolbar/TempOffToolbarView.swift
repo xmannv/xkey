@@ -28,17 +28,7 @@ struct TempOffToolbarView: View {
                 )
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 3)
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
-        )
+        .floatingToolbarStyle()
     }
 }
 

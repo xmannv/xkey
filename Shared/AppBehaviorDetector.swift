@@ -715,22 +715,9 @@ class AppBehaviorDetector {
         "com.termius-dmg.mac"
     ]
     
-    /// Fast terminals (GPU-accelerated) - need less delay
-    static let fastTerminals: Set<String> = [
-        "io.alacritty", "com.mitchellh.ghostty", "net.kovidgoyal.kitty",
-        "com.github.wez.wezterm", "com.raphaelamorim.rio"
-    ]
-    
-    /// Medium speed terminals
-    static let mediumTerminals: Set<String> = [
-        "com.googlecode.iterm2", "dev.warp.Warp-Stable", "co.zeit.hyper",
-        "org.tabby", "com.termius-dmg.mac"
-    ]
-    
-    /// Slow terminals (Apple Terminal)
-    static let slowTerminals: Set<String> = [
-        "com.apple.Terminal"
-    ]
+    /// Unified terminal delays (backspace, wait, text) in microseconds
+    /// All terminals use the same config
+    static let terminalDelays: InjectionDelays = (8000, 25000, 8000)
     
     /// Browser apps
     static let browserApps: Set<String> = [
@@ -1110,6 +1097,63 @@ class AppBehaviorDetector {
     /// Find matching Window Title Rule for current context
     /// Returns the first matching rule (custom rules have priority over built-in rules)
     ///
+    // MARK: - Rule Matching Helpers (shared logic)
+    
+    /// Check if a built-in rule is active based on user settings.
+    /// - Default-enabled rules are active unless user explicitly disabled them
+    /// - Default-disabled rules are active only if user explicitly enabled them
+    private func isBuiltInRuleActive(
+        _ rule: WindowTitleRule,
+        disabledRules: Set<String>,
+        enabledRules: Set<String>
+    ) -> Bool {
+        if rule.isEnabled {
+            return !disabledRules.contains(rule.name)
+        } else {
+            return enabledRules.contains(rule.name)
+        }
+    }
+    
+    /// Iterate through a set of rules and collect matches against the current context.
+    /// Uses lazy-loaded AX info to avoid unnecessary Accessibility API calls.
+    /// - Parameters:
+    ///   - rules: The rules to iterate
+    ///   - bundleId: Current app's bundle ID
+    ///   - windowTitle: Current window title
+    ///   - cachedAXInfo: Inout cache for lazy AX info loading
+    ///   - matches: Inout array to append matches to
+    ///   - returnFirst: If true, stops after first match (for findMatchingRule)
+    /// - Returns: The first matching rule if returnFirst is true and a match was found
+    @discardableResult
+    private func matchRules(
+        _ rules: [WindowTitleRule],
+        bundleId: String,
+        windowTitle: String,
+        cachedAXInfo: inout FocusedElementInfo?,
+        matches: inout [WindowTitleRule],
+        returnFirst: Bool = false
+    ) -> WindowTitleRule? {
+        for rule in rules {
+            let axInfo = rule.hasAXPatterns ? {
+                if cachedAXInfo == nil {
+                    cachedAXInfo = getFocusedElementInfo()
+                }
+                return cachedAXInfo!
+            }() : nil
+            
+            if rule.matches(bundleId: bundleId, windowTitle: windowTitle, axInfo: axInfo) {
+                if returnFirst { return rule }
+                matches.append(rule)
+            }
+        }
+        return nil
+    }
+    
+    // MARK: - Rule Matching (public API)
+    
+    /// Find the first matching Window Title Rule for the current context
+    /// Priority: custom rules first (user-defined), then built-in rules
+    ///
     /// Note: No caching is used here because:
     /// 1. Focus can change within same window (e.g., Google Docs content → address bar)
     /// 2. Window title might change (e.g., switching tabs)
@@ -1120,57 +1164,26 @@ class AppBehaviorDetector {
             return nil
         }
         
-        // Always get fresh window title (no caching)
         let windowTitle = getCurrentWindowTitle() ?? ""
-        
-        // Note: Empty window title is OK - rules with empty titlePattern will still match
-        // This allows rules that apply to all windows of an app (e.g., Firefox rule)
-        
-        // Lazy-load AX info only when needed (when a rule has AX patterns)
         var cachedAXInfo: FocusedElementInfo? = nil
-        func getAXInfo() -> FocusedElementInfo {
-            if cachedAXInfo == nil {
-                cachedAXInfo = getFocusedElementInfo()
-            }
-            return cachedAXInfo!
-        }
+        var matches: [WindowTitleRule] = []  // not used for returnFirst, but required by matchRules
         
         // Search in custom rules first (higher priority)
-        for rule in customRules where rule.isEnabled {
-            // Pass AX info only if rule has AX patterns (lazy load)
-            let axInfo = rule.hasAXPatterns ? getAXInfo() : nil
-            if rule.matches(bundleId: bundleId, windowTitle: windowTitle, axInfo: axInfo) {
-                return rule
-            }
+        let activeCustomRules = customRules.filter { $0.isEnabled }
+        if let match = matchRules(activeCustomRules, bundleId: bundleId, windowTitle: windowTitle,
+                                  cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true) {
+            return match
         }
         
         // Then search in built-in rules
-        // Logic: rule is active if:
-        // - rule.isEnabled=true AND not in disabledBuiltInRules (user hasn't disabled it)
-        // - rule.isEnabled=false AND in enabledBuiltInRules (user has explicitly enabled it)
         let disabledBuiltInRules = SharedSettings.shared.getDisabledBuiltInRules()
         let enabledBuiltInRules = SharedSettings.shared.getEnabledBuiltInRules()
-        for rule in Self.builtInWindowTitleRules {
-            let isRuleActive: Bool
-            if rule.isEnabled {
-                // Default enabled: skip if user disabled it
-                isRuleActive = !disabledBuiltInRules.contains(rule.name)
-            } else {
-                // Default disabled: only active if user enabled it
-                isRuleActive = enabledBuiltInRules.contains(rule.name)
-            }
-            
-            if !isRuleActive {
-                continue
-            }
-            // Pass AX info only if rule has AX patterns (lazy load)
-            let axInfo = rule.hasAXPatterns ? getAXInfo() : nil
-            if rule.matches(bundleId: bundleId, windowTitle: windowTitle, axInfo: axInfo) {
-                return rule
-            }
+        let activeBuiltInRules = Self.builtInWindowTitleRules.filter {
+            isBuiltInRuleActive($0, disabledRules: disabledBuiltInRules, enabledRules: enabledBuiltInRules)
         }
         
-        return nil
+        return matchRules(activeBuiltInRules, bundleId: bundleId, windowTitle: windowTitle,
+                          cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true)
     }
     
     /// Find ALL matching Window Title Rules for current context
@@ -1183,56 +1196,24 @@ class AppBehaviorDetector {
             return []
         }
         
-        // Always get fresh window title (no caching)
         let windowTitle = getCurrentWindowTitle() ?? ""
-        
         var matchingRules: [WindowTitleRule] = []
-        
-        // Lazy-load AX info only when needed (when a rule has AX patterns)
         var cachedAXInfo: FocusedElementInfo? = nil
-        func getAXInfo() -> FocusedElementInfo {
-            if cachedAXInfo == nil {
-                cachedAXInfo = getFocusedElementInfo()
-            }
-            return cachedAXInfo!
-        }
         
         // FIRST: Search in built-in rules (lower priority - applied first)
         // This allows custom rules to override built-in rules
-        // Logic: rule is active if:
-        // - rule.isEnabled=true AND not in disabledBuiltInRules (user hasn't disabled it)
-        // - rule.isEnabled=false AND in enabledBuiltInRules (user has explicitly enabled it)
         let disabledBuiltInRules = SharedSettings.shared.getDisabledBuiltInRules()
         let enabledBuiltInRules = SharedSettings.shared.getEnabledBuiltInRules()
-        for rule in Self.builtInWindowTitleRules {
-            let isRuleActive: Bool
-            if rule.isEnabled {
-                // Default enabled: skip if user disabled it
-                isRuleActive = !disabledBuiltInRules.contains(rule.name)
-            } else {
-                // Default disabled: only active if user enabled it
-                isRuleActive = enabledBuiltInRules.contains(rule.name)
-            }
-            
-            if !isRuleActive {
-                continue
-            }
-            // Pass AX info only if rule has AX patterns (lazy load)
-            let axInfo = rule.hasAXPatterns ? getAXInfo() : nil
-            if rule.matches(bundleId: bundleId, windowTitle: windowTitle, axInfo: axInfo) {
-                matchingRules.append(rule)
-            }
+        let activeBuiltInRules = Self.builtInWindowTitleRules.filter {
+            isBuiltInRuleActive($0, disabledRules: disabledBuiltInRules, enabledRules: enabledBuiltInRules)
         }
+        matchRules(activeBuiltInRules, bundleId: bundleId, windowTitle: windowTitle,
+                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules)
         
         // THEN: Search in custom rules (higher priority - can override)
-        // Custom rules are in user-defined order (can be reordered via drag & drop)
-        for rule in customRules where rule.isEnabled {
-            // Pass AX info only if rule has AX patterns (lazy load)
-            let axInfo = rule.hasAXPatterns ? getAXInfo() : nil
-            if rule.matches(bundleId: bundleId, windowTitle: windowTitle, axInfo: axInfo) {
-                matchingRules.append(rule)
-            }
-        }
+        let activeCustomRules = customRules.filter { $0.isEnabled }
+        matchRules(activeCustomRules, bundleId: bundleId, windowTitle: windowTitle,
+                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules)
         
         return matchingRules
     }
@@ -1620,7 +1601,7 @@ class AppBehaviorDetector {
         if isInTerminalPanel() {
             return InjectionMethodInfo(
                 method: .slow,
-                delays: InjectionMethod.slow.defaultDelays,
+                delays: Self.terminalDelays,
                 textSendingMethod: .chunked,
                 description: "Terminal (VSCode/Cursor)"
             )
@@ -1832,23 +1813,13 @@ class AppBehaviorDetector {
             )
         }
         
-        // Fast terminals (GPU-accelerated)
-        if Self.fastTerminals.contains(bundleId) {
+        // All terminals - unified delays
+        if Self.terminalApps.contains(bundleId) {
             return InjectionMethodInfo(
                 method: .slow,
-                delays: (2000, 4000, 2000),
+                delays: Self.terminalDelays,
                 textSendingMethod: .chunked,
-                description: "Fast Terminal (GPU)"
-            )
-        }
-        
-        // Medium terminals
-        if Self.mediumTerminals.contains(bundleId) {
-            return InjectionMethodInfo(
-                method: .slow,
-                delays: (12000, 30000, 6000),
-                textSendingMethod: .oneByOne,
-                description: "Medium Terminal"
+                description: "Terminal"
             )
         }
         
@@ -1859,16 +1830,6 @@ class AppBehaviorDetector {
                 delays: InjectionMethod.fast.defaultDelays,
                 textSendingMethod: .oneByOne,
                 description: "Fast + OneByOne"
-            )
-        }
-        
-        // Slow terminals (Apple Terminal)
-        if Self.slowTerminals.contains(bundleId) {
-            return InjectionMethodInfo(
-                method: .slow,
-                delays: (4000, 8000, 4000),
-                textSendingMethod: .chunked,
-                description: "Slow Terminal"
             )
         }
         

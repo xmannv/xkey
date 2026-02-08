@@ -65,10 +65,21 @@ class VietnameseData {
     static let KEY_TAB: UInt16 = 0x30
     static let KEY_RETURN: UInt16 = 0x24
     static let KEY_ESC: UInt16 = 0x35
+    static let KEY_FORWARD_DELETE: UInt16 = 0x75
     static let KEY_LEFT: UInt16 = 0x7B
     static let KEY_RIGHT: UInt16 = 0x7C
     static let KEY_DOWN: UInt16 = 0x7D
     static let KEY_UP: UInt16 = 0x7E
+    static let KEY_HOME: UInt16 = 0x73
+    static let KEY_END: UInt16 = 0x77
+    static let KEY_PAGE_UP: UInt16 = 0x74
+    static let KEY_PAGE_DOWN: UInt16 = 0x79
+    
+    /// All cursor movement key codes (arrow keys + Home/End/PageUp/PageDown)
+    static let cursorMovementKeys: Set<UInt16> = [
+        KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP,
+        KEY_HOME, KEY_END, KEY_PAGE_UP, KEY_PAGE_DOWN
+    ]
     
     // MARK: - Processing Characters (from Engine.cpp)
     
@@ -88,7 +99,7 @@ class VietnameseData {
     let breakCode: [UInt16] = [
         KEY_ESC, KEY_TAB, KEY_ENTER, KEY_RETURN, KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP,
         KEY_COMMA, KEY_DOT, KEY_SLASH, KEY_SEMICOLON, KEY_QUOTE, KEY_BACK_SLASH,
-        KEY_MINUS, KEY_EQUALS, KEY_BACKQUOTE, KEY_TAB
+        KEY_MINUS, KEY_EQUALS, KEY_BACKQUOTE
     ]
     
     let macroBreakCode: [UInt16] = [
@@ -313,7 +324,6 @@ class VietnameseData {
             [KEY_E, KEY_Y],
             [KEY_E, KEY_U],
             [KEY_E, KEY_P],
-            [KEY_E, KEY_C],
             [KEY_E, KEY_N],
             [KEY_E, KEY_M],
             [KEY_E]
@@ -391,7 +401,6 @@ class VietnameseData {
             [KEY_E, KEY_Y],
             [KEY_E, KEY_U],
             [KEY_E, KEY_P],
-            [KEY_E, KEY_C],
             [KEY_E, KEY_N],
             [KEY_E, KEY_M],
             [KEY_E]
@@ -403,7 +412,6 @@ class VietnameseData {
             [KEY_I, KEY_T],
             [KEY_I, KEY_U],
             [KEY_I, KEY_U, KEY_P],
-            [KEY_I, KEY_N],
             [KEY_I, KEY_M],
             [KEY_I, KEY_P],
             [KEY_I, KEY_A],
@@ -422,7 +430,6 @@ class VietnameseData {
             [KEY_U, KEY_T],
             [KEY_U, KEY_U],
             [KEY_U, KEY_A],
-            [KEY_U, KEY_I],
             [KEY_U, KEY_C],
             [KEY_U, KEY_N],
             [KEY_U, KEY_M],
@@ -675,15 +682,15 @@ class VietnameseData {
                 // Mark indices: Sắc=0, Huyền=2, Hỏi=4, Ngã=6, Nặng=8
                 let markIndex: Int
                 switch mark {
-                case 0x80000:  // MARK1_MASK - Sắc
+                case VNEngine.MARK1_MASK:  // Sắc
                     markIndex = 0
-                case 0x100000: // MARK2_MASK - Huyền
+                case VNEngine.MARK2_MASK:  // Huyền
                     markIndex = 2
-                case 0x200000: // MARK3_MASK - Hỏi
+                case VNEngine.MARK3_MASK:  // Hỏi
                     markIndex = 4
-                case 0x400000: // MARK4_MASK - Ngã
+                case VNEngine.MARK4_MASK:  // Ngã
                     markIndex = 6
-                case 0x800000: // MARK5_MASK - Nặng
+                case VNEngine.MARK5_MASK:  // Nặng
                     markIndex = 8
                 default:
                     markIndex = 0

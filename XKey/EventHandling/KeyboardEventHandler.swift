@@ -248,8 +248,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Step 1: Send backspaces
         if result.backspaceCount > 0 {
             for i in 0..<result.backspaceCount {
-                if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
-                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
+                if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: true),
+                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: false) {
                     keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
                     keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
                     keyDown.post(tap: .cgSessionEventTap)
@@ -355,8 +355,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             if hasModifierCombo {
                 // Check if this is a cursor movement key
                 let keyCode = event.keyCode
-                let cursorMovementKeys: [CGKeyCode] = [0x7B, 0x7C, 0x7D, 0x7E, 0x73, 0x77, 0x74, 0x79] // Arrow keys, Home, End, Page Up/Down
-                let isCursorMovement = cursorMovementKeys.contains(keyCode)
+                let isCursorMovement = VietnameseData.cursorMovementKeys.contains(keyCode)
                 
                 if isCursorMovement {
                     // CRITICAL FIX: Use resetWithCursorMoved() to properly set the flag
@@ -398,34 +397,23 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // These keys need special handling and don't need character conversion
 
         // Handle Backspace/Delete
-        if keyCode == 0x33 {
-            debugLogCallback?("[\(getTimestamp())] ⌫ BACKSPACE received (keyCode=0x33)")
+        if keyCode == VietnameseData.KEY_DELETE {
+            debugLogCallback?("[\(getTimestamp())] ⌫ BACKSPACE received (keyCode=0x\(String(format: "%02X", VietnameseData.KEY_DELETE)))")
             return handleBackspace(event: event, proxy: proxy)
         }
 
         // Handle cursor movement keys - reset engine as focus might have changed
-        let cursorMovementKeys: [CGKeyCode] = [
-            0x7B, // Left Arrow
-            0x7C, // Right Arrow
-            0x7D, // Down Arrow
-            0x7E, // Up Arrow
-            0x73, // Home
-            0x77, // End
-            0x74, // Page Up
-            0x79  // Page Down
-        ]
-
-        if cursorMovementKeys.contains(keyCode) {
+        if VietnameseData.cursorMovementKeys.contains(keyCode) {
             let keyName: String
             switch keyCode {
-            case 0x7B: keyName = "←"
-            case 0x7C: keyName = "→"
-            case 0x7D: keyName = "↓"
-            case 0x7E: keyName = "↑"
-            case 0x73: keyName = "Home"
-            case 0x77: keyName = "End"
-            case 0x74: keyName = "PgUp"
-            case 0x79: keyName = "PgDn"
+            case VietnameseData.KEY_LEFT: keyName = "←"
+            case VietnameseData.KEY_RIGHT: keyName = "→"
+            case VietnameseData.KEY_DOWN: keyName = "↓"
+            case VietnameseData.KEY_UP: keyName = "↑"
+            case VietnameseData.KEY_HOME: keyName = "Home"
+            case VietnameseData.KEY_END: keyName = "End"
+            case VietnameseData.KEY_PAGE_UP: keyName = "PgUp"
+            case VietnameseData.KEY_PAGE_DOWN: keyName = "PgDn"
             default: keyName = "?"
             }
             debugLogCallback?("[\(getTimestamp())] \(keyName) Arrow/Nav key received (keyCode=0x\(String(format: "%02X", keyCode)))")
@@ -440,7 +428,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // they may still have text on the right side. Forward Delete must be blocked.
         // NOTE: Only real field switches (like Tab in a form) should reset mid-sentence,
         // but we can't distinguish that from regular Tab, so preserve state to be safe.
-        if keyCode == 0x30 { // Tab
+        if keyCode == VietnameseData.KEY_TAB { // Tab
             engine.reset()
             injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state
             return event
@@ -451,7 +439,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // through the same code path (performUndoTyping callback)
 
         // Handle Forward Delete (Fn+Delete)
-        if keyCode == 0x75 { // Forward Delete
+        if keyCode == VietnameseData.KEY_FORWARD_DELETE { // Forward Delete
             engine.reset()
             injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state after Forward Delete
             return event  // Pass through

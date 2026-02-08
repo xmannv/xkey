@@ -77,8 +77,8 @@ class AdvancedInjectionMethods {
         
         // Select all using Cmd+Left (home) + Shift+Cmd+Right (select to end)
         // This works better in Arc browser than Cmd+A
-        let leftArrowKeyCode: CGKeyCode = 0x7B
-        let rightArrowKeyCode: CGKeyCode = 0x7C
+        let leftArrowKeyCode: CGKeyCode = CGKeyCode(VietnameseData.KEY_LEFT)
+        let rightArrowKeyCode: CGKeyCode = CGKeyCode(VietnameseData.KEY_RIGHT)
         
         // Cmd+Left = Home
         postKey(leftArrowKeyCode, source: source, flags: .maskCommand, proxy: proxy)

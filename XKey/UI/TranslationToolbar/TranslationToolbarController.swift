@@ -80,32 +80,7 @@ class TranslationToolbarController {
 
     private func createPanel() -> NSPanel {
         let toolbarView = TranslationToolbarView(viewModel: viewModel)
-        let hostingController = NSHostingController(rootView: toolbarView)
-
-        // Create panel with special styling for floating toolbar
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 44),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-
-        panel.contentViewController = hostingController
-        panel.isFloatingPanel = true
-        panel.level = .popUpMenu  // Above most windows
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false  // We use SwiftUI shadow
-        panel.isReleasedWhenClosed = false
-        panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-
-        // Size to fit content
-        if let contentSize = hostingController.view.fittingSize as NSSize? {
-            panel.setContentSize(contentSize)
-        }
-
-        return panel
+        return FloatingToolbarPositioning.createPanel(rootView: toolbarView, initialWidth: 200)
     }
 
     // MARK: - Show/Hide
@@ -191,7 +166,7 @@ class TranslationToolbarController {
         // Get the window of the focused element
         var windowRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &windowRef) == .success,
-              let axWindow = windowRef else {
+              windowRef != nil else {
             return false
         }
         
@@ -213,160 +188,7 @@ class TranslationToolbarController {
     /// Uses mouse position as fallback if caret position not available
     private func positionNearCursor() {
         guard let panel = panel else { return }
-
-        // Try to get cursor position from text field via Accessibility API
-        if let cursorRect = getCursorRectFromAccessibility() {
-            positionPanel(panel, relativeTo: cursorRect, isCursorRect: true)
-        } else {
-            // Fallback: position near mouse position
-            let mouseLocation = NSEvent.mouseLocation
-            let mouseRect = NSRect(x: mouseLocation.x, y: mouseLocation.y, width: 1, height: 20)
-            positionPanel(panel, relativeTo: mouseRect, isCursorRect: false)
-        }
-    }
-
-    private func positionPanel(_ panel: NSPanel, relativeTo targetRect: NSRect, isCursorRect: Bool) {
-        let panelSize = panel.frame.size
-
-        // Center horizontally on target cursor position
-        var x = targetRect.origin.x - panelSize.width / 2 + targetRect.width / 2
-
-        // Gap between toolbar and cursor
-        let gap: CGFloat = isCursorRect ? 8 : 12
-
-        // Position ABOVE the target (like macOS Fn popup)
-        var y = targetRect.origin.y + targetRect.height + gap
-
-        // Find the screen that contains the target position
-        let targetPoint = NSPoint(x: targetRect.midX, y: targetRect.midY)
-        var containingScreen: NSScreen? = nil
-
-        for screen in NSScreen.screens {
-            if screen.frame.contains(targetPoint) {
-                containingScreen = screen
-                break
-            }
-        }
-
-        // If no screen contains the point, find the nearest screen
-        if containingScreen == nil {
-            containingScreen = NSScreen.screens.min(by: { screen1, screen2 in
-                let dist1 = distanceToScreen(point: targetPoint, screen: screen1)
-                let dist2 = distanceToScreen(point: targetPoint, screen: screen2)
-                return dist1 < dist2
-            })
-        }
-
-        if let screen = containingScreen ?? NSScreen.main {
-            let screenFrame = screen.visibleFrame
-
-            // Adjust horizontal position to stay within screen bounds
-            x = max(screenFrame.minX + 10, min(x, screenFrame.maxX - panelSize.width - 10))
-
-            // If toolbar would go above screen top, position below target instead
-            if y + panelSize.height > screenFrame.maxY {
-                y = targetRect.origin.y - panelSize.height - gap
-            }
-
-            // Ensure not below screen bottom
-            if y < screenFrame.minY {
-                y = screenFrame.minY + 10
-            }
-        }
-
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-    }
-
-    private func distanceToScreen(point: NSPoint, screen: NSScreen) -> CGFloat {
-        let frame = screen.frame
-        let clampedX = max(frame.minX, min(point.x, frame.maxX))
-        let clampedY = max(frame.minY, min(point.y, frame.maxY))
-        let dx = point.x - clampedX
-        let dy = point.y - clampedY
-        return sqrt(dx * dx + dy * dy)
-    }
-
-    /// Get cursor rectangle from focused text element via Accessibility API
-    private func getCursorRectFromAccessibility() -> NSRect? {
-        let systemWide = AXUIElementCreateSystemWide()
-
-        // Get focused element
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
-            return nil
-        }
-
-        let axElement = focusedElement as! AXUIElement
-
-        // Try to get cursor bounds via AXBoundsForRange
-        if let cursorRect = getCursorBoundsViaRange(axElement) {
-            return cursorRect
-        }
-
-        return nil
-    }
-
-    /// Get cursor bounds using AXBoundsForRangeParameterizedAttribute
-    private func getCursorBoundsViaRange(_ element: AXUIElement) -> NSRect? {
-        // Get selected text range (cursor position)
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-              let rangeValue = rangeRef else {
-            return nil
-        }
-
-        // Get bounds for the cursor position
-        var boundsRef: CFTypeRef?
-        let boundsResult = AXUIElementCopyParameterizedAttributeValue(
-            element,
-            kAXBoundsForRangeParameterizedAttribute as CFString,
-            rangeValue,
-            &boundsRef
-        )
-
-        if boundsResult != .success {
-            return nil
-        }
-
-        guard let boundsValue = boundsRef else {
-            return nil
-        }
-
-        // Extract CGRect from AXValue
-        var axBounds = CGRect.zero
-        guard AXValueGetValue(boundsValue as! AXValue, .cgRect, &axBounds) else {
-            return nil
-        }
-
-        // Validate bounds
-        if axBounds.width == 0 && axBounds.height == 0 {
-            return nil
-        }
-
-        if axBounds.height == 0 {
-            axBounds.size.height = 18
-        }
-
-        return convertAXToCocoaCoordinates(axBounds)
-    }
-
-    /// Convert AX coordinates (top-left origin) to Cocoa coordinates (bottom-left origin)
-    private func convertAXToCocoaCoordinates(_ axRect: CGRect) -> NSRect? {
-        guard let primaryScreen = NSScreen.screens.first else {
-            return nil
-        }
-
-        let primaryHeight = primaryScreen.frame.height
-        let cocoaY = primaryHeight - axRect.origin.y - axRect.height
-        let cocoaX = axRect.origin.x
-
-        return NSRect(
-            x: cocoaX,
-            y: cocoaY,
-            width: axRect.width,
-            height: axRect.height
-        )
+        FloatingToolbarPositioning.positionNearCursor(panel, cursorGap: 8, mouseGap: 12)
     }
 
     // MARK: - Auto-hide

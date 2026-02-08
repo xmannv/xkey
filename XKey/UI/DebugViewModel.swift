@@ -1082,7 +1082,7 @@ class DebugViewModel: ObservableObject {
                 self.forceAccessibilityStatus = "✅ Enabled for \(appName)"
                 self.logEvent("[FORCE-AX] Enabled AXManualAccessibility for \(appName) (\(bundleID)) PID=\(pid)")
             } else {
-                let errorDesc = self.axErrorDescription(result)
+                let errorDesc = result.humanReadableDescription
                 self.forceAccessibilityStatus = "❌ \(appName): \(errorDesc)"
                 self.logEvent("[FORCE-AX] Failed to set AXManualAccessibility for \(appName): \(errorDesc)")
             }
@@ -1149,7 +1149,7 @@ class DebugViewModel: ObservableObject {
                 self.forceAccessibilityStatus = "✅ Enhanced UI for \(appName)"
                 self.logEvent("[FORCE-AX] Enabled AXEnhancedUserInterface for \(appName) (\(bundleID)) PID=\(pid)")
             } else {
-                let errorDesc = self.axErrorDescription(result)
+                let errorDesc = result.humanReadableDescription
                 self.forceAccessibilityStatus = "❌ \(appName): \(errorDesc)"
                 self.logEvent("[FORCE-AX] Failed to set AXEnhancedUserInterface for \(appName): \(errorDesc)")
             }
@@ -1185,7 +1185,7 @@ class DebugViewModel: ObservableObject {
                 manualAxStatus = "unknown type"
             }
         } else {
-            manualAxStatus = axErrorDescription(manualAxResult)
+            manualAxStatus = manualAxResult.humanReadableDescription
         }
         
         // Check AXEnhancedUserInterface current value
@@ -1199,18 +1199,18 @@ class DebugViewModel: ObservableObject {
                 enhancedStatus = "unknown type"
             }
         } else {
-            enhancedStatus = axErrorDescription(enhancedResult)
+            enhancedStatus = enhancedResult.humanReadableDescription
         }
         
         // Check if we can get focused window (basic accessibility test)
         var windowRef: CFTypeRef?
         let windowResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef)
-        let windowStatus = windowResult == .success ? "✅ Available" : "❌ \(axErrorDescription(windowResult))"
+        let windowStatus = windowResult == .success ? "✅ Available" : "❌ \(windowResult.humanReadableDescription)"
         
         // Check if we can get menu bar (another accessibility test)
         var menuRef: CFTypeRef?
         let menuResult = AXUIElementCopyAttributeValue(appElement, kAXMenuBarAttribute as CFString, &menuRef)
-        let menuStatus = menuResult == .success ? "✅ Available" : "❌ \(axErrorDescription(menuResult))"
+        let menuStatus = menuResult == .success ? "✅ Available" : "❌ \(menuResult.humanReadableDescription)"
         
         // Log results
         logEvent("[AX-CHECK] Results:")
@@ -1230,29 +1230,7 @@ class DebugViewModel: ObservableObject {
             }
         }
     }
-    
-    /// Get human-readable description for AXError
-    private func axErrorDescription(_ error: AXError) -> String {
-        switch error {
-        case .success: return "Success"
-        case .failure: return "General failure"
-        case .illegalArgument: return "Illegal argument"
-        case .invalidUIElement: return "Invalid UI element"
-        case .invalidUIElementObserver: return "Invalid observer"
-        case .cannotComplete: return "Cannot complete"
-        case .attributeUnsupported: return "Attribute unsupported (app may not support this)"
-        case .actionUnsupported: return "Action unsupported"
-        case .notificationUnsupported: return "Notification unsupported"
-        case .notImplemented: return "Not implemented"
-        case .notificationAlreadyRegistered: return "Already registered"
-        case .notificationNotRegistered: return "Not registered"
-        case .apiDisabled: return "API disabled - grant Accessibility permission"
-        case .noValue: return "No value"
-        case .parameterizedAttributeUnsupported: return "Parameterized attribute unsupported"
-        case .notEnoughPrecision: return "Not enough precision"
-        @unknown default: return "Unknown error (\(error.rawValue))"
-        }
-    }
+
     
 
     // MARK: - Injection Test Properties
@@ -1652,8 +1630,8 @@ class DebugViewModel: ObservableObject {
             
             // Step 1: Send Cmd+A (Select All)
             // 'A' keycode is 0x00
-            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: true),
-               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x00, keyDown: false) {
+            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_A), keyDown: true),
+               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(VietnameseData.KEY_A), keyDown: false) {
                 // Set Command modifier
                 keyDown.flags = .maskCommand
                 keyUp.flags = .maskCommand
@@ -1666,9 +1644,8 @@ class DebugViewModel: ObservableObject {
             usleep(10000)  // 10ms delay before delete
             
             // Step 2: Send Delete/Backspace to remove selected text
-            // Backspace keycode is 0x33
-            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: true),
-               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x33, keyDown: false) {
+            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: true),
+               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: false) {
                 keyDown.post(tap: .cghidEventTap)
                 usleep(1000)  // 1ms delay
                 keyUp.post(tap: .cghidEventTap)

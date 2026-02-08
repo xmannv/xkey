@@ -186,13 +186,7 @@ class InputProcessor {
         }
     }
     
-    func isWordBreakKey(_ char: Character) -> Bool {
-        let wordBreaks: Set<Character> = [
-            " ", ",", ".", "!", "?", ";", ":",
-            "\n", "\r", "\t"
-        ]
-        return wordBreaks.contains(char)
-    }
+    // Note: Word break logic is centralized in VNEngine.isWordBreak(character:inputMethod:)
 }
 
 // MARK: - Quick Telex Support

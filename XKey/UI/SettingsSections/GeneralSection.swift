@@ -59,11 +59,11 @@ struct GeneralSection: View {
                                         hotkey: Binding(
                                             get: { 
                                                 viewModel.preferences.undoTypingHotkey ?? 
-                                                Hotkey(keyCode: 0x35, modifiers: [], isModifierOnly: false) // Default Esc
+                                                Hotkey(keyCode: VietnameseData.KEY_ESC, modifiers: [], isModifierOnly: false) // Default Esc
                                             },
                                             set: { newValue in
                                                 // If user sets Esc with no modifiers, treat as default (nil)
-                                                if newValue.keyCode == 0x35 && newValue.modifiers.isEmpty && !newValue.isModifierOnly {
+                                                if newValue.keyCode == VietnameseData.KEY_ESC && newValue.modifiers.isEmpty && !newValue.isModifierOnly {
                                                     viewModel.preferences.undoTypingHotkey = nil
                                                 } else {
                                                     viewModel.preferences.undoTypingHotkey = newValue

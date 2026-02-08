@@ -5,68 +5,10 @@ import AppKit
 extension VNEngine {
 
     /// Validate if the current word buffer is a valid Vietnamese word
+    /// Delegates to checkWordSpelling(word:) with the current buffer word
     func isCurrentWordValid() -> Bool {
-        guard SharedSettings.shared.spellCheckEnabled else {
-            logCallback?("📖 Dictionary check: DISABLED (spellCheckEnabled=false)")
-            return true // Spell checking disabled
-        }
-
         let currentWord = self.getCurrentWord()
-        guard !currentWord.isEmpty else {
-            logCallback?("📖 Dictionary check: SKIPPED (empty word)")
-            return true // Empty word is considered valid
-        }
-
-        // When vAllowConsonantZFWJ is enabled, words containing Z, F, W, J consonants
-        // should be considered valid without dictionary check
-        // This allows foreign-influenced Vietnamese words like "zị", "wốn", etc.
-        if vAllowConsonantZFWJ == 1 {
-            let lowercaseWord = currentWord.lowercased()
-            let specialConsonants: [Character] = ["z", "f", "w", "j"]
-            
-            // Check if word starts with or contains these consonants
-            if let firstChar = lowercaseWord.first, specialConsonants.contains(firstChar) {
-                logCallback?("📖 Dictionary check: SKIPPED (vAllowConsonantZFWJ=1, starts with '\(firstChar)')")
-                return true
-            }
-            
-            // Also check if word contains these consonants anywhere (for compound words)
-            for consonant in specialConsonants {
-                if lowercaseWord.contains(consonant) {
-                    logCallback?("📖 Dictionary check: SKIPPED (vAllowConsonantZFWJ=1, contains '\(consonant)')")
-                    return true
-                }
-            }
-        }
-        
-        // First, check user dictionary (custom words defined by user)
-        if SharedSettings.shared.isWordInUserDictionary(currentWord) {
-            logCallback?("📖 Dictionary check: FOUND in User Dictionary, word='\(currentWord)'")
-            return true // Word is in user dictionary, considered valid
-        }
-
-        // Check against hunspell dictionary
-        let style: VNDictionaryManager.DictionaryStyle = SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
-        let styleName = style == .dauCu ? "Dấu cũ" : "Dấu mới"
-        
-        let isDictionaryLoaded = VNDictionaryManager.shared.isDictionaryLoaded(style: style)
-        if !isDictionaryLoaded {
-            logCallback?("📖 Dictionary check: NOT LOADED (style=\(styleName))")
-            return true // Dictionary not loaded, assume valid
-        }
-        
-        let isValid = VNDictionaryManager.shared.isValidWord(currentWord, style: style)
-        logCallback?("📖 Dictionary check: word='\(currentWord)', style=\(styleName), valid=\(isValid)")
-
-        if isValid {
-            return true
-        }
-
-        // If not found in dictionary, use Natural Language framework as fallback
-        let nlValid = isValidWordUsingNaturalLanguage(currentWord)
-        logCallback?("📖 NaturalLanguage check: word='\(currentWord)', valid=\(nlValid)")
-
-        return nlValid
+        return checkWordSpelling(word: currentWord)
     }
 
     /// Check if the current word buffer contains Vietnamese-specific characters

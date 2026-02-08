@@ -1426,7 +1426,6 @@ class WindowTitleRulesViewModel: ObservableObject {
     func updateRule(_ rule: WindowTitleRule, originalId: UUID?) {
         if let id = originalId {
             // Create new rule with original ID
-            var updatedRule = rule
             // Update the rule (need to delete and re-add since ID is immutable)
             AppBehaviorDetector.shared.removeCustomRule(id: id)
             AppBehaviorDetector.shared.addCustomRule(rule)

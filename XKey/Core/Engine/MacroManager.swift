@@ -24,27 +24,29 @@ class MacroManager {
     private var vCodeTable: Int = 0
     private var vAutoCapsMacro: Bool = false
     
-    // MARK: - Vietnamese Mask Constants (matching VNEngine)
+    // MARK: - Constants (referencing canonical sources to avoid duplication)
+    // Masks are defined in VNEngine, key codes in VietnameseData
     
-    private static let CAPS_MASK: UInt32      = 0x10000
-    private static let TONE_MASK: UInt32      = 0x20000     // Circumflex (â, ê, ô)
-    private static let TONEW_MASK: UInt32     = 0x40000     // Breve/Horn (ă, ơ, ư)
-    private static let MARK1_MASK: UInt32     = 0x80000     // Sắc
-    private static let MARK2_MASK: UInt32     = 0x100000    // Huyền
-    private static let MARK3_MASK: UInt32     = 0x200000    // Hỏi
-    private static let MARK4_MASK: UInt32     = 0x400000    // Ngã
-    private static let MARK5_MASK: UInt32     = 0x800000    // Nặng
-    private static let MARK_MASK: UInt32      = 0xF80000
-    private static let CHAR_CODE_MASK: UInt32 = 0x2000000   // Already Unicode character
+    // Type aliases for cleaner internal usage
+    private static var CAPS_MASK: UInt32      { VNEngine.CAPS_MASK }
+    private static var TONE_MASK: UInt32      { VNEngine.TONE_MASK }
+    private static var TONEW_MASK: UInt32     { VNEngine.TONEW_MASK }
+    private static var MARK1_MASK: UInt32     { VNEngine.MARK1_MASK }
+    private static var MARK2_MASK: UInt32     { VNEngine.MARK2_MASK }
+    private static var MARK3_MASK: UInt32     { VNEngine.MARK3_MASK }
+    private static var MARK4_MASK: UInt32     { VNEngine.MARK4_MASK }
+    private static var MARK5_MASK: UInt32     { VNEngine.MARK5_MASK }
+    private static var MARK_MASK: UInt32      { VNEngine.MARK_MASK }
+    private static var CHAR_CODE_MASK: UInt32 { VNEngine.CHAR_CODE_MASK }
     
-    // Vietnamese vowel key codes (macOS virtual key codes)
-    private static let KEY_A: UInt16 = 0x00
-    private static let KEY_E: UInt16 = 0x0E
-    private static let KEY_I: UInt16 = 0x22
-    private static let KEY_O: UInt16 = 0x1F
-    private static let KEY_U: UInt16 = 0x20
-    private static let KEY_Y: UInt16 = 0x10
-    private static let KEY_D: UInt16 = 0x02
+    // Vietnamese vowel key codes (referencing VietnameseData)
+    private static var KEY_A: UInt16 { VietnameseData.KEY_A }
+    private static var KEY_E: UInt16 { VietnameseData.KEY_E }
+    private static var KEY_I: UInt16 { VietnameseData.KEY_I }
+    private static var KEY_O: UInt16 { VietnameseData.KEY_O }
+    private static var KEY_U: UInt16 { VietnameseData.KEY_U }
+    private static var KEY_Y: UInt16 { VietnameseData.KEY_Y }
+    private static var KEY_D: UInt16 { VietnameseData.KEY_D }
     
     /// Vietnamese vowel Unicode mapping: vowelKey -> [hasTone][hasToneW][markIndex] -> (lowercase, uppercase)
     /// This allows converting internal Vietnamese data to proper Unicode characters
@@ -514,17 +516,15 @@ class MacroManager {
             }
         }
         
-        // Fallback: Basic keyCode to character mapping for consonants and special chars
-        let keyCodeToChar: [UInt16: Character] = [
-            0x00: "a", 0x0B: "b", 0x08: "c", 0x02: "d", 0x0E: "e",
-            0x03: "f", 0x05: "g", 0x04: "h", 0x22: "i", 0x26: "j",
-            0x28: "k", 0x25: "l", 0x2E: "m", 0x2D: "n", 0x1F: "o",
-            0x23: "p", 0x0C: "q", 0x0F: "r", 0x01: "s", 0x11: "t",
-            0x20: "u", 0x09: "v", 0x0D: "w", 0x07: "x", 0x10: "y",
-            0x06: "z",
+        // Fallback: Build from shared letter map + digits + special chars
+        var keyCodeToChar = KeyCodeToCharacter.keyCodeToLetterMap
+        // Add digits
+        let digitMap: [UInt16: Character] = [
             0x12: "1", 0x13: "2", 0x14: "3", 0x15: "4", 0x17: "5",
-            0x16: "6", 0x1A: "7", 0x1C: "8", 0x19: "9", 0x1D: "0",
-            // Special characters
+            0x16: "6", 0x1A: "7", 0x1C: "8", 0x19: "9", 0x1D: "0"
+        ]
+        // Add special characters
+        let specialMap: [UInt16: Character] = [
             0x32: "`",  // KEY_BACKQUOTE (tilde ~ with Shift)
             0x1B: "-",  // KEY_MINUS
             0x18: "=",  // KEY_EQUALS
@@ -537,6 +537,8 @@ class MacroManager {
             0x2F: ".",  // KEY_DOT
             0x2C: "/"   // KEY_SLASH
         ]
+        keyCodeToChar.merge(digitMap) { _, new in new }
+        keyCodeToChar.merge(specialMap) { _, new in new }
         
         if let char = keyCodeToChar[keyCode] {
             // Handle special characters with Shift modifier

@@ -11,6 +11,7 @@ import SwiftUI
 class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, NSWindowDelegate {
     
     private let viewModel: DebugViewModel
+    private var pinManager: WindowPinManager?
     
     /// Callback when window is closed (via Close button on title bar)
     var onWindowClose: (() -> Void)?
@@ -45,14 +46,19 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
         // Set window delegate to catch close event
         window.delegate = self
         
-        // Setup always on top callback
+        // Setup pin button using shared WindowPinManager
+        let pm = WindowPinManager(window: window, initiallyPinned: viewModel.isAlwaysOnTop)
+        pm.onToggle = { [weak self] isEnabled in
+            self?.viewModel.isAlwaysOnTop = isEnabled
+        }
+        pm.setupPinButton()
+        self.pinManager = pm
+        
+        // Setup always on top callback (ViewModel → window level + pin button)
         viewModel.alwaysOnTopCallback = { [weak self] isEnabled in
             self?.window?.level = isEnabled ? .floating : .normal
-            self?.updatePinButton(isEnabled)
+            self?.pinManager?.updatePinButton(isEnabled)
         }
-        
-        // Add pin button to title bar
-        setupPinButton()
     }
     
     // MARK: - NSWindowDelegate
@@ -108,50 +114,5 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol, 
     
     func logEngineResult(input: String, output: String, backspaces: Int) {
         viewModel.logEngineResult(input: input, output: output, backspaces: backspaces)
-    }
-    
-    // MARK: - Pin Button
-    
-    private var pinButton: NSButton?
-    
-    private func setupPinButton() {
-        guard let window = window else { return }
-        
-        // Create pin button
-        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
-        button.bezelStyle = .shadowlessSquare
-        button.isBordered = false
-        button.image = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Pin window")
-        button.contentTintColor = .systemBlue
-        button.target = self
-        button.action = #selector(togglePin)
-        button.toolTip = "Keep window on top"
-        
-        // Add to title bar
-        if let titlebarView = window.standardWindowButton(.closeButton)?.superview {
-            titlebarView.addSubview(button)
-            
-            // Position at top right (before close button)
-            button.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                button.trailingAnchor.constraint(equalTo: titlebarView.trailingAnchor, constant: -8),
-                button.centerYAnchor.constraint(equalTo: titlebarView.centerYAnchor)
-            ])
-        }
-        
-        self.pinButton = button
-        updatePinButton(viewModel.isAlwaysOnTop)
-    }
-    
-    @objc private func togglePin() {
-        viewModel.isAlwaysOnTop.toggle()
-    }
-    
-    private func updatePinButton(_ isPinned: Bool) {
-        pinButton?.image = NSImage(
-            systemSymbolName: isPinned ? "pin.fill" : "pin.slash",
-            accessibilityDescription: isPinned ? "Unpin window" : "Pin window"
-        )
-        pinButton?.contentTintColor = isPinned ? .systemBlue : .systemGray
     }
 }

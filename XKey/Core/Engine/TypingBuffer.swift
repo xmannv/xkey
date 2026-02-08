@@ -189,23 +189,24 @@ struct CharacterEntry: Equatable {
 /// Single source of truth - no more sync issues between typingWord and keyStates
 final class TypingBuffer {
 
-    // MARK: - Constants (same as VNEngine for compatibility)
+    // MARK: - Constants (referencing VNEngine as canonical source)
 
     static let MAX_SIZE = 32
 
-    static let CHAR_MASK: UInt32    = 0xFFFF      // Bits 0-15: key code
-    static let CAPS_MASK: UInt32    = 0x10000     // Bit 16: uppercase
-    static let TONE_MASK: UInt32    = 0x20000     // Bit 17: circumflex (^)
-    static let TONEW_MASK: UInt32   = 0x40000     // Bit 18: horn (ư, ơ)
-    static let MARK_MASK: UInt32    = 0xF80000    // Bits 19-23: tone marks
-    static let STANDALONE_MASK: UInt32 = 0x1000000 // Bit 24: standalone char
+    // Masks - delegate to VNEngine to avoid duplication
+    static var CHAR_MASK: UInt32       { VNEngine.CHAR_MASK }
+    static var CAPS_MASK: UInt32       { VNEngine.CAPS_MASK }
+    static var TONE_MASK: UInt32       { VNEngine.TONE_MASK }
+    static var TONEW_MASK: UInt32      { VNEngine.TONEW_MASK }
+    static var MARK_MASK: UInt32       { VNEngine.MARK_MASK }
+    static var STANDALONE_MASK: UInt32 { VNEngine.STANDALONE_MASK }
 
-    // Tone marks
-    static let MARK1: UInt32 = 0x080000  // Sắc (´)
-    static let MARK2: UInt32 = 0x100000  // Huyền (`)
-    static let MARK3: UInt32 = 0x180000  // Hỏi (?)
-    static let MARK4: UInt32 = 0x200000  // Ngã (~)
-    static let MARK5: UInt32 = 0x280000  // Nặng (.)
+    // Tone mark values - delegate to VNEngine to avoid duplication
+    static var MARK1: UInt32 { VNEngine.MARK1_MASK }  // Sắc (´)
+    static var MARK2: UInt32 { VNEngine.MARK2_MASK }  // Huyền (`)
+    static var MARK3: UInt32 { VNEngine.MARK3_MASK }  // Hỏi (?)
+    static var MARK4: UInt32 { VNEngine.MARK4_MASK }  // Ngã (~)
+    static var MARK5: UInt32 { VNEngine.MARK5_MASK }  // Nặng (.)
 
     // MARK: - Storage
 
@@ -298,7 +299,7 @@ final class TypingBuffer {
         // The entry had (1 primary + N modifiers) keystrokes
         let keystrokesToRemove = removed.keystrokeCount
         for _ in 0..<keystrokesToRemove {
-            keystrokeSequence.popLast()
+            _ = keystrokeSequence.popLast()
         }
 
         // If we have overflow, bring one back
@@ -324,7 +325,7 @@ final class TypingBuffer {
         if index == entries.count {
             let keystrokesToRemove = removed.keystrokeCount
             for _ in 0..<keystrokesToRemove {
-                keystrokeSequence.popLast()
+                _ = keystrokeSequence.popLast()
             }
         }
 
@@ -400,7 +401,7 @@ final class TypingBuffer {
         guard !entries.isEmpty else { return nil }
         let removed = entries[entries.count - 1].removeLastModifier()
         if removed != nil {
-            keystrokeSequence.popLast()
+            _ = keystrokeSequence.popLast()
         }
         return removed
     }
@@ -415,7 +416,7 @@ final class TypingBuffer {
         if removed != nil {
             // Remove from sequence - this assumes the modifier is still near the end
             // This is a best-effort approach; in complex undo scenarios, sequence may be imperfect
-            keystrokeSequence.popLast()
+            _ = keystrokeSequence.popLast()
         }
         return removed
     }
@@ -650,9 +651,9 @@ struct BufferSnapshot: Equatable {
         overflow.reduce(0) { $0 + $1.keystrokeCount }
     }
 
-    /// Check if this is a space (KEY_SPACE = 0x31)
+    /// Check if this is a space
     var isSpace: Bool {
-        entries.count == 1 && entries[0].keyCode == 0x31
+        entries.count == 1 && entries[0].keyCode == VietnameseData.KEY_SPACE
     }
 
     /// Get all processed data (for legacy compatibility)
@@ -715,7 +716,7 @@ final class TypingHistory {
     }
 
     /// Save a space word
-    func saveSpaces(count: Int, keyCode: UInt16 = 0x31) {
+    func saveSpaces(count: Int, keyCode: UInt16 = VietnameseData.KEY_SPACE) {
         var entries: [CharacterEntry] = []
         for _ in 0..<count {
             entries.append(CharacterEntry(keyCode: keyCode, isCaps: false))

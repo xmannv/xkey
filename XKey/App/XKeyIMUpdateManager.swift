@@ -8,6 +8,7 @@
 
 import Foundation
 import AppKit
+import UserNotifications
 
 /// Manager for XKeyIM auto-update functionality
 class XKeyIMUpdateManager {
@@ -212,12 +213,18 @@ class XKeyIMUpdateManager {
     
     /// Show notification to user about XKeyIM update
     private func showUpdateNotification(version: String) {
-        let notification = NSUserNotification()
-        notification.title = "XKeyIM đã được cập nhật"
-        notification.informativeText = "Phiên bản \(version) đã được cài đặt.\n\nVui lòng chuyển sang input method khác rồi quay lại XKey để áp dụng."
-        notification.soundName = NSUserNotificationDefaultSoundName
-        
-        NSUserNotificationCenter.default.deliver(notification)
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            
+            let content = UNMutableNotificationContent()
+            content.title = "XKeyIM đã được cập nhật"
+            content.body = "Phiên bản \(version) đã được cài đặt.\n\nVui lòng chuyển sang input method khác rồi quay lại XKey để áp dụng."
+            content.sound = .default
+            
+            let request = UNNotificationRequest(identifier: "xkeyim-update-\(version)", content: content, trigger: nil)
+            center.add(request)
+        }
         
         logDebug("XKeyIM: Update notification sent to user")
     }

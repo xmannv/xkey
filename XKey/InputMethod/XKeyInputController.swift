@@ -123,7 +123,7 @@ class XKeyInputController: IMKInputController {
         let isUppercase = character.isUppercase
         
         // Handle special keys
-        if event.keyCode == 0x33 { // Backspace
+        if event.keyCode == VietnameseData.KEY_DELETE { // Backspace
             return handleBackspace(client: client)
         }
         
@@ -278,12 +278,8 @@ class XKeyInputController: IMKInputController {
     
     /// Check if character is a word break
     private func isWordBreakKey(_ character: Character) -> Bool {
-        let wordBreaks: Set<Character> = [
-            " ", ",", ".", "!", "?", ";", ":",
-            "\n", "\r", "\t", "(", ")",
-            "{", "}", "<", ">", "/", "\\", "|"
-        ]
-        return wordBreaks.contains(character)
+        // Use centralized logic from VNEngine to ensure consistency
+        return VNEngine.isWordBreak(character: character, inputMethod: inputMethod)
     }
 }
 

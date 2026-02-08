@@ -41,6 +41,10 @@
 		10333D132F11209900DDEF2E /* ForceAccessibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */; };
 		1045F4272EF91CBA00F735BE /* VNEngineEnglishDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045F4262EF91CBA00F735BE /* VNEngineEnglishDetection.swift */; };
 		1045F4282EF91CBA00F735BE /* VNEngineEnglishDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045F4262EF91CBA00F735BE /* VNEngineEnglishDetection.swift */; };
+		105B938D2F3883530018DC12 /* AXErrorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B938C2F3883530018DC12 /* AXErrorExtension.swift */; };
+		105B938F2F3883C10018DC12 /* FloatingToolbarPositioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B938E2F3883C10018DC12 /* FloatingToolbarPositioning.swift */; };
+		105B93912F38848D0018DC12 /* WindowPinManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93902F38848D0018DC12 /* WindowPinManager.swift */; };
+		105B93932F388AAA0018DC12 /* FloatingToolbarStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */; };
 		106779A62ED41FD400FE0B24 /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A22ED41FD400FE0B24 /* StatusBarManager.swift */; };
 		106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A12ED41FD400FE0B24 /* DebugWindowController.swift */; };
 		107602EE2EF4E3BA00ADC084 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */; };
@@ -73,7 +77,7 @@
 		564995EF131811377C4F3FF6 /* VNEngineAdvanced.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6BDFF6F99DC1B577BA425 /* VNEngineAdvanced.swift */; };
 		5A61FAA58A29AD3225DD649C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803B94EF161FE79A022FF806 /* SettingsView.swift */; };
 		5FEB1775ED6A86BD90EEE11F /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EAA0ED7079ABD1980FBFFAE /* SettingsWindowController.swift */; };
-		795D22D182670DD83BDECF21 /* WindowTitleRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9E201050648938B3927D7A /* WindowTitleRulesView.swift */; };
+		795D22D182670DD83BDECF21 /* XKey/UI/WindowTitleRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9E201050648938B3927D7A /* XKey/UI/WindowTitleRulesView.swift */; };
 		7FBD214005ADB766CB3DF3B8 /* VNEngineMacro.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF69262CDE29C3D3410A3567 /* VNEngineMacro.swift */; };
 		81891108B8C7C600973DBBB2 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE144E0F510944E89100C852 /* SharedComponents.swift */; };
 		A1000001 /* XKeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001 /* XKeyApp.swift */; };
@@ -106,6 +110,7 @@
 		EXCLUDEDAPPS001 /* ExcludedAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EXCLUDEDAPPS002 /* ExcludedAppsView.swift */; };
 		F3F2891E34784154B457BA39 /* AppearanceSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D22A491FA1C51411B4A156 /* AppearanceSection.swift */; };
 		F97414DA17E4F78264530EF0 /* KeyCodeToCharacter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */; };
+		F97414DB17E4F78264530EF1 /* KeyCodeToCharacter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */; };
 		FFFF798B22C18C084A0F7458 /* MacroSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F58879C0DDD2958AA9FF0D /* MacroSection.swift */; };
 		LAUNCHATLOGIN001 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = LAUNCHATLOGIN002 /* LaunchAtLogin.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
@@ -151,6 +156,10 @@
 		1029C48E2EF0504D0073ABCD /* DonationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DonationView.swift; sourceTree = "<group>"; };
 		10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForceAccessibilityManager.swift; sourceTree = "<group>"; };
 		1045F4262EF91CBA00F735BE /* VNEngineEnglishDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineEnglishDetection.swift; sourceTree = "<group>"; };
+		105B938C2F3883530018DC12 /* AXErrorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXErrorExtension.swift; sourceTree = "<group>"; };
+		105B938E2F3883C10018DC12 /* FloatingToolbarPositioning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingToolbarPositioning.swift; sourceTree = "<group>"; };
+		105B93902F38848D0018DC12 /* WindowPinManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPinManager.swift; sourceTree = "<group>"; };
+		105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingToolbarStyle.swift; sourceTree = "<group>"; };
 		106779A12ED41FD400FE0B24 /* DebugWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWindowController.swift; sourceTree = "<group>"; };
 		106779A22ED41FD400FE0B24 /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceManager.swift; sourceTree = "<group>"; };
@@ -173,7 +182,7 @@
 		1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogFileReader.swift; sourceTree = "<group>"; };
 		2FB7B1CC880090240CFD79B3 /* ExcludedAppsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExcludedAppsSection.swift; sourceTree = "<group>"; };
 		3A3D9B46E4A73E69A837ADAD /* ConvertToolSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConvertToolSection.swift; sourceTree = "<group>"; };
-		3E9E201050648938B3927D7A /* WindowTitleRulesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XKey/UI/WindowTitleRulesView.swift; sourceTree = SOURCE_ROOT; };
+		3E9E201050648938B3927D7A /* XKey/UI/WindowTitleRulesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XKey/UI/WindowTitleRulesView.swift; sourceTree = SOURCE_ROOT; };
 		49F58879C0DDD2958AA9FF0D /* MacroSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacroSection.swift; sourceTree = "<group>"; };
 		4A2608F3ABD0C3E93C052478 /* QuickTypingSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickTypingSection.swift; sourceTree = "<group>"; };
 		4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyCodeToCharacter.swift; sourceTree = "<group>"; };
@@ -232,18 +241,18 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		100D2BAE2EF2B89600C26B87 /* XKeyIM */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = XKeyIM;
-			sourceTree = "<group>";
-		};
+		100D2BAE2EF2B89600C26B87 /* XKeyIM */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (EXCLUDE_PLIST1 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = XKeyIM; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EXCLUDE_PLIST1 = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 100D2BAC2EF2B89600C26B87 /* XKeyIM */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		100D2BAA2EF2B89600C26B87 /* Frameworks */ = {
@@ -293,6 +302,7 @@
 		101A444A2ED419E9003F9D05 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				105B938C2F3883530018DC12 /* AXErrorExtension.swift */,
 				10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */,
 				1089F7EB2EF76F2300E833ED /* OverlayAppDetector.swift */,
 				10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */,
@@ -414,6 +424,9 @@
 		A5000007 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				105B93902F38848D0018DC12 /* WindowPinManager.swift */,
+				105B938E2F3883C10018DC12 /* FloatingToolbarPositioning.swift */,
+				105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */,
 				1029C48E2EF0504D0073ABCD /* DonationView.swift */,
 				10A214972ED42DFA005B52BD /* HotkeyRecorderView.swift */,
 				10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */,
@@ -429,7 +442,7 @@
 				MACROVM002 /* MacroManagementViewModel.swift */,
 				CONVERTVM002 /* ConvertToolViewModel.swift */,
 				EXCLUDEDAPPS002 /* ExcludedAppsView.swift */,
-				3E9E201050648938B3927D7A /* WindowTitleRulesView.swift */,
+				3E9E201050648938B3927D7A /* XKey/UI/WindowTitleRulesView.swift */,
 				0D7A4B3BFC35CF0327897BFD /* SettingsSections */,
 				1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */,
 				53FD9B0D641FE6019C3870E0 /* TempOffToolbar */,
@@ -651,6 +664,7 @@
 				100D2BDD2EF2C1D800C26B87 /* VNEngineSettings.swift in Sources */,
 				E2BB81375FD0B38574D4F669 /* SharedSettings.swift in Sources */,
 				259D34BEC13552450AB30413 /* DebugLogger.swift in Sources */,
+				F97414DB17E4F78264530EF1 /* KeyCodeToCharacter.swift in Sources */,
 				TYPBUF003 /* TypingBuffer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -689,6 +703,7 @@
 				A100000B /* KeyboardEventHandler.swift in Sources */,
 				A100000C /* AdvancedInjectionMethods.swift in Sources */,
 				101A44482ED419AE003F9D05 /* Preferences.swift in Sources */,
+				105B93912F38848D0018DC12 /* WindowPinManager.swift in Sources */,
 				48B758BE0BDCAB95CFBADD3D /* VNEngineSettings.swift in Sources */,
 				564995EF131811377C4F3FF6 /* VNEngineAdvanced.swift in Sources */,
 				10333D132F11209900DDEF2E /* ForceAccessibilityManager.swift in Sources */,
@@ -709,10 +724,11 @@
 				EXCLUDEDAPPS001 /* ExcludedAppsView.swift in Sources */,
 				100D2BE62EF2C72600C26B87 /* SharedSettings.swift in Sources */,
 				F97414DA17E4F78264530EF0 /* KeyCodeToCharacter.swift in Sources */,
-				795D22D182670DD83BDECF21 /* WindowTitleRulesView.swift in Sources */,
+				795D22D182670DD83BDECF21 /* XKey/UI/WindowTitleRulesView.swift in Sources */,
 				10BEC2BC2F2675B200D6A3C3 /* TranslationNetworkManager.swift in Sources */,
 				0B6000E78A4C06F6DCE7780B /* DebugLogger.swift in Sources */,
 				ECDC6B719E71FFE4F91DC588 /* GeneralSection.swift in Sources */,
+				105B938F2F3883C10018DC12 /* FloatingToolbarPositioning.swift in Sources */,
 				CEBF55C134CDBDA34B5E84A8 /* QuickTypingSection.swift in Sources */,
 				C4EDC498282B5B6D76626F6D /* AdvancedSection.swift in Sources */,
 				102986BD2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */,
@@ -730,6 +746,8 @@
 				EA073CDD9FDCDED0416D29FA /* TempOffToolbarController.swift in Sources */,
 				DA898EBD755CC092AEB1B685 /* TempOffToolbarView.swift in Sources */,
 				AA51E2E403268ACC6EF82BA4 /* TempOffToolbarViewModel.swift in Sources */,
+				105B938D2F3883530018DC12 /* AXErrorExtension.swift in Sources */,
+				105B93932F388AAA0018DC12 /* FloatingToolbarStyle.swift in Sources */,
 				102986B22F252F5700B4DEEE /* TranslationProvider.swift in Sources */,
 				10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */,
 				102986B32F252F5700B4DEEE /* TranslationService.swift in Sources */,
@@ -781,6 +799,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				EXCLUDED_SOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = XKeyIM/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = XKey;
@@ -816,6 +835,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				EXCLUDED_SOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = XKeyIM/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = XKey;

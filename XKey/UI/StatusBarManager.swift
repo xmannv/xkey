@@ -38,7 +38,7 @@ class StatusBarManager: ObservableObject {
         // Create status item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
-        guard let button = statusItem?.button else {
+        guard statusItem?.button != nil else {
             log("Failed to create status bar button")
             return
         }

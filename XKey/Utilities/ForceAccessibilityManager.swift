@@ -91,7 +91,7 @@ class ForceAccessibilityManager {
             enabledBundleId = bundleId
             logCallback?("[FORCE-AX] ✅ Enabled for '\(appName)' (rule: \(ruleName))")
         } else {
-            let errorDesc = axErrorDescription(result)
+            let errorDesc = result.humanReadableDescription
             logCallback?("[FORCE-AX] ❌ Failed for '\(appName)': \(errorDesc)")
             
             // If attribute unsupported, this app doesn't support AXManualAccessibility
@@ -124,28 +124,5 @@ class ForceAccessibilityManager {
         
         enabledPid = 0
         enabledBundleId = ""
-    }
-    
-    /// Get human-readable description for AXError
-    private func axErrorDescription(_ error: AXError) -> String {
-        switch error {
-        case .success: return "Success"
-        case .failure: return "General failure"
-        case .illegalArgument: return "Illegal argument"
-        case .invalidUIElement: return "Invalid UI element"
-        case .invalidUIElementObserver: return "Invalid observer"
-        case .cannotComplete: return "Cannot complete"
-        case .attributeUnsupported: return "Attribute unsupported"
-        case .actionUnsupported: return "Action unsupported"
-        case .notificationUnsupported: return "Notification unsupported"
-        case .notImplemented: return "Not implemented"
-        case .notificationAlreadyRegistered: return "Already registered"
-        case .notificationNotRegistered: return "Not registered"
-        case .apiDisabled: return "API disabled - grant Accessibility permission"
-        case .noValue: return "No value"
-        case .parameterizedAttributeUnsupported: return "Parameterized attribute unsupported"
-        case .notEnoughPrecision: return "Not enough precision"
-        @unknown default: return "Unknown error (\(error.rawValue))"
-        }
     }
 }
