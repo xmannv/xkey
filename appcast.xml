@@ -6,37 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260208)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260208</link>
-      <sparkle:version>20260208</sparkle:version>
+      <title>Version 1.2.20 (Build 20260209)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260209</link>
+      <sparkle:version>20260209</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: DRY constants, extract UI components, fix build warnings</p>
+<p>fix: AX Direct fallback uses backspace instead of Shift+Left selection</p>
+<p>The Shift+Left selection fallback is unreliable in Firefox content areas,</p>
+<p>causing characters to be inserted without replacing (e.g., 'dịch' → 'diịch').</p>
+<p>Replace with backspace-based fallback which is universally reliable.</p>
 <ul>
-<li>Deduplicate bitmask constants: MacroManager and TypingBuffer now</li>
+<li>CharacterInjector: fallback to backspace + text when AX API fails</li>
+<li>CharacterInjector: backspace-only mode also uses backspace instead of selection</li>
+<li>Add AXDirectFallbackTests for the new fallback behavior</li>
+<li>Bump build number to 20260209</li>
 </ul>
-<p>  delegate to VNEngine as canonical source instead of duplicating values</p>
-<ul>
-<li>MacroManager uses shared KeyCodeToCharacter.keyCodeToLetterMap</li>
-<li>AppBehaviorDetector: unify terminal delays, extract helper methods</li>
-</ul>
-<p>  (isBuiltInRuleActive, matchRules)</p>
-<ul>
-<li>Extract FloatingToolbarPositioning, FloatingToolbarStyle, and</li>
-</ul>
-<p>  WindowPinManager from toolbar controllers (~400 lines reduced)</p>
-<ul>
-<li>Add AXErrorExtension for cleaner AXError handling</li>
-<li>Fix Swift warnings: unused popLast() results, concurrency annotations</li>
-<li>XKeyIM: add missing assets (AccentColor, MenuIcon), cleanup debugger</li>
-<li>Bump build version to 20260208</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260208">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260209">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 08 Feb 2026 09:30:03 +0000</pubDate>
+      <pubDate>Mon, 09 Feb 2026 05:09:01 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260208/XKey.dmg" sparkle:version="20260208" sparkle:shortVersionString="1.2.20" length="11413741" type="application/octet-stream" sparkle:edSignature="XcBoasLxlyuITj949rsHpE8CQbFxex6VrjDumIsNDFh8v/crhEssXThZ8Otyj1T/l4iAcKME2xtSMEsRQc2kDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260209/XKey.dmg" sparkle:version="20260209" sparkle:shortVersionString="1.2.20" length="11414145" type="application/octet-stream" sparkle:edSignature="3Lus82PjRLYqjfqau2y9xsX1DJYJdaPW7pI6HdRztSktwFPtFyLVaoC0T5TsDap1iZKdTgxlNree26UWML5oDA==" />
     </item>
   </channel>
 </rss>
