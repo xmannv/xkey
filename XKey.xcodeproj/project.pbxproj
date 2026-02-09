@@ -116,6 +116,7 @@
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
 		TEST00001 /* VNEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00002 /* VNEngineTests.swift */; };
+		TEST00025 /* AXDirectFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00026 /* AXDirectFallbackTests.swift */; };
 		TEST00003 /* KeyCodeToCharacterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00004 /* KeyCodeToCharacterTests.swift */; };
 		TEST00019 /* TypingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00020 /* TypingBufferTests.swift */; };
 		TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00022 /* VNEngineBufferIntegrationTests.swift */; };
@@ -233,6 +234,7 @@
 		TEST00020 /* TypingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBufferTests.swift; sourceTree = "<group>"; };
 		TEST00022 /* VNEngineBufferIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineBufferIntegrationTests.swift; sourceTree = "<group>"; };
 		TEST00024 /* TranslationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationProviderTests.swift; sourceTree = "<group>"; };
+		TEST00026 /* AXDirectFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXDirectFallbackTests.swift; sourceTree = "<group>"; };
 		TRANSLATTB002 /* TranslationToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarController.swift; sourceTree = "<group>"; };
 		TRANSLATTB004 /* TranslationToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarView.swift; sourceTree = "<group>"; };
 		TRANSLATTB006 /* TranslationToolbarViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarViewModel.swift; sourceTree = "<group>"; };
@@ -494,6 +496,7 @@
 				TEST00020 /* TypingBufferTests.swift */,
 				TEST00022 /* VNEngineBufferIntegrationTests.swift */,
 				TEST00024 /* TranslationProviderTests.swift */,
+				TEST00026 /* AXDirectFallbackTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -772,6 +775,7 @@
 				TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */,
 				1025CD6E2F27CA13007B6E9F /* VNEngineBackspaceRestoreTests.swift in Sources */,
 				TEST00023 /* TranslationProviderTests.swift in Sources */,
+				TEST00025 /* AXDirectFallbackTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

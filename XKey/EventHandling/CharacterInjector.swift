@@ -128,9 +128,19 @@ class CharacterInjector {
                 // Forward debug callback to AdvancedInjectionMethods
                 AdvancedInjectionMethods.shared.debugCallback = debugCallback
                 AdvancedInjectionMethods.shared.injectViaAXWithFallback(bs: backspaceCount, text: charPreview) {
-                    // Fallback to selection method if AX fails
-                    self.debugCallback?("    → AX failed, fallback to selection")
-                    self.injectViaSelectionInternal(count: backspaceCount, delays: delays, proxy: proxy)
+                    // Fallback: use backspace + text instead of Shift+Left selection
+                    // Shift+Left selection is unreliable in Firefox content areas,
+                    // causing characters to be inserted without replacing (e.g., "dịch" → "diịch")
+                    // Backspace is universally reliable across all apps
+                    self.debugCallback?("    → AX failed, fallback to backspace + text")
+                    for i in 0..<backspaceCount {
+                        self.sendKeyPress(VietnameseData.KEY_DELETE, proxy: proxy)
+                        usleep(1000)
+                        self.debugCallback?("    → Backspace \(i + 1)/\(backspaceCount)")
+                    }
+                    if backspaceCount > 0 {
+                        usleep(3000)  // Wait for backspaces to be processed
+                    }
                     self.sendTextChunkedInternal(charPreview, delay: delays.text, proxy: proxy, useDirectPost: false)
                 }
                 // AX Direct handles both backspace and text insertion (or fallback does), so skip Step 2
@@ -462,10 +472,11 @@ class CharacterInjector {
             injectViaAutocomplete(count: count, delays: delays, proxy: proxy)
 
         case .axDirect:
-            // AX Direct method: For backspace-only, fall back to selection method
+            // AX Direct method: For backspace-only, fall back to backspace method
             // (AX API needs both backspace count AND replacement text to work properly)
-            debugCallback?("    → AX Direct (backspace-only): fallback to selection × \(count)")
-            injectViaSelection(count: count, delays: delays, proxy: proxy)
+            // Use real backspace keys instead of Shift+Left selection (unreliable in Firefox)
+            debugCallback?("    → AX Direct (backspace-only): fallback to backspace × \(count)")
+            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
 
         case .slow:
             // Slow method for Terminal/JetBrains: higher delays between keystrokes
