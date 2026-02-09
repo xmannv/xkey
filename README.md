@@ -6,6 +6,7 @@
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
   [![Version](https://img.shields.io/badge/version-1.2.20-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Homebrew Cask](https://img.shields.io/homebrew/cask/v/xkey?label=homebrew%20cask)](https://formulae.brew.sh/cask/xkey)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -203,6 +204,31 @@ Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, gi�
 
 - macOS 12.0 (Monterey) trở lên
 - Quyền truy cập Accessibility
+
+### Cài đặt qua Homebrew (Khuyến nghị)
+
+XKey đã có mặt trên [Homebrew Cask](https://formulae.brew.sh/cask/xkey). Chỉ cần một lệnh duy nhất:
+
+```bash
+brew install --cask xkey
+```
+
+Homebrew sẽ tự động tải, cài đặt XKey vào thư mục Applications, và quản lý cập nhật cho bạn.
+
+**Cập nhật lên phiên bản mới:**
+
+```bash
+brew upgrade --cask xkey
+```
+
+**Gỡ cài đặt:**
+
+```bash
+brew uninstall --cask xkey
+```
+
+> **Lưu ý:** Sau khi cài đặt, bạn vẫn cần cấp quyền Accessibility cho XKey:
+> **System Settings** → **Privacy & Security** → **Accessibility** → Bật quyền cho XKey
 
 ### Cài đặt từ Release
 
