@@ -107,6 +107,21 @@ struct InjectionMethodInfo {
     let textSendingMethod: TextSendingMethod
     let description: String
     
+    /// When true, sends U+202F before backspaces to break autocomplete suggestions.
+    /// Used for Firefox when AX query degrades (role = AXWindow) and we can't tell
+    /// if user is in address bar or content area. Safe for both:
+    /// - Address bar: U+202F breaks autocomplete → extra backspace removes it
+    /// - Content area: U+202F is invisible → extra backspace removes it
+    let needsEmptyCharPrefix: Bool
+    
+    init(method: InjectionMethod, delays: InjectionDelays, textSendingMethod: TextSendingMethod, description: String, needsEmptyCharPrefix: Bool = false) {
+        self.method = method
+        self.delays = delays
+        self.textSendingMethod = textSendingMethod
+        self.description = description
+        self.needsEmptyCharPrefix = needsEmptyCharPrefix
+    }
+    
     static let defaultFast = InjectionMethodInfo(
         method: .fast,
         delays: InjectionMethod.fast.defaultDelays,
@@ -1680,12 +1695,15 @@ class AppBehaviorDetector {
             }
             
             // Firefox-based browsers address bar (AXDOMIdentifier: "urlbar-input")
+            // Use .fast + emptyCharPrefix to break autocomplete
+            // AX Direct was failing (no selected text range) and proxy fallback caused "diịch" bug
             if Self.firefoxBasedBrowsers.contains(bundleId) && isFirefoxStyleAddressBar() {
                 return InjectionMethodInfo(
-                    method: .axDirect,
-                    delays: InjectionMethod.axDirect.defaultDelays,
-                    textSendingMethod: .oneByOne,
-                    description: "Firefox Address Bar"
+                    method: .fast,
+                    delays: InjectionMethod.fast.defaultDelays,
+                    textSendingMethod: .chunked,
+                    description: "Firefox Address Bar",
+                    needsEmptyCharPrefix: true
                 )
             }
         }
@@ -1754,17 +1772,21 @@ class AppBehaviorDetector {
             )
         }
 
-        // Firefox-based browsers - content area handling
-        // Address bar is handled by hardcoded logic in detectInjectionMethod() via isFirefoxStyleAddressBar()
-        // Content area (AXWindow): use axDirect method (AX API to set text directly)
-        // Note: Selection method in content area interferes with mouse word selection
+        // Firefox-based browsers - AX degraded fallback (role = AXWindow)
+        // When AX query fails on Firefox, the focused element returns AXWindow (window-level)
+        // instead of the actual element (AXTextField for address bar, nil for content area).
+        // We can't tell if user is in address bar or content area, so use .fast with
+        // needsEmptyCharPrefix flag. This sends U+202F before backspaces to break autocomplete:
+        // - Address bar: U+202F breaks autocomplete → extra backspace removes it → works ✅
+        // - Content area: U+202F is invisible → extra backspace removes it → works ✅
         if Self.firefoxBasedBrowsers.contains(bundleId) {
             if role == "AXWindow" {
                 return InjectionMethodInfo(
-                    method: .axDirect,
-                    delays: InjectionMethod.axDirect.defaultDelays,
+                    method: .fast,
+                    delays: InjectionMethod.fast.defaultDelays,
                     textSendingMethod: .chunked,
-                    description: "Firefox Content Area"
+                    description: "Firefox (AX degraded fallback)",
+                    needsEmptyCharPrefix: true
                 )
             }
         }

@@ -698,7 +698,8 @@ class DebugViewModel: ObservableObject {
         }
 
         let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-        addAppDetectorLog("  → Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] [\(textMethodName)]")
+        let emptyCharPrefixNote = injectionInfo.needsEmptyCharPrefix ? " [EmptyCharPrefix]" : ""
+        addAppDetectorLog("  → Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] [\(textMethodName)]\(emptyCharPrefixNote)")
         addAppDetectorLog("  → Injection Reason: \(injectionInfo.description)")
         
         // Get IMKit behavior

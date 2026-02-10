@@ -104,7 +104,7 @@ class CharacterInjector {
 
         // Build preview of characters to inject
         let charPreview = characters.map { $0.unicode(codeTable: codeTable) }.joined()
-        debugCallback?("Inject: bs=\(backspaceCount), chars=\(characters.count), text=\"\(charPreview)\", method=\(method), textMode=\(textSendingMethod)")
+        debugCallback?("Inject: bs=\(backspaceCount), chars=\(characters.count), text=\"\(charPreview)\", method=\(method), textMode=\(textSendingMethod), emptyCharPrefix=\(methodInfo.needsEmptyCharPrefix)")
 
         // Step 1: Send backspaces
         if backspaceCount > 0 {
@@ -148,6 +148,15 @@ class CharacterInjector {
                 return
 
             case .slow, .fast:
+                // Empty char prefix: send U+202F to break autocomplete before backspaces
+                // Used when AX query degrades on Firefox (can't tell address bar from content area)
+                if methodInfo.needsEmptyCharPrefix {
+                    debugCallback?("    → EmptyCharPrefix: sending U+202F + bs=\(backspaceCount + 1), text=\"\(charPreview)\"")
+                    injectViaEmptyCharPrefixInternal(backspaceCount: backspaceCount, text: charPreview, delays: delays, proxy: proxy, textSendingMethod: textSendingMethod)
+                    debugCallback?("injectSync: complete (emptyCharPrefix)")
+                    return
+                }
+                
                 debugCallback?("    → Backspace method: delays=\(delays), directPost=\(useDirectPost)")
                 // Forward Delete is only used for .autocomplete method
                 // For slow/fast methods, just send backspaces
@@ -267,6 +276,47 @@ class CharacterInjector {
         if count > 0 {
             usleep(delays.wait > 0 ? delays.wait : 5000)
         }
+    }
+    
+    /// Internal: EmptyCharPrefix injection (no semaphore)
+    /// Sends U+202F to break autocomplete, then (backspaceCount+1) backspaces, then text.
+    /// The +1 backspace removes the U+202F character itself.
+    /// Uses post(tap: .cgSessionEventTap) for reliable delivery in Firefox.
+    private func injectViaEmptyCharPrefixInternal(backspaceCount: Int, text: String, delays: InjectionDelays, proxy: CGEventTapProxy, textSendingMethod: TextSendingMethod) {
+        // Step 1: Send U+202F to break autocomplete suggestions
+        sendEmptyCharacter(proxy: proxy, useDirectPost: true)
+        usleep(1000)  // 1ms for empty char to be registered
+        debugCallback?("    → Sent U+202F (narrow no-break space) to break autocomplete")
+        
+        // Step 2: Send (backspaceCount + 1) backspaces
+        // +1 to delete the U+202F we just sent
+        let totalBackspaces = backspaceCount + 1
+        for i in 0..<totalBackspaces {
+            sendKeyPress(VietnameseData.KEY_DELETE, proxy: proxy, useDirectPost: true)
+            usleep(delays.backspace)
+            debugCallback?("    → Backspace \(i + 1)/\(totalBackspaces)")
+        }
+        
+        // Step 3: Wait after all backspaces
+        if totalBackspaces > 0 {
+            usleep(delays.wait)
+            debugCallback?("    → Post-backspace wait: \(delays.wait)µs")
+        }
+        
+        // Step 4: Send replacement text
+        if !text.isEmpty {
+            switch textSendingMethod {
+            case .oneByOne:
+                debugCallback?("    → Text mode: one-by-one (directPost=true)")
+                sendTextOneByOneInternal(text, delay: delays.text, proxy: proxy, useDirectPost: true)
+            case .chunked:
+                debugCallback?("    → Text mode: chunked (directPost=true)")
+                sendTextChunkedInternal(text, delay: delays.text, proxy: proxy, useDirectPost: true)
+            }
+        }
+        
+        // Settle time
+        usleep(5000)
     }
     
     /// Internal: Send text chunked (no semaphore)
@@ -486,8 +536,16 @@ class CharacterInjector {
 
         case .fast:
             // Fast method: minimal delays, no Forward Delete
-            debugCallback?("    → Fast method (normal)")
-            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
+            // Empty char prefix: send U+202F before backspaces when AX query degrades
+            if methodInfo.needsEmptyCharPrefix {
+                debugCallback?("    → Fast + EmptyCharPrefix: U+202F + backspace × \(count + 1)")
+                sendEmptyCharacter(proxy: proxy, useDirectPost: true)
+                usleep(1000)  // 1ms for empty char to be registered
+                injectViaBackspace(count: count + 1, codeTable: codeTable, delays: delays, proxy: proxy)
+            } else {
+                debugCallback?("    → Fast method (normal)")
+                injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
+            }
         
         case .passthrough:
             // Passthrough should never reach here - no injection needed
@@ -898,7 +956,9 @@ class CharacterInjector {
     }
 
     /// Send empty character to fix autocomplete (U+202F - Narrow No-Break Space)
-    private func sendEmptyCharacter(proxy: CGEventTapProxy) {
+    /// - Parameter useDirectPost: If true, posts via cgSessionEventTap (for emptyCharPrefix method).
+    ///   If false, uses tapPostEvent(proxy) (for other methods).
+    private func sendEmptyCharacter(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
 
         let emptyChar: UInt16 = 0x202F  // Narrow No-Break Space
@@ -916,8 +976,13 @@ class CharacterInjector {
         keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
         keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
 
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
+        if useDirectPost {
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        } else {
+            keyDown.tapPostEvent(proxy)
+            keyUp.tapPostEvent(proxy)
+        }
     }
 
     /// Send Shift+Left Arrow to select text (for Chromium browsers)
