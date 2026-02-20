@@ -6,35 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260210)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260210</link>
-      <sparkle:version>20260210</sparkle:version>
+      <title>Version 1.2.20 (Build 20260220)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260220</link>
+      <sparkle:version>20260220</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: replace axDirect with emptyCharPrefix for Firefox input</p>
+<p>fix: XKeyIM only logs to file when debugModeEnabled is true</p>
 <ul>
-<li>Add needsEmptyCharPrefix flag to InjectionMethodInfo struct</li>
-<li>Switch Firefox address bar and AX degraded fallback from .axDirect</li>
+<li>Change DebugLogger.isLoggingEnabled default from true to false</li>
+<li>XKeyIMSettings reads debugModeEnabled from App Group plist</li>
+<li>XKeyIMController syncs isLoggingEnabled before preWarmSingletons()</li>
+<li>Auto-disable logging when debugWindowController is disconnected</li>
+<li>Respond to realtime debug mode toggle via DistributedNotification</li>
+<li>Bump build number to 20260220</li>
 </ul>
-<p>  to .fast method with emptyCharPrefix enabled</p>
-<ul>
-<li>Implement emptyCharPrefix injection: sends U+202F (Narrow No-Break</li>
-</ul>
-<p>  Space) before backspaces to break Firefox autocomplete suggestions</p>
-<ul>
-<li>Add useDirectPost parameter to sendEmptyCharacter() for reliable</li>
-</ul>
-<p>  delivery via cgSessionEventTap</p>
-<ul>
-<li>Show [EmptyCharPrefix] indicator in debug logs</li>
-<li>Bump build number to 20260210</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260210">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260220">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 10 Feb 2026 04:31:31 +0000</pubDate>
+      <pubDate>Fri, 20 Feb 2026 08:30:25 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260210/XKey.dmg" sparkle:version="20260210" sparkle:shortVersionString="1.2.20" length="11422646" type="application/octet-stream" sparkle:edSignature="eeQPkxp/DPsWm/kQhH9fZgcQ+oqC1OzmNHpHrqAwqrGmAttGMjBTboa/ywvHl54/lBYoP8WYoGZTh18JCK/QBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260220/XKey.dmg" sparkle:version="20260220" sparkle:shortVersionString="1.2.20" length="11423902" type="application/octet-stream" sparkle:edSignature="mpJ2l84kybD50zdWziIMjwiMN190ZSafcTOHkhzCSQojFr3U4BYAi/aytxAX24cA9h1NI/wWcAq5RCDKYYDBCA==" />
     </item>
   </channel>
 </rss>
