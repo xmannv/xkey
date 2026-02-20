@@ -55,6 +55,14 @@ class XKeyIMController: IMKInputController {
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
 
+        // Load settings FIRST (before anything else)
+        // This reads debugModeEnabled from plist to control logging
+        settings = XKeyIMSettings()
+        
+        // Sync debug logging state BEFORE any log calls
+        // This ensures prewarm timing logs are captured when debug mode is enabled
+        DebugLogger.shared.isLoggingEnabled = settings.debugModeEnabled
+
         // Pre-warm singletons on first controller creation to eliminate cold start lag
         // This runs BEFORE any user input, so by the time user types, everything is ready
         if !Self.hasPreWarmed {
@@ -70,8 +78,7 @@ class XKeyIMController: IMKInputController {
             IMKitDebugger.shared.log(message, category: "VNEngine")
         }
 
-        // Load settings
-        settings = XKeyIMSettings()
+        // Apply engine settings from loaded settings
         applySettings()
 
         // Listen for settings changes from XKey app
@@ -123,6 +130,9 @@ class XKeyIMController: IMKInputController {
     private func reloadSettings() {
         settings.reload()
         applySettings()
+        
+        // Sync debug logging state - respect user's debug mode toggle
+        DebugLogger.shared.isLoggingEnabled = settings.debugModeEnabled
     }
     
     // MARK: - IMKInputController Overrides
@@ -1226,6 +1236,7 @@ class XKeyIMSettings {
     var freeMarkEnabled: Bool = false
     var restoreIfWrongSpelling: Bool = true
     var useMarkedText: Bool = true  // Default to true - standard IMKit behavior
+    var debugModeEnabled: Bool = false  // Controls whether XKeyIM writes to ~/XKey_Debug.log
     
     init() {
         reload()
@@ -1262,6 +1273,9 @@ class XKeyIMSettings {
         if oldUseMarkedText != useMarkedText {
             IMKitDebugger.shared.log("reload() - useMarkedText CHANGED: \(oldUseMarkedText) → \(useMarkedText)", category: "SETTINGS")
         }
+        
+        // Debug Mode - controls whether XKeyIM writes to ~/XKey_Debug.log
+        debugModeEnabled = readBool(forKey: "XKey.debugModeEnabled")
     }
     
     // MARK: - Plist Read Helpers

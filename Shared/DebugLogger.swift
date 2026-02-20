@@ -35,6 +35,10 @@ class DebugLogger {
             if let controller = debugWindowController {
                 isLoggingEnabled = controller.isLoggingEnabled
                 isVerboseLogging = controller.isVerboseLogging
+            } else {
+                // Debug window disconnected - disable file logging in XKey app
+                isLoggingEnabled = false
+                isVerboseLogging = false
             }
         }
     }
@@ -42,8 +46,8 @@ class DebugLogger {
     /// Whether verbose logging is enabled
     var isVerboseLogging: Bool = true
     
-    /// Whether logging is enabled
-    var isLoggingEnabled: Bool = true
+    /// Whether logging is enabled (default: false, explicitly enabled by XKey/XKeyIM based on debugModeEnabled setting)
+    var isLoggingEnabled: Bool = false
     
     /// Background queue for async file writing
     private let logQueue = DispatchQueue(label: "com.xkey.logger", qos: .utility)
