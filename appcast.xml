@@ -6,26 +6,25 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260220)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260220</link>
-      <sparkle:version>20260220</sparkle:version>
+      <title>Version 1.2.20 (Build 20260224)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260224</link>
+      <sparkle:version>20260224</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: XKeyIM only logs to file when debugModeEnabled is true</p>
+<p>fix(XKeyIM): fix icon not displaying in input menu</p>
 <ul>
-<li>Change DebugLogger.isLoggingEnabled default from true to false</li>
-<li>XKeyIMSettings reads debugModeEnabled from App Group plist</li>
-<li>XKeyIMController syncs isLoggingEnabled before preWarmSingletons()</li>
-<li>Auto-disable logging when debugWindowController is disconnected</li>
-<li>Respond to realtime debug mode toggle via DistributedNotification</li>
-<li>Bump build number to 20260220</li>
+<li>Create proper 16×16pt PDF icons for macOS template rendering</li>
+<li>MenuIcon.pdf: Vietnam star silhouette (active icon)</li>
+<li>MenuIconVI.pdf: 'VI' text alternative (backup)</li>
+<li>Remove MenuIcon.imageset from Assets.xcassets to prevent naming conflicts</li>
+<li>Update tsInputMethodIconFileKey to reference MenuIcon.pdf</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260220">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260224">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 20 Feb 2026 08:30:25 +0000</pubDate>
+      <pubDate>Tue, 24 Feb 2026 05:05:43 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260220/XKey.dmg" sparkle:version="20260220" sparkle:shortVersionString="1.2.20" length="11423902" type="application/octet-stream" sparkle:edSignature="mpJ2l84kybD50zdWziIMjwiMN190ZSafcTOHkhzCSQojFr3U4BYAi/aytxAX24cA9h1NI/wWcAq5RCDKYYDBCA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260224/XKey.dmg" sparkle:version="20260224" sparkle:shortVersionString="1.2.20" length="11421953" type="application/octet-stream" sparkle:edSignature="bfuKbeIE7WWCn0XNwaV9CcpUKWReMy2zF4t+nEKvFr1XNu4lvbsJ+OappRmiG5K4zB2cIkcj6cxJfx+WAvJvCw==" />
     </item>
   </channel>
 </rss>
