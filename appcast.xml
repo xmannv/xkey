@@ -6,25 +6,29 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260224.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260224.1</link>
-      <sparkle:version>20260224.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260225)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260225</link>
+      <sparkle:version>20260225</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(XKeyIM): fix icon not displaying in input menu</p>
+<p>fix: standalone W English detection bug (wngs → ứng) & add missing debug config settings</p>
 <ul>
-<li>Create proper 16×16pt PDF icons for macOS template rendering</li>
-<li>MenuIcon.pdf: Vietnam star silhouette (active icon)</li>
-<li>MenuIconVI.pdf: 'VI' text alternative (backup)</li>
-<li>Remove MenuIcon.imageset from Assets.xcassets to prevent naming conflicts</li>
-<li>Update tsInputMethodIconFileKey to reference MenuIcon.pdf</li>
+<li>Fix English detection incorrectly flagging standalone W + consonant</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260224.1">Xem chi tiết trên GitHub</a></p>
+<p>  patterns (e.g. 'wn') as impossible Vietnamese clusters when</p>
+<p>  allowConsonantZFWJ is disabled. Now all w-prefixed words pass through</p>
+<p>  when supportsStandaloneW is true, since w represents ư (valid vowel).</p>
+<ul>
+<li>Add test: testTelex<em>WNGS</em>ToUng verifies w-n-g-s → ứng</li>
+<li>Add missing settings to debug config log: upperCaseFirstChar,</li>
+</ul>
+<p>  undoTypingEnabled, beepOnToggle, Translation section, Excluded Apps</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260225">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 24 Feb 2026 08:27:36 +0000</pubDate>
+      <pubDate>Wed, 25 Feb 2026 03:26:12 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260224.1/XKey.dmg" sparkle:version="20260224.1" sparkle:shortVersionString="1.2.20" length="11424356" type="application/octet-stream" sparkle:edSignature="hY6D52CBA/DbKD5i6hzva4s8l/UJKJMuHs3raeumLlpU87/e0JaA/kn6yNd+JDBvlua7KWxrnMs0IFWtP4QsDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260225/XKey.dmg" sparkle:version="20260225" sparkle:shortVersionString="1.2.20" length="11431809" type="application/octet-stream" sparkle:edSignature="+b+tUt/yuXrILkR6+JVxWirz6cNQiqmtECJZMW8+m7wjAXs6eW7MdzYrtiQb4Lag0YIms4KPDfcK5o1TZ+gxDQ==" />
     </item>
   </channel>
 </rss>
