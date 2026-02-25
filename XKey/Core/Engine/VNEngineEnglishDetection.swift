@@ -454,27 +454,12 @@ extension String {
         let supportsStandaloneW = (inputType == 0 || inputType == 3)
         
         if supportsStandaloneW {
-            // Allow standalone 'w' at word start (w → ư)
-            if word == "w" {
+            // When standalone W is supported (Telex/Simple Telex 2), 'w' at word start
+            // represents 'ư' — a valid Vietnamese vowel that combines freely with consonants:
+            // wn → ưn (ưng, ứng, ừng...), wt → ưt (ướt), wc → ưc (ước), etc.
+            // Allow ALL w-starting words through; invalid combos are caught by spell check.
+            if word.hasPrefix("w") {
                 return false
-            }
-            
-            // Allow 'w' followed by mark keys or 'w' for undo
-            // ws → ứ, wf → ừ, wr → ử, wx → ữ, wj → ự (standalone ư + tone mark)
-            // ww → w (undo: ư → w)
-            if word.count >= 2 && word.hasPrefix("w") {
-                let prefix2 = String(word.prefix(2))
-                
-                // Allow w + mark key patterns (for adding tone to standalone ư)
-                let telexMarkKeys: Set<String> = ["ws", "wf", "wr", "wx", "wj"]
-                if telexMarkKeys.contains(prefix2) {
-                    return false
-                }
-                
-                // Allow ww for undo (ư → w)
-                if prefix2 == "ww" {
-                    return false
-                }
             }
             
             // Allow consonant + w patterns (hw → hư, bw → bư, etc.)

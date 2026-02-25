@@ -1076,6 +1076,27 @@ class VNEngineTests: XCTestCase {
         XCTAssertEqual(engine.getCurrentWord(), "", "Buffer should be empty after reset")
         XCTAssertEqual(engine.getRawInputStringForEnglishDetection(), "", "Raw input should be empty after reset")
     }
+    
+    // MARK: - Standalone W + Consonant Bug Fix Tests
+    
+    /// Test that "wngs" produces "ứng" (not "ưngs")
+    /// Bug: English detection flagged "wn" as impossible pattern, setting tempDisableKey=true
+    /// and preventing 's' from being applied as sắc tone mark
+    func testTelex_WNGS_ToUng() {
+        engine.reset()
+        engine.vFreeMark = 1
+        // Ensure allowConsonantZFWJ is OFF (default)
+        engine.vAllowConsonantZFWJ = 0
+        
+        // w-n-g-s → ứng (standalone ư + ng ending + sắc tone)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ứng",
+            "w-n-g-s should produce 'ứng' (standalone ư + ng ending + sắc tone)")
+    }
 
 }
 

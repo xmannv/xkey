@@ -346,6 +346,10 @@ class DebugViewModel: ObservableObject {
         lines.append("  Modern Style: \(settings.modernStyle ? "ON" : "OFF")")
         lines.append("  Spell Check: \(settings.spellCheckEnabled ? "ON" : "OFF")")
         lines.append("  Free Mark: \(settings.freeMarkEnabled ? "ON" : "OFF")")
+        lines.append("  Allow Consonant ZFWJ: \(settings.allowConsonantZFWJ ? "ON" : "OFF")")
+        lines.append("  Upper Case First Char: \(settings.upperCaseFirstChar ? "ON" : "OFF")")
+        lines.append("  Undo Typing: \(settings.undoTypingEnabled ? "ON" : "OFF")")
+        lines.append("  Beep on Toggle: \(settings.beepOnToggle ? "ON" : "OFF")")
         lines.append("")
         
         // Quick Telex
@@ -383,6 +387,27 @@ class DebugViewModel: ObservableObject {
         // Toolbar
         lines.append("[Toolbar]")
         lines.append("  Temp Off Toolbar: \(settings.tempOffToolbarEnabled ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Translation
+        lines.append("[Translation]")
+        lines.append("  Translation: \(settings.translationEnabled ? "ON" : "OFF")")
+        lines.append("  Source Language: \(settings.translationSourceLanguage)")
+        lines.append("  Target Language: \(settings.translationTargetLanguage)")
+        lines.append("  Replace Original: \(settings.translationReplaceOriginal ? "ON" : "OFF")")
+        lines.append("  Toolbar: \(settings.translationToolbarEnabled ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Excluded Apps
+        if let data = settings.getExcludedApps(),
+           let apps = try? JSONDecoder().decode([ExcludedApp].self, from: data) {
+            lines.append("[Excluded Apps] Count: \(apps.count)")
+            for app in apps {
+                lines.append("  - \(app.appName) (\(app.bundleIdentifier))")
+            }
+        } else {
+            lines.append("[Excluded Apps] Count: 0")
+        }
         
         lines.append("=== END CONFIGURATION ===")
         
