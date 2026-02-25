@@ -40,6 +40,9 @@ jobs:
             console.log(`📊 Comment created at: ${commentCreatedAt.toISOString()}`);
             console.log(`📊 Time difference: ${timeDiffSeconds} seconds`);
             
+            // Check if commenter is the issue author
+            const isAuthor = commenter === context.payload.issue.user.login;
+            
             // Check if commenter is owner or collaborator
             const repo = await github.rest.repos.get({
               owner: context.repo.owner,
@@ -60,7 +63,8 @@ jobs:
               isCollaborator = false;
             }
             
-            const hasWriteAccess = isOwner || isCollaborator;
+            // Issue authors can close their own issues even without collaborator access
+            const hasWriteAccess = isOwner || isCollaborator || isAuthor;
             
             // If commenter has write access AND comment was created within 10 seconds of issue close,
             // this is likely a "Close with comment" action - don't reopen
