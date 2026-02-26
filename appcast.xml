@@ -6,29 +6,31 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260225)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260225</link>
-      <sparkle:version>20260225</sparkle:version>
+      <title>Version 1.2.20 (Build 20260226)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260226</link>
+      <sparkle:version>20260226</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: standalone W English detection bug (wngs → ứng) & add missing debug config settings</p>
+<p>fix: prevent invalid circumflex in multi-vowel groups (insertAOE)</p>
+<p>When typing double vowels (oo→ô, aa→â, ee→ê) in a multi-vowel group,</p>
+<p>validate the post-transform vowel sequence before applying circumflex.</p>
+<p>Bug: typing 'caoto' produced 'caôt' because the vowelTable pattern</p>
+<p>[KEY<em>O, KEY</em>T] matched, but [a, ô] is not a valid Vietnamese sequence.</p>
+<p>Fix: simulate the circumflex transform and check if the resulting</p>
+<p>vowel sequence is valid via VowelSequenceValidator. If invalid,</p>
+<p>fallback to insertKey instead of adding circumflex.</p>
+<p>Added 9 test cases covering:</p>
 <ul>
-<li>Fix English detection incorrectly flagging standalone W + consonant</li>
+<li>Bug fix: caoto → caoto (not caôt)</li>
+<li>Block: toata, toana (invalid [o, â]), noete (invalid [o, ê])</li>
+<li>Regression: tooi→tôi, coot→côt, boot→bôt, thoong→thông, xoong→xông</li>
 </ul>
-<p>  patterns (e.g. 'wn') as impossible Vietnamese clusters when</p>
-<p>  allowConsonantZFWJ is disabled. Now all w-prefixed words pass through</p>
-<p>  when supportsStandaloneW is true, since w represents ư (valid vowel).</p>
-<ul>
-<li>Add test: testTelex<em>WNGS</em>ToUng verifies w-n-g-s → ứng</li>
-<li>Add missing settings to debug config log: upperCaseFirstChar,</li>
-</ul>
-<p>  undoTypingEnabled, beepOnToggle, Translation section, Excluded Apps</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260225">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260226">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 25 Feb 2026 03:26:12 +0000</pubDate>
+      <pubDate>Thu, 26 Feb 2026 06:13:14 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260225/XKey.dmg" sparkle:version="20260225" sparkle:shortVersionString="1.2.20" length="11431809" type="application/octet-stream" sparkle:edSignature="+b+tUt/yuXrILkR6+JVxWirz6cNQiqmtECJZMW8+m7wjAXs6eW7MdzYrtiQb4Lag0YIms4KPDfcK5o1TZ+gxDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260226/XKey.dmg" sparkle:version="20260226" sparkle:shortVersionString="1.2.20" length="11431128" type="application/octet-stream" sparkle:edSignature="/CeRbk2MjyjeIjr2z6V+e/uPJGH0o//VOS7v32ZxO0+PXuvueET4s+5kdfPH5J/sxuMRN30smdQXBGl4FUL6CQ==" />
     </item>
   </channel>
 </rss>
