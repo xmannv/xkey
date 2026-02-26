@@ -898,7 +898,45 @@ class VNEngine {
                         }
                     }
                     
+                    // Save state before attempting mark insertion
+                    // typingWord is backed by TypingBuffer (reference type), so save processedData manually
+                    let savedHookState = hookState
+                    var savedProcessedData: [Int: UInt32] = [:]
+                    for i in 0..<Int(index) {
+                        savedProcessedData[i] = typingWord[i]
+                    }
+                    
                     insertMarkInternal(markMask: markMask, canModifyFlag: true, deltaBackSpace: 0)
+                    
+                    // Check 1: insertMarkInternal returned vDoNothing (e.g., vowelCount=0 with
+                    // multi-char consonant like "ng" — no valid vowel target for the mark).
+                    // Restore state and let the key be inserted as a regular character.
+                    if hookState.code == UInt8(vDoNothing) {
+                        logCallback?("  → insertMarkInternal returned vDoNothing, restoring state")
+                        hookState = savedHookState
+                        for (i, data) in savedProcessedData {
+                            typingWord[i] = data
+                        }
+                        isChanged = false
+                        break
+                    }
+                    
+                    // Check 2: getCharacterCode validation — if the mark landed on a consonant
+                    // that has no entry in the code table, restore state (safety net)
+                    if hookState.code != UInt8(vRestore) {
+                        let markedCharCode = getCharacterCode(typingWord[vowelWillSetMark])
+                        let hasMarkOnChar = (typingWord[vowelWillSetMark] & VNEngine.MARK_MASK) != 0
+                        if hasMarkOnChar && (markedCharCode & VNEngine.CHAR_CODE_MASK) == 0 {
+                            logCallback?("  → Mark validation FAILED: getCharacterCode returned raw data for typingWord[\(vowelWillSetMark)]=\(String(format: "0x%X", typingWord[vowelWillSetMark]))")
+                            hookState = savedHookState
+                            for (i, data) in savedProcessedData {
+                                typingWord[i] = data
+                            }
+                            hookState.code = UInt8(vDoNothing)
+                            isChanged = false
+                            break
+                        }
+                    }
                     
                     // Track modifier keystroke for restore functionality
                     // Only add if not a restore operation (duplicate mark key)
@@ -2398,6 +2436,23 @@ class VNEngine {
             vowelWillSetMark = vowelEndIndex
             hookState.backspaceCount = Int(index) - vowelEndIndex
             logCallback?("  Single vowel: vowelWillSetMark=\(vowelWillSetMark)")
+        } else if vowelCount == 0 && vowelEndIndex > 1 {
+            // No valid vowel found, AND the detected 'i' is deep inside the word
+            // (vowelEndIndex > 1 means 'i' is preceded by a multi-char consonant like "ng").
+            //
+            // This catches cases like "ngin" where findAndCalculateVowel treats "gi" as a
+            // consonant cluster (vowelCount=0), but the real initial consonant is "ng", not "gi".
+            // Applying a mark here would produce invalid words like "ngĩn".
+            //
+            // When vowelEndIndex <= 1, we ALLOW the mark — this preserves valid words like
+            // "gì" (g+i+f) and "gìn" (g+i+n+f) where "gi" IS the initial consonant and
+            // handleOldMark's special case correctly places the mark on 'i'.
+            //
+            // NOTE: We use vowelEndIndex (not vowelStartIndex) because findAndCalculateVowel
+            // sets vowelEndIndex BEFORE the "gi" break, but vowelStartIndex is never reached.
+            logCallback?("  vowelCount=0, vowelEndIndex=\(vowelEndIndex) > 1: no valid vowel in multi-char consonant context, skipping mark")
+            hookState.code = UInt8(vDoNothing)
+            return
         } else {
             if vUseModernOrthography == 0 {
                 handleOldMark()

@@ -1243,6 +1243,90 @@ class VNEngineTests: XCTestCase {
                        "noete should NOT get circumflex because [o, ê] is not valid Vietnamese")
     }
 
+    // MARK: - Bug Fix: Mark on consonant validation (vowelCount=0 guard)
+    
+    /// Typing "nginx" must produce "nginx" — no mark applied.
+    /// findAndCalculateVowel treats "gi" as a consonant cluster (vowelCount=0).
+    /// Because vowelEndIndex=2 > 1 (the 'i' is deep inside the word after "ng" consonant),
+    /// insertMarkInternal skips mark placement and returns vDoNothing.
+    func testTelex_NGINX_ShouldNotApplyMark() {
+        engine.reset()
+        engine.vFreeMark = 1
+        
+        // n-g-i-n-x → "nginx" (vowelCount=0, vowelEndIndex=2 > 1 → mark skipped)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "nginx",
+                       "ngin+x should produce 'nginx' — 'gi' treated as consonant, vowelEndIndex > 1")
+    }
+    
+    /// Same as above but without ending consonant: "ngi" + x → "ngix"
+    func testTelex_NGIX_ShouldNotApplyMark() {
+        engine.reset()
+        engine.vFreeMark = 1
+        
+        // n-g-i-x → "ngix" (vowelCount=0, vowelEndIndex=2 > 1 → mark skipped)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ngix",
+                       "ngi+x should produce 'ngix' — 'gi' treated as consonant, vowelEndIndex > 1")
+    }
+    
+    /// "nghĩ" (to think) must still work — "ngh" is the initial consonant, 'i' is a standalone
+    /// vowel (vowelCount=1), so mark placement proceeds normally.
+    func testTelex_NGHIX_ShouldApplyMark() {
+        engine.reset()
+        engine.vFreeMark = 1
+        
+        // n-g-h-i-x → "nghĩ" (vowelCount=1, 'i' is the vowel)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "nghĩ",
+                       "nghix should produce 'nghĩ' (valid ngã on vowel 'i')")
+    }
+    
+    /// Regression: "gì" (what) must still work — "gi" IS the initial consonant at word start
+    /// (vowelEndIndex=1 ≤ 1), so handleOldMark's special case places mark on 'i'.
+    func testTelex_GIF_ShouldApplyMark() {
+        engine.reset()
+        engine.vFreeMark = 1
+        
+        // g-i-f → "gì" (vowelCount=0, but vowelEndIndex=1 ≤ 1 → mark allowed)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "gì",
+                       "gif should produce 'gì' — 'gi' is initial consonant at word start")
+    }
+    
+    /// Regression: "gìn" (to preserve) must still work — same logic as "gì" but with
+    /// ending consonant 'n' and free mark placement.
+    func testTelex_GINF_ShouldApplyMark() {
+        engine.reset()
+        engine.vFreeMark = 1
+        
+        // g-i-n-f → "gìn" (vowelCount=0, but vowelEndIndex=1 ≤ 1 → mark allowed)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "gìn",
+                       "ginf should produce 'gìn' — 'gi' is initial consonant at word start")
+    }
+
 }
 
 
