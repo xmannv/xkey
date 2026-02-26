@@ -1496,6 +1496,47 @@ class VNEngine {
                 insertKey(keyCode: keyCode, isCaps: isCaps)
                 return
             }
+            
+            // POST-TRANSFORM VALIDATION: Simulate adding circumflex to the target vowel
+            // and check if the resulting vowel sequence would be valid.
+            // Example: "caot" + "o" → target is 'o' at index 2 in vowel group [a, o]
+            //   After transform: [a, ô] → NOT valid Vietnamese → fallback to insertKey
+            // Example: "to" + "o" → target is 'o' at index 1 in vowel group [o] (single)
+            //   → skip this check (only applies to multi-vowel groups)
+            // Example: "tho" + "o" → single vowel, becomes "thô" → valid
+            // Find which vowel in the group would receive the circumflex
+            for i in stride(from: vowelEndIndex, through: vowelStartIndex, by: -1) {
+                if chr(i) == keyCode {
+                    // This vowel would get circumflex - simulate post-transform sequence
+                    var predictedSequence: [VNVowel] = []
+                    for j in vowelStartIndex...vowelEndIndex {
+                        if j == i {
+                            // Apply circumflex to this vowel
+                            switch keyCode {
+                            case VietnameseData.KEY_A: predictedSequence.append(.aCircumflex)
+                            case VietnameseData.KEY_E: predictedSequence.append(.eCircumflex)
+                            case VietnameseData.KEY_O: predictedSequence.append(.oCircumflex)
+                            default: break
+                            }
+                        } else if let vowel = convertToVNVowel(at: j) {
+                            // Remove horn (TONEW) from prediction since insertAOE strips it
+                            switch vowel {
+                            case .oHorn: predictedSequence.append(.o)
+                            case .uHorn: predictedSequence.append(.u)
+                            case .aBreve: predictedSequence.append(.a)
+                            default: predictedSequence.append(vowel)
+                            }
+                        }
+                    }
+                    
+                    if !predictedSequence.isEmpty && !VowelSequenceValidator.isValid(predictedSequence) {
+                        logCallback?("  → Post-transform vowel sequence \(predictedSequence) is invalid, inserting key normally")
+                        insertKey(keyCode: keyCode, isCaps: isCaps)
+                        return
+                    }
+                    break
+                }
+            }
         }
 
         // Track which vowels had TONEW_MASK removed (e.g., ư → u, ơ → o)

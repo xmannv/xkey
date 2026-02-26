@@ -1098,6 +1098,151 @@ class VNEngineTests: XCTestCase {
             "w-n-g-s should produce 'ứng' (standalone ư + ng ending + sắc tone)")
     }
 
+    // MARK: - Bug Fix: insertAOE Post-Transform Vowel Validation
+    
+    /// Bug: Typing "caoto" should produce "caoto", not "caôt"
+    /// The engine was incorrectly adding circumflex because "ot" matched a vowelTable pattern,
+    /// but the resulting vowel sequence [a, ô] is not valid Vietnamese.
+    func testTelex_CAOTO_ShouldNotAddCircumflex() {
+        engine.reset()
+        
+        // c-a-o-t-o → should be "caoto" (no circumflex)
+        _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "caoto",
+                       "caoto should NOT get circumflex because [a, ô] is not a valid Vietnamese vowel sequence")
+    }
+    
+    /// Regression: "tooi" should still correctly produce "tôi"
+    /// Vowel group is just [o] (single vowel), so post-transform check doesn't apply
+    func testTelex_TOOI_ShouldAddCircumflex() {
+        engine.reset()
+        
+        // t-o-o-i → "tôi"
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "tôi",
+                       "tooi should produce 'tôi' (valid circumflex transform)")
+    }
+    
+    /// Regression: "coot" should produce "côt" (e.g., "cốt", "cột")
+    /// Vowel group is just [o], circumflex is applied to single vowel
+    func testTelex_COOT_ShouldAddCircumflex() {
+        engine.reset()
+        
+        // c-o-o-t → "côt"
+        _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "côt",
+                       "coot should produce 'côt' (valid circumflex transform)")
+    }
+    
+    /// Regression: "boot" should produce "bôt" (e.g., "bột")
+    func testTelex_BOOT_ShouldAddCircumflex() {
+        engine.reset()
+        
+        // b-o-o-t → "bôt"
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "bôt",
+                       "boot should produce 'bôt' (valid circumflex transform)")
+    }
+    
+    /// Regression: "thoong" → circumflex is applied when second 'o' is typed (single vowel [o] → [ô])
+    /// Then 'ng' is added → "thông" (valid Vietnamese word)
+    func testTelex_THOONG_CircumflexApplied() {
+        engine.reset()
+        
+        // t-h-o-o-n-g → "thông"
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "thông",
+                       "thoong should produce 'thông' (oo→ô on single vowel, then +ng)")
+    }
+    
+    /// Regression: "xoong" → circumflex applied (single vowel), then +ng → "xông"
+    func testTelex_XOONG_CircumflexApplied() {
+        engine.reset()
+        
+        // x-o-o-n-g → "xông"
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "xông",
+                       "xoong should produce 'xông' (oo→ô on single vowel, then +ng)")
+    }
+    
+    // MARK: - Extended: aa→â and ee→ê in multi-vowel groups
+    
+    /// "toata" → multi-vowel [o, a], typing second 'a' should NOT add circumflex
+    /// because [o, â] is not a valid Vietnamese vowel sequence
+    func testTelex_TOATA_ShouldNotAddCircumflex() {
+        engine.reset()
+        
+        // t-o-a-t-a → "toata" (pattern [KEY_A, KEY_T] matches "at")
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "toata",
+                       "toata should NOT get circumflex because [o, â] is not valid Vietnamese")
+    }
+    
+    /// "toana" → multi-vowel [o, a], typing second 'a' via pattern [KEY_A, KEY_N]
+    /// should NOT add circumflex because [o, â] invalid
+    func testTelex_TOANA_ShouldNotAddCircumflex() {
+        engine.reset()
+        
+        // t-o-a-n-a → "toana" (pattern [KEY_A, KEY_N] matches "an")
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "toana",
+                       "toana should NOT get circumflex because [o, â] is not valid Vietnamese")
+    }
+    
+    /// "noete" → multi-vowel [o, e], typing second 'e' should NOT add circumflex
+    /// because [o, ê] is not a valid Vietnamese vowel sequence
+    func testTelex_NOETE_ShouldNotAddCircumflex() {
+        engine.reset()
+        
+        // n-o-e-t-e → "noete" (pattern [KEY_E, KEY_T] matches "et")
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "noete",
+                       "noete should NOT get circumflex because [o, ê] is not valid Vietnamese")
+    }
+
 }
 
 
