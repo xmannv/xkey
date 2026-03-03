@@ -36,7 +36,7 @@ APP_NAME="XKey"
 DMG_NAME="XKey.dmg"
 DMG_VOLUME_NAME="XKey"
 REPO_URL="https://github.com/xmannv/xkey"
-SPARKLE_BIN="/tmp/Sparkle-2.8.1/bin"
+SPARKLE_BIN="/tmp/Sparkle-2.9.0/bin"
 
 # Read version from Version.xcconfig (centralized version management)
 XCCONFIG_FILE="$(pwd)/Version.xcconfig"
@@ -524,14 +524,11 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
     
     # Check if Sparkle tools exist
     if [ ! -d "$SPARKLE_BIN" ]; then
-        echo "📥 Downloading Sparkle tools (v2.8.1)..."
-        cd /tmp
-        curl -L https://github.com/sparkle-project/Sparkle/releases/download/2.8.1/Sparkle-2.8.1.tar.xz -o Sparkle-2.8.1.tar.xz
-        rm -rf Sparkle-2.8.1
-        mkdir Sparkle-2.8.1
-        cd Sparkle-2.8.1
-        tar -xf ../Sparkle-2.8.1.tar.xz
-        cd - > /dev/null
+        echo "📥 Downloading Sparkle tools (v2.9.0)..."
+        curl -L https://github.com/sparkle-project/Sparkle/releases/download/2.9.0/Sparkle-2.9.0.tar.xz -o /tmp/Sparkle-2.9.0.tar.xz
+        rm -rf /tmp/Sparkle-2.9.0
+        mkdir -p /tmp/Sparkle-2.9.0
+        tar -xf /tmp/Sparkle-2.9.0.tar.xz -C /tmp/Sparkle-2.9.0
         echo "✅ Sparkle tools downloaded"
     fi
     
@@ -557,8 +554,22 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
     fi
     
     # Sign DMG with EdDSA signature
+    # NOTE: sign_update may return non-zero exit code even on success,
+    # so we temporarily disable set -e to capture output and handle errors ourselves
     echo "🔏 Signing DMG with EdDSA key..."
-    SPARKLE_OUTPUT=$("$SPARKLE_BIN/sign_update" "Release/$DMG_NAME" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") 2>&1)
+    SPARKLE_KEY_FILE=$(mktemp)
+    echo "$SPARKLE_PRIVATE_KEY" > "$SPARKLE_KEY_FILE"
+    set +e
+    SPARKLE_OUTPUT=$("$SPARKLE_BIN/sign_update" "Release/$DMG_NAME" --ed-key-file "$SPARKLE_KEY_FILE" 2>&1)
+    SPARKLE_EXIT=$?
+    set -e
+    rm -f "$SPARKLE_KEY_FILE"
+    
+    if [ $SPARKLE_EXIT -ne 0 ] && [ -z "$SPARKLE_OUTPUT" ]; then
+        echo "❌ Error: sign_update failed with exit code $SPARKLE_EXIT"
+        echo "   Output: $SPARKLE_OUTPUT"
+        exit 1
+    fi
     
     # Extract signature from output
     # The output might be in different formats:
