@@ -142,18 +142,26 @@ extension VNEngine {
         guard vietnameseData.isLetter(keyCode) else { return }
         guard !firstEntry.isCaps else { return }
 
+        // Check if the character was going to be passed through (not yet on screen)
+        // When hookState.code == vDoNothing, the original key event will be consumed
+        // by changing to vWillProcess, so the lowercase char never appears on screen.
+        // In that case, backspaceCount must be 0 (nothing to delete).
+        // Otherwise, if Vietnamese processing already happened (vWillProcess),
+        // we need to backspace the characters that ARE on screen.
+        let charAlreadyOnScreen = hookState.code != UInt8(vDoNothing)
+
         // Set uppercase flag
         buffer[0].isCaps = true
 
         hookState.code = UInt8(vWillProcess)
-        hookState.backspaceCount = buffer.count
+        hookState.backspaceCount = charAlreadyOnScreen ? buffer.count : 0
         hookState.newCharCount = buffer.count
 
         for i in 0..<buffer.count {
             hookState.charData[buffer.count - 1 - i] = getCharacterCode(buffer[i].processedData)
         }
 
-        logCallback?("Upper Case First Char: Applied")
+        logCallback?("Upper Case First Char: Applied (backspace=\(hookState.backspaceCount))")
     }
     // MARK: - Restore If Wrong Spelling
 

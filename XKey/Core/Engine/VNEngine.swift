@@ -3123,6 +3123,20 @@ class VNEngine {
         logCallback?("clearHistory: history cleared for terminal")
     }
 
+    /// Update upperCaseStatus based on the word break character
+    /// Called from processWordBreak() and externally when buffer is empty
+    /// to ensure auto-capitalize works regardless of which code path runs.
+    func updateUpperCaseStatus(character: Character) {
+        guard vUpperCaseFirstChar == 1 else { return }
+        if character == "." {
+            upperCaseStatus = 1
+        } else if character == "\n" || character == "\r" {
+            upperCaseStatus = 2
+        } else {
+            upperCaseStatus = 0
+        }
+    }
+
     /// Notify engine that focus changed during typing session
     /// This can happen when suggestion popups appear - keystrokes may go to popup
     /// causing buffer desync. Restore will be skipped at next word break/backspace.
@@ -3582,6 +3596,9 @@ extension VNEngine {
         // Reset cursor moved flag after word break
         // This allows restore logic to work normally for the next word
         cursorMovedSinceReset = false
+
+        // Upper case first char - update status based on word break character
+        updateUpperCaseStatus(character: character)
 
         return ProcessResult() // Empty result, no consumption
     }

@@ -550,6 +550,11 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 // No buffer, no macroKey, and not a macroable character
                 // Just reset engine and let word break pass through
                 // This prevents restoring autocompleted text (like emojis)
+                
+                // IMPORTANT: Update uppercase status BEFORE reset
+                // When Enter is pressed with empty buffer, we still need to track
+                // that a sentence-ending event occurred for auto-capitalize feature
+                engine.updateUpperCaseStatus(character: character)
                 engine.reset()
             }
             
