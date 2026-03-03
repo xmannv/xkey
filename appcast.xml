@@ -6,35 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260226.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260226.1</link>
-      <sparkle:version>20260226.1</sparkle:version>
+      <title>Version 1.2.20 (Build 20260303)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260303</link>
+      <sparkle:version>20260303</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: prevent mark placement on consonant in 'ngin' pattern (nginx flicker bug)</p>
+<p>fix: auto-capitalize after Enter with empty buffer</p>
 <ul>
-<li>Add vowelCount=0 guard in insertMarkInternal: when findAndCalculateVowel</li>
+<li>Extract updateUpperCaseStatus() method in VNEngine for reuse</li>
+<li>Call updateUpperCaseStatus() in KeyboardEventHandler when Enter</li>
 </ul>
-<p>  returns no vowel AND vowelEndIndex > 1 (indicating 'i' is deep inside word</p>
-<p>  after multi-char consonant like 'ng'), skip mark placement entirely.</p>
-<p>  This prevents invalid words like 'ngĩn' from being produced.</p>
+<p>  is pressed with empty buffer (sentence-ending detection)</p>
 <ul>
-<li>Add getCharacterCode safety net in handleMarkKey: if mark lands on a</li>
+<li>Fix backspace count in uppercase application: avoid deleting</li>
 </ul>
-<p>  consonant with no code table entry, restore state and insert key as-is.</p>
+<p>  characters not yet on screen (hookState.code == vDoNothing)</p>
 <ul>
-<li>Key distinction: vowelEndIndex=1 (gi at word start) allows marks for valid</li>
+<li>Bump build number to 20260303</li>
 </ul>
-<p>  words like 'gì' and 'gìn'. vowelEndIndex>1 (ngin) skips marks.</p>
-<ul>
-<li>Add 5 test cases: nginx, ngix (skip mark), nghĩ, gì, gìn (allow mark)</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260226.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260303">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 26 Feb 2026 10:23:23 +0000</pubDate>
+      <pubDate>Tue, 03 Mar 2026 03:05:37 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260226.1/XKey.dmg" sparkle:version="20260226.1" sparkle:shortVersionString="1.2.20" length="11437893" type="application/octet-stream" sparkle:edSignature="s0mueQ1n5BeUozFAKUdJ+ZGtRlmygoBlzwYiHkwruUIrR2Wpx/+Lr5bmjBq4Yp7IVM/k3SpzeFBV5jA936d5DA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260303/XKey.dmg" sparkle:version="20260303" sparkle:shortVersionString="1.2.20" length="11523335" type="application/octet-stream" sparkle:edSignature="kzpiC8Qn6b1cSWT9b2cIroB/Vy4efes8tfxrY8Do6JE14zU0+GVsrWBAk3e+dINpGleS5eJuLWdX4dg1D1o0Ag==" />
     </item>
   </channel>
 </rss>
