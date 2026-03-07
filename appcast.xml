@@ -6,30 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260303)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260303</link>
-      <sparkle:version>20260303</sparkle:version>
+      <title>Version 1.2.20 (Build 20260307)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260307</link>
+      <sparkle:version>20260307</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: auto-capitalize after Enter with empty buffer</p>
+<p>feat(XKeyIM): enable Vietnamese toggle menu & show 'E' icon when XKeyIM active</p>
 <ul>
-<li>Extract updateUpperCaseStatus() method in VNEngine for reuse</li>
-<li>Call updateUpperCaseStatus() in KeyboardEventHandler when Enter</li>
+<li>Uncomment Vietnamese toggle menu item in XKeyIMController.menu()</li>
+<li>Fix AppDelegate.handleInputSourceChange(): force isVietnameseEnabled=false</li>
 </ul>
-<p>  is pressed with empty buffer (sentence-ending detection)</p>
+<p>  when XKeyIM is active so XKey main app shows 'E' (engine off)</p>
 <ul>
-<li>Fix backspace count in uppercase application: avoid deleting</li>
+<li>XKeyIM handles Vietnamese typing independently via its own engine</li>
 </ul>
-<p>  characters not yet on screen (hookState.code == vDoNothing)</p>
-<ul>
-<li>Bump build number to 20260303</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260303">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260307">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 03 Mar 2026 03:05:37 +0000</pubDate>
+      <pubDate>Sat, 07 Mar 2026 10:49:30 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260303/XKey.dmg" sparkle:version="20260303" sparkle:shortVersionString="1.2.20" length="11523335" type="application/octet-stream" sparkle:edSignature="kzpiC8Qn6b1cSWT9b2cIroB/Vy4efes8tfxrY8Do6JE14zU0+GVsrWBAk3e+dINpGleS5eJuLWdX4dg1D1o0Ag==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260307/XKey.dmg" sparkle:version="20260307" sparkle:shortVersionString="1.2.20" length="11523694" type="application/octet-stream" sparkle:edSignature="4XpIo8v9DGwftDeLnOyyzZmvsDyCcWt1vR7LNKpmNcKlJQCzsudMQd27gdmrSODkeSJ0pVEBAr3hARlCRibIDg==" />
     </item>
   </channel>
 </rss>
