@@ -1653,9 +1653,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("🔑 Switched to XKeyIM - suspending CGEvent tap")
             eventTapManager?.suspend()
 
-            // Force enable Vietnamese mode for XKeyIM
-            self.statusBarManager?.viewModel.isVietnameseEnabled = true
-            self.keyboardHandler?.setVietnamese(true)
+            // Force DISABLE XKey main app's Vietnamese engine
+            // XKeyIM handles Vietnamese typing itself, so XKey main app shows "E" (engine off)
+            self.statusBarManager?.viewModel.isVietnameseEnabled = false
+            self.keyboardHandler?.setVietnamese(false)
         } else {
             // Check if event tap is already running
             // If not (e.g., started with XKeyIM active), start it now

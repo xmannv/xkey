@@ -1142,15 +1142,15 @@ class XKeyIMController: IMKInputController {
         let menu = NSMenu()
         
         // Vietnamese toggle
-        // let vnItem = NSMenuItem(
-        //     title: isVietnameseEnabled ? "✓ Tiếng Việt" : "Tiếng Việt",
-        //     action: #selector(toggleVietnamese),
-        //     keyEquivalent: ""
-        // )
-        // vnItem.target = self
-        // menu.addItem(vnItem)
+        let vnItem = NSMenuItem(
+            title: isVietnameseEnabled ? "✓ Tiếng Việt" : "Tắt Tiếng Việt",
+            action: #selector(toggleVietnamese),
+            keyEquivalent: ""
+        )
+        vnItem.target = self
+        menu.addItem(vnItem)
         
-        // menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem.separator())
 
         // Version info
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
