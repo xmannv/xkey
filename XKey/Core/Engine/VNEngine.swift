@@ -2096,6 +2096,37 @@ class VNEngine {
         // vowelEndIdx is now at position k
         
         // ============================================
+        // Check for repeated identical vowels (≥ 3)
+        // e.g. "ooo", "aaa" are not valid Vietnamese
+        // Uses raw keystroke sequence instead of buffer entries,
+        // because Telex transforms merge entries (e.g. o-o→ô,
+        // then 3rd o undoes → oo = only 2 entries for 3 keystrokes)
+        // ============================================
+        let rawKeystrokes = buffer.getKeystrokeSequence()
+        if rawKeystrokes.count >= 3 {
+            // Find max run of identical vowel keystrokes
+            var maxRun = 1
+            var currentRun = 1
+            for ri in 1..<rawKeystrokes.count {
+                let prevKey = rawKeystrokes[ri - 1].keyCode
+                let curKey = rawKeystrokes[ri].keyCode
+                if curKey == prevKey && !vietnameseData.isConsonant(curKey) {
+                    currentRun += 1
+                    if currentRun > maxRun { maxRun = currentRun }
+                } else {
+                    currentRun = 1
+                }
+            }
+            if maxRun >= 3 {
+                logCallback?("checkSpelling: Rejected - repeated identical vowel keystroke x\(maxRun)")
+                spellingOK = false
+                spellingVowelOK = false
+                tempDisableKey = true
+                return
+            }
+        }
+        
+        // ============================================
         // Check end consonant (with endConsonantTable)
         // ============================================
         if k > j {

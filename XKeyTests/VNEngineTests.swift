@@ -1327,6 +1327,126 @@ class VNEngineTests: XCTestCase {
                        "ginf should produce 'gìn' — 'gi' is initial consonant at word start")
     }
 
+    // MARK: - Bug Fix: Repeated Identical Vowel Rejection (≥ 3)
+    
+    /// Main bug: typing "p-o-o-o-r" should produce "poor", NOT "pỏo"
+    /// Flow: p → o → oo(=ô) → ooo(ô undone=oo) → poor (r not treated as mark)
+    /// checkSpelling detects 3 identical 'o' keystrokes in raw sequence → tempDisableKey=true
+    func testRepeatedVowel_POOOR_ShouldNotApplyMark() {
+        engine.reset()
+        
+        // p-o-o-o-r
+        // Buffer after p-o-o: [p, ô] (Telex: o-o → ô)
+        // Buffer after p-o-o-o: [p, o, o] (3rd 'o' undoes ô → oo, then insertKey adds 'o')
+        // Buffer after p-o-o-o-r: [p, o, o, r] = "poor" (r as plain char, not hỏi mark)
+        _ = engine.processKey(character: "p", keyCode: VietnameseData.KEY_P, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "r", keyCode: VietnameseData.KEY_R, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "poor",
+                       "p-o-o-o-r should produce 'poor' — 3 identical 'o' keystrokes disable Vietnamese")
+    }
+    
+    /// Same bug with 'a' vowel: typing "b-a-a-a-s" should produce "baas", NOT "bás" or similar
+    /// Flow: b → a → aa(=â) → aaa(â undone=aa) → baas (s not treated as sắc mark)
+    func testRepeatedVowel_BAAAS_ShouldNotApplyMark() {
+        engine.reset()
+        
+        // b-a-a-a-s
+        // Buffer after b-a-a: [b, â] (Telex: a-a → â)
+        // Buffer after b-a-a-a: [b, a, a] (3rd 'a' undoes â → aa)
+        // Buffer after b-a-a-a-s: [b, a, a, s] = "baas" (s as plain char, not sắc mark)
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "baas",
+                       "b-a-a-a-s should produce 'baas' — 3 identical 'a' keystrokes disable Vietnamese")
+    }
+    
+    /// Bug with 'u' vowel: typing "l-u-u-u-s" should produce "luuus"
+    /// Note: 'u-u' does NOT transform via circumflex in Telex, so all 3 'u' entries are preserved.
+    func testRepeatedVowel_LUUUS_ShouldNotApplyMark() {
+        engine.reset()
+        
+        // l-u-u-u-s
+        // Buffer: [l, u, u, u, s] = "luuus" (u has no circumflex transform)
+        _ = engine.processKey(character: "l", keyCode: VietnameseData.KEY_L, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "luuus",
+                       "l-u-u-u-s should produce 'luuus' — 'u' has no circumflex transform")
+    }
+    
+    /// Bug with 'e' vowel: typing "t-e-e-e-f" should produce "teef", NOT "tế" or similar
+    /// Flow: t → e → ee(=ê) → eee(ê undone=ee) → teef (f not treated as huyền mark)
+    func testRepeatedVowel_TEEEF_ShouldNotApplyMark() {
+        engine.reset()
+        
+        // t-e-e-e-f
+        // Buffer after t-e-e: [t, ê] (Telex: e-e → ê)
+        // Buffer after t-e-e-e: [t, e, e] (3rd 'e' undoes ê → ee)
+        // Buffer after t-e-e-e-f: [t, e, e, f] = "teef" (f as plain char, not huyền mark)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "teef",
+                       "t-e-e-e-f should produce 'teef' — 3 identical 'e' keystrokes disable Vietnamese")
+    }
+    
+    /// Regression: "tooi" → "tôi" must still work (only 2 vowels, not 3)
+    func testRepeatedVowel_TOOI_StillWorks() {
+        engine.reset()
+        
+        // t-o-o-i → "tôi"
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "tôi",
+                       "tooi should still produce 'tôi' — only 2 identical vowels (below threshold)")
+    }
+    
+    /// Regression: "nguowif" → "người" must still work (3 different vowels: ư, ơ, i)
+    func testRepeatedVowel_NGUOI_StillWorks() {
+        engine.reset()
+        
+        // n-g-u-o-w-f-i → "người"
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "người",
+                       "nguowfi should still produce 'người' — 3 different vowels are valid")
+    }
+    
+    /// Regression: "aa" → "â" must still work (only 2 identical vowels)
+    func testRepeatedVowel_AA_StillWorks() {
+        engine.reset()
+        
+        // a-a → "â"
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "â",
+                       "aa should still produce 'â' — only 2 identical vowels (below threshold)")
+    }
+
 }
 
 

@@ -269,25 +269,49 @@ class VNEngineBackspaceRestoreTests: XCTestCase {
 
     // MARK: - Cross Word Boundary Tests
 
-    func testDeleteAcrossWordBoundary() {
-        // Type "hello world"
+    func testDeleteAcrossWordBoundary_Telex() {
+        // Default vInputType = 0 (Telex), 'w' is a horn key
+        // Use "click" instead of "world" to avoid Telex transformation
         typeWord("hello")
         processSpace()
-        typeWord("world")
+        typeWord("click")
         
-        // Delete all of "world"
+        // Delete all of "click" (5 chars, no Telex transforms)
         for _ in 0..<5 {
             typeBackspace()
         }
         
-        XCTAssertTrue(engine.buffer.isEmpty)
+        XCTAssertTrue(engine.buffer.isEmpty, "Buffer should be empty after deleting 'click'")
         
         // Delete the space
-        XCTAssertEqual(engine.spaceCount, 1)
+        XCTAssertEqual(engine.spaceCount, 1, "spaceCount should be 1")
         typeBackspace()
         
         // Now should restore "hello" from history
-        // After restore, buffer may have "hello" content
+        XCTAssertEqual(engine.getCurrentWord(), "hello", "Should restore 'hello' after crossing word boundary")
+    }
+    
+    func testDeleteAcrossWordBoundary_SimpleTelex1() {
+        // Simple Telex 1: vInputType = 2, 'w' is a normal key
+        engine.vInputType = 2
+        
+        typeWord("hello")
+        processSpace()
+        typeWord("world")
+        
+        // Delete all of "world" (5 chars, 'w' is normal in Simple Telex 1)
+        for _ in 0..<5 {
+            typeBackspace()
+        }
+        
+        XCTAssertTrue(engine.buffer.isEmpty, "Buffer should be empty after deleting 'world'")
+        
+        // Delete the space
+        XCTAssertEqual(engine.spaceCount, 1, "spaceCount should be 1")
+        typeBackspace()
+        
+        // Now should restore "hello" from history
+        XCTAssertEqual(engine.getCurrentWord(), "hello", "Should restore 'hello' after crossing word boundary")
     }
 
     func testContinuousBackspaceAcrossMultipleWords() {
