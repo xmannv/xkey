@@ -38,11 +38,35 @@ struct TranslationSection: View {
                     SettingsGroup(title: "Phím tắt") {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
-                                Text("Dịch text đang chọn:")
+                                Text("Dịch text về ngôn ngữ đích:")
                                 Spacer()
                                 HotkeyRecorderView(hotkey: $viewModel.preferences.translationHotkey, minimumModifiers: 2)
                                     .frame(width: 150)
                             }
+
+                            HStack {
+                                Text("Dịch text về ngôn ngữ nguồn:")
+                                Spacer()
+                                HotkeyRecorderView(hotkey: $viewModel.preferences.translateToSourceHotkey, minimumModifiers: 2)
+                                    .frame(width: 150)
+                            }
+
+                            Divider()
+
+                            HStack {
+                                Text("Thời gian tự ẩn kết quả dịch:")
+                                Spacer()
+                                TextField("", value: $viewModel.preferences.translationResultAutoHideSeconds, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 50)
+                                    .multilineTextAlignment(.center)
+                                Text("giây")
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Text("Bằng 0 = không tự ẩn, click bên ngoài để ẩn")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             
                             Text("Chọn text và nhấn phím tắt để dịch. Nếu không chọn text, sẽ dịch toàn bộ nội dung.")
                                 .font(.caption)

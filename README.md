@@ -115,8 +115,8 @@ Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh:
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Phím tắt dịch** | Chọn văn bản và nhấn phím tắt để dịch ngay lập tức |
-| **Tự động thay thế** | Thay thế văn bản gốc bằng bản dịch hoặc copy vào clipboard |
+| **Dịch về ngôn ngữ đích** | Chọn văn bản và nhấn phím tắt để dịch, tự động thay thế văn bản gốc |
+| **Dịch về ngôn ngữ nguồn** | Phím tắt riêng để dịch ngược lại về ngôn ngữ nguồn, hiển thị kết quả trong overlay |
 | **Tự động nhận diện** | Nhận diện ngôn ngữ nguồn tự động |
 | **Đa ngôn ngữ** | Hỗ trợ 30+ ngôn ngữ phổ biến (Anh, Việt, Trung, Nhật, Hàn, Pháp, Đức...) |
 | **Ngôn ngữ tùy chỉnh** | Nhập mã ISO 639-1 để sử dụng bất kỳ ngôn ngữ nào |
@@ -128,6 +128,14 @@ Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh:
 | **Google Translate** | Miễn phí, hỗ trợ đa ngôn ngữ, chất lượng tốt |
 | **Tencent Transmart** | Miễn phí, tối ưu cho các ngôn ngữ Châu Á |
 | **Volcano Engine** | Miễn phí, chất lượng cao cho tiếng Trung ↔ Việt |
+
+**Overlay kết quả dịch (cho phím tắt "Dịch về ngôn ngữ nguồn"):**
+- 🪟 Glassmorphism UI — nền mờ, tự động phù hợp Light/Dark mode
+- 📋 Nút copy nhanh bản dịch vào clipboard
+- 🔤 Nút tăng/giảm cỡ chữ (+/−) để đọc dễ hơn
+- ↔️ Kéo header để di chuyển overlay, kéo cạnh để resize
+- ⏱️ Thời gian tự ẩn tùy chỉnh (0 = không tự ẩn, click outside để ẩn)
+- 📊 Thanh countdown hiển thị thời gian còn lại
 
 **Tính năng nổi bật:**
 - ✅ Fallback tự động: Nếu nhà cung cấp này lỗi, tự động thử nhà cung cấp khác

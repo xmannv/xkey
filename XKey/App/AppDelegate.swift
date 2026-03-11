@@ -2289,6 +2289,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             self?.updateTranslationHotkey()
+            self?.updateTranslateToSourceHotkey()
         }
         
         // Setup notification observer for translation toolbar settings changes
@@ -2302,6 +2303,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initial setup
         updateTranslationHotkey()
+        updateTranslateToSourceHotkey()
     }
     
     /// Handle translation toolbar settings changes (enable/disable)
@@ -2428,6 +2430,104 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Simple approach: update status bar tooltip temporarily
             // Could be enhanced with proper notification banner
             print("[Translation] \(message)")
+        }
+    }
+
+    // MARK: - Translate to Source Hotkey
+
+    private func updateTranslateToSourceHotkey() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        
+        // Check if translation is enabled
+        guard preferences.translationEnabled else {
+            eventTapManager?.translateToSourceHotkey = nil
+            eventTapManager?.onTranslateToSourceHotkey = nil
+            debugWindowController?.logEvent("Translate-to-source hotkey disabled (feature off)")
+            return
+        }
+
+        let hotkey = preferences.translateToSourceHotkey
+
+        // If no keycode, disable hotkey
+        guard hotkey.keyCode != 0 else {
+            eventTapManager?.translateToSourceHotkey = nil
+            eventTapManager?.onTranslateToSourceHotkey = nil
+            debugWindowController?.logEvent("Translate-to-source hotkey disabled (no key set)")
+            return
+        }
+
+        // Configure EventTapManager to handle translate-to-source hotkey
+        eventTapManager?.translateToSourceHotkey = hotkey
+        eventTapManager?.onTranslateToSourceHotkey = { [weak self] in
+            self?.performTranslateToSource()
+        }
+
+        debugWindowController?.logEvent("Translate-to-source hotkey set: \(hotkey.displayString)")
+    }
+    
+    /// Perform translation of selected text back to source language
+    /// Shows result in overlay (does not replace text)
+    private func performTranslateToSource() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        let service = TranslationService.shared
+        
+        debugWindowController?.logEvent("Translate-to-source triggered via hotkey")
+        
+        // Get selected text or full value via AX (with source info)
+        guard let textResult = service.getSelectedTextWithSource(), !textResult.text.isEmpty else {
+            debugWindowController?.logEvent("   No text to translate")
+            showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
+            return
+        }
+        
+        let textToTranslate = textResult.text
+        
+        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\" (source: \(textResult.source))")
+        
+        // Determine languages: translate FROM target TO source (reverse direction)
+        let fromLang = preferences.translationTargetLanguage
+        var toLang = preferences.translationSourceLanguage
+        
+        // Can't translate TO "auto" - use "vi" as default
+        if toLang.code == "auto" {
+            toLang = TranslationLanguage.find(byCode: "vi")
+            debugWindowController?.logEvent("   Source language is 'auto', using 'vi' as target for reverse translation")
+        }
+        
+        debugWindowController?.logEvent("   Reverse translation: \(fromLang.code) → \(toLang.code)")
+        
+        // Show loading overlay near cursor
+        TranslationLoadingOverlay.shared.show()
+        
+        // Perform translation asynchronously
+        Task {
+            do {
+                let result = try await service.translate(
+                    text: textToTranslate,
+                    from: fromLang,
+                    to: toLang
+                )
+                
+                await MainActor.run {
+                    // Hide loading overlay
+                    TranslationLoadingOverlay.shared.hide()
+                    
+                    let finalText = result.translatedText
+                    debugWindowController?.logEvent("   Reverse translated: \"\(finalText.prefix(50))...\"")
+                    
+                    // Show result in overlay (don't replace text)
+                    let autoHide = preferences.translationResultAutoHideSeconds
+                    TranslationResultOverlay.shared.show(text: finalText, autoHideSeconds: autoHide)
+                }
+            } catch {
+                await MainActor.run {
+                    // Hide loading overlay on error
+                    TranslationLoadingOverlay.shared.hide()
+                    
+                    debugWindowController?.logEvent("   Reverse translation failed: \(error.localizedDescription)")
+                    showTranslationNotification(message: "Lỗi dịch: \(error.localizedDescription)")
+                }
+            }
         }
     }
 

@@ -42,6 +42,10 @@ class EventTapManager {
     var translationHotkey: Hotkey?
     var onTranslationHotkey: (() -> Void)?
     
+    // Translate to source language hotkey configuration
+    var translateToSourceHotkey: Hotkey?
+    var onTranslateToSourceHotkey: (() -> Void)?
+    
     // Debug hotkey configuration
     var debugHotkey: Hotkey?
     var onDebugHotkey: (() -> Void)?
@@ -393,6 +397,23 @@ class EventTapManager {
                 // Call translation callback on main thread
                 DispatchQueue.main.async { [weak self] in
                     self?.onTranslationHotkey?()
+                }
+                // Consume the event completely - don't pass to other apps
+                return nil
+            }
+        }
+
+        // Check for translate-to-source hotkey
+        // Skip if user is recording a new hotkey
+        if let hotkey = translateToSourceHotkey, type == .keyDown, !isHotkeyRecording {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            // Compare only relevant modifiers (ignore CapsLock etc.)
+            let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
+            if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
+                debugLogCallback?("  → TRANSLATE-TO-SOURCE HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                // Call callback on main thread
+                DispatchQueue.main.async { [weak self] in
+                    self?.onTranslateToSourceHotkey?()
                 }
                 // Consume the event completely - don't pass to other apps
                 return nil

@@ -82,6 +82,8 @@ struct Preferences: Codable {
     var translationTargetLanguageCode: String = "vi"       // ISO 639-1 code
     var translationReplaceOriginal: Bool = true  // Replace selected text with translation
     var translationToolbarEnabled: Bool = true   // Show floating toolbar for quick language selection
+    var translateToSourceHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
+    var translationResultAutoHideSeconds: Int = 4  // 0 = don't auto-hide, click outside to dismiss
     
     /// Get source language as TranslationLanguage object
     var translationSourceLanguage: TranslationLanguage {

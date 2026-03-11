@@ -97,6 +97,9 @@ enum SharedSettingsKey: String {
     case translationTargetLanguage = "XKey.translationTargetLanguage"
     case translationReplaceOriginal = "XKey.translationReplaceOriginal"
     case translationToolbarEnabled = "XKey.translationToolbarEnabled"
+    case translateToSourceHotkeyCode = "XKey.translateToSourceHotkeyCode"
+    case translateToSourceHotkeyModifiers = "XKey.translateToSourceHotkeyModifiers"
+    case translationResultAutoHideSeconds = "XKey.translationResultAutoHideSeconds"
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -620,6 +623,33 @@ class SharedSettings {
         }
     }
 
+    var translateToSourceHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.translateToSourceHotkeyCode.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.translateToSourceHotkeyCode.rawValue)
+            notifyTranslationSettingsChanged()
+        }
+    }
+
+    var translateToSourceHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.translateToSourceHotkeyModifiers.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.translateToSourceHotkeyModifiers.rawValue)
+            notifyTranslationSettingsChanged()
+        }
+    }
+
+    var translationResultAutoHideSeconds: Int {
+        get {
+            let dict = readPlistDict()
+            if dict[SharedSettingsKey.translationResultAutoHideSeconds.rawValue] == nil {
+                return 4  // Default: 4 seconds
+            }
+            return readInt(forKey: SharedSettingsKey.translationResultAutoHideSeconds.rawValue)
+        }
+        set { writeInt(newValue, forKey: SharedSettingsKey.translationResultAutoHideSeconds.rawValue) }
+    }
+
     /// Notify that translation toolbar settings have changed
     private func notifyTranslationToolbarSettingsChanged() {
         guard !isBatchUpdating else { return }
@@ -990,6 +1020,15 @@ class SharedSettings {
         prefs.translationTargetLanguageCode = translationTargetLanguage
         prefs.translationReplaceOriginal = translationReplaceOriginal
         prefs.translationToolbarEnabled = translationToolbarEnabled
+        let transToSrcHotkeyCode = translateToSourceHotkeyCode
+        let transToSrcHotkeyModifiers = translateToSourceHotkeyModifiers
+        if transToSrcHotkeyCode != 0 || transToSrcHotkeyModifiers != 0 {
+            prefs.translateToSourceHotkey = Hotkey(
+                keyCode: transToSrcHotkeyCode,
+                modifiers: ModifierFlags(rawValue: transToSrcHotkeyModifiers)
+            )
+        }
+        prefs.translationResultAutoHideSeconds = translationResultAutoHideSeconds
 
         // Debug settings
         prefs.debugModeEnabled = debugModeEnabled
@@ -1103,6 +1142,9 @@ class SharedSettings {
         translationTargetLanguage = prefs.translationTargetLanguageCode
         translationReplaceOriginal = prefs.translationReplaceOriginal
         translationToolbarEnabled = prefs.translationToolbarEnabled
+        translateToSourceHotkeyCode = prefs.translateToSourceHotkey.keyCode
+        translateToSourceHotkeyModifiers = prefs.translateToSourceHotkey.modifiers.rawValue
+        translationResultAutoHideSeconds = prefs.translationResultAutoHideSeconds
 
         // Batch update is done - settings are already written to plist via setters
         isBatchUpdating = false

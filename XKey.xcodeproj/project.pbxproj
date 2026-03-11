@@ -60,6 +60,7 @@
 		10A2149A2ED42DFA005B52BD /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */; };
 		10BEC2BC2F2675B200D6A3C3 /* TranslationNetworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */; };
 		10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */; };
+		TRRESULT001 /* TranslationResultOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRRESULT002 /* TranslationResultOverlay.swift */; };
 		10F26F0F2ED6CAF900B9FA1F /* ConvertTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */; };
 		10F26F102ED6CAF900B9FA1F /* SmartSwitchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */; };
 		10F26F112ED6CAF900B9FA1F /* VietnameseData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */; };
@@ -173,6 +174,7 @@
 		10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
 		10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationNetworkManager.swift; sourceTree = "<group>"; };
 		10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLoadingOverlay.swift; sourceTree = "<group>"; };
+		TRRESULT002 /* TranslationResultOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationResultOverlay.swift; sourceTree = "<group>"; };
 		10F26F0A2ED6CAF900B9FA1F /* ConvertTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertTool.swift; sourceTree = "<group>"; };
 		10F26F0B2ED6CAF900B9FA1F /* MacroManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManager.swift; sourceTree = "<group>"; };
 		10F26F0C2ED6CAF900B9FA1F /* SmartSwitchManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartSwitchManager.swift; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 			children = (
 				10BEC2BB2F2675B200D6A3C3 /* TranslationNetworkManager.swift */,
 				10CE48232F260CCA0060594D /* TranslationLoadingOverlay.swift */,
+				TRRESULT002 /* TranslationResultOverlay.swift */,
 				102986AE2F252F5700B4DEEE /* GoogleTranslateProvider.swift */,
 				102986AF2F252F5700B4DEEE /* TranslationProvider.swift */,
 				102986B02F252F5700B4DEEE /* TranslationService.swift */,
@@ -753,6 +756,7 @@
 				105B93932F388AAA0018DC12 /* FloatingToolbarStyle.swift in Sources */,
 				102986B22F252F5700B4DEEE /* TranslationProvider.swift in Sources */,
 				10CE48242F260CCA0060594D /* TranslationLoadingOverlay.swift in Sources */,
+				TRRESULT001 /* TranslationResultOverlay.swift in Sources */,
 				102986B32F252F5700B4DEEE /* TranslationService.swift in Sources */,
 				102986B42F252F5700B4DEEE /* GoogleTranslateProvider.swift in Sources */,
 				102986B52F25400000B4DEEE /* TencentTransmartProvider.swift in Sources */,
