@@ -6,38 +6,25 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260309)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260309</link>
-      <sparkle:version>20260309</sparkle:version>
+      <title>Version 1.2.20 (Build 20260311)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260311</link>
+      <sparkle:version>20260311</sparkle:version>
       <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: detect repeated vowels using raw keystroke sequence & fix test input method</p>
+<p>Refine Macro UI with toggle and bulk actions</p>
 <ul>
-<li>checkSpelling: count consecutive identical vowel keystrokes from</li>
-</ul>
-<p>  buffer.getKeystrokeSequence() instead of buffer entries (which are</p>
-<p>  affected by Telex transforms like o-o→ô). If ≥3 identical vowel</p>
-<p>  keystrokes detected, reject input (spellingOK=false, tempDisableKey=true).</p>
-<ul>
-<li>Add/update repeated vowel test cases:</li>
-</ul>
-<p>  - POOOR → 'poor', BAAAS → 'baas', TEEEF → 'teef' (circumflex undo)</p>
-<p>  - LUUUS → 'luuus' (no circumflex for u)</p>
-<p>  - Regression tests: tooi→tôi, người, â still work</p>
-<ul>
-<li>Fix testDeleteAcrossWordBoundary: split into Telex (using 'click')</li>
-</ul>
-<p>  and Simple Telex 1 (vInputType=2, using 'world') variants, since</p>
-<p>  'w' is a horn key in Telex mode.</p>
-<ul>
+<li>Add per-macro enable/disable toggle with visual state feedback</li>
+<li>Add Enable All / Disable All / Clear All bulk action buttons</li>
+<li>Add confirmation dialog for Clear All action</li>
+<li>Improve macro row layout with toggle switch and opacity states</li>
 <li>Bump version</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260309">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260311">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 09 Mar 2026 06:30:58 +0000</pubDate>
+      <pubDate>Wed, 11 Mar 2026 05:45:02 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260309/XKey.dmg" sparkle:version="20260309" sparkle:shortVersionString="1.2.20" length="11525918" type="application/octet-stream" sparkle:edSignature="2k6FZSN48DbYlvq7yJY2ko0g96YDvf5bTe1w4qRJRRLYtADYDXzfPNvCp9z7+DwkzsZAHU4bfvJE5ZnrQpTcDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260311/XKey.dmg" sparkle:version="20260311" sparkle:shortVersionString="1.2.20" length="11592559" type="application/octet-stream" sparkle:edSignature="DcpGzTHKsxdQiIJJUa+4+1WB6mUljmjdgDcFvGxdREgXXSLsOTYdxxIvd6Mz25VLj8ZnDYVkaWWATaA5YpwXBg==" />
     </item>
   </channel>
 </rss>
