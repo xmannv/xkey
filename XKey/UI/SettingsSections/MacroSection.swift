@@ -34,6 +34,7 @@ struct MacroSection: View {
     @State private var errorMessage: String = ""
     @State private var editingMacro: MacroItem? = nil
     @State private var searchText: String = ""
+    @State private var showClearAllConfirm: Bool = false
     @FocusState private var isContentFieldFocused: Bool
 
     private var filteredMacros: [MacroItem] {
@@ -191,18 +192,60 @@ struct MacroSection: View {
                                 Label("Export", systemImage: "square.and.arrow.up")
                             }
                             .buttonStyle(.bordered)
-
-                            if !viewModel.macros.isEmpty {
-                                Button(role: .destructive) {
-                                    viewModel.clearAll()
-                                } label: {
-                                    Label("Xóa tất cả", systemImage: "trash")
-                                }
-                                .buttonStyle(.bordered)
-                            }
                         }
 
                         Divider()
+
+                        // Column header row
+                        if !viewModel.macros.isEmpty {
+                            HStack {
+                                Text("Từ viết tắt")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 12) {
+                                    Button("Bật tất cả") {
+                                        viewModel.enableAllMacros()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.caption)
+                                    .foregroundColor(.accentColor)
+                                    
+                                    Text("·")
+                                        .foregroundColor(.secondary)
+                                    
+                                    Button("Tắt tất cả") {
+                                        viewModel.disableAllMacros()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    
+                                    Text("·")
+                                        .foregroundColor(.secondary)
+                                    
+                                    Button("Xóa tất cả") {
+                                        showClearAllConfirm = true
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                }
+                                .fixedSize()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .alert("Xóa tất cả macro?", isPresented: $showClearAllConfirm) {
+                                Button("Xóa", role: .destructive) {
+                                    viewModel.clearAll()
+                                }
+                                Button("Hủy", role: .cancel) { }
+                            } message: {
+                                Text("Tất cả macro sẽ bị xóa vĩnh viễn. Bạn có chắc chắn?")
+                            }
+                        }
 
                         // Macro list
                         if viewModel.macros.isEmpty && searchText.isEmpty {
@@ -246,6 +289,9 @@ struct MacroSection: View {
                                 ForEach(filteredMacros) { macro in
                                     MacroRowView(
                                         macro: macro,
+                                        onToggle: {
+                                            viewModel.toggleMacro(macro)
+                                        },
                                         onEdit: {
                                             editMacro(macro)
                                         },
@@ -352,6 +398,7 @@ struct MacroSection: View {
 
 struct MacroRowView: View {
     let macro: MacroItem
+    let onToggle: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
     @State private var isHovered = false
@@ -362,12 +409,12 @@ struct MacroRowView: View {
             Text(macro.text)
                 .font(.system(.body, design: .monospaced))
                 .fontWeight(.semibold)
-                .foregroundColor(.accentColor)
+                .foregroundColor(macro.isEnabled ? .accentColor : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.accentColor.opacity(0.1))
+                .background(macro.isEnabled ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.1))
                 .cornerRadius(4)
-                .frame(minWidth: 80, alignment: .center)
+                .frame(minWidth: 80, alignment: .leading)
             
             // Arrow
             Image(systemName: "arrow.right")
@@ -392,13 +439,22 @@ struct MacroRowView: View {
                 }
                 
                 Text(macro.content)
-                    .foregroundColor(.primary)
+                    .foregroundColor(macro.isEnabled ? .primary : .secondary)
                     .lineLimit(3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
             // Action buttons
             HStack(spacing: 8) {
+                // Enable/Disable toggle
+                Toggle("", isOn: Binding(
+                    get: { macro.isEnabled },
+                    set: { _ in onToggle() }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                
                 // Edit button
                 Button(action: onEdit) {
                     Image(systemName: "pencil")
@@ -422,6 +478,7 @@ struct MacroRowView: View {
         .padding(.vertical, 10)
         .background(isHovered ? Color.gray.opacity(0.1) : Color.gray.opacity(0.03))
         .cornerRadius(8)
+        .opacity(macro.isEnabled ? 1.0 : 0.6)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering

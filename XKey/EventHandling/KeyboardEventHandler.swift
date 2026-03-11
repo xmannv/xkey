@@ -185,21 +185,28 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         
         if let data = SharedSettings.shared.getMacrosData(),
            let macros = try? JSONDecoder().decode([MacroItemData].self, from: data) {
-            for macro in macros {
+            for macro in macros where macro.isEnabled {
                 _ = macroManager.addMacro(text: macro.text, content: macro.content)
             }
         }
     }
     
-    /// Simple struct for decoding macro data
+    /// Struct for decoding macro data (includes isEnabled for filtering)
     private struct MacroItemData: Codable {
         let id: UUID
         let text: String
         let content: String
-    }
-    
-    // MARK: - Debug (removed - now using print statements)
-    
+        let isEnabled: Bool
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(UUID.self, forKey: .id)
+            text = try container.decode(String.self, forKey: .text)
+            content = try container.decode(String.self, forKey: .content)
+            // Default to true
+            isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        }
+    }    
     // MARK: - Vietnamese Toggle
     
     func toggleVietnamese() {

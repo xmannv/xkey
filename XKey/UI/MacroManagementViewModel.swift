@@ -17,11 +17,22 @@ struct MacroItem: Identifiable, Codable {
     let id: UUID
     let text: String
     let content: String
+    var isEnabled: Bool
     
-    init(id: UUID = UUID(), text: String, content: String) {
+    init(id: UUID = UUID(), text: String, content: String, isEnabled: Bool = true) {
         self.id = id
         self.text = text
         self.content = content
+        self.isEnabled = isEnabled
+    }
+    
+    // Custom decoding to handle backward compatibility (old data without isEnabled)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        text = try container.decode(String.self, forKey: .text)
+        content = try container.decode(String.self, forKey: .content)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 }
 
@@ -59,12 +70,17 @@ class MacroManagementViewModel: ObservableObject {
            let decoded = try? JSONDecoder().decode([MacroItem].self, from: data) {
             macros = decoded
             
-            // Sync to MacroManager (if available)
-            if let manager = getMacroManager() {
-                for macro in macros {
-                    _ = manager.addMacro(text: macro.text, content: macro.content)
-                }
-            }
+            // Sync only enabled macros to MacroManager
+            syncEnabledMacrosToEngine()
+        }
+    }
+    
+    /// Sync only enabled macros to MacroManager (engine core)
+    private func syncEnabledMacrosToEngine() {
+        guard let manager = getMacroManager() else { return }
+        manager.clearAll()
+        for macro in macros where macro.isEnabled {
+            _ = manager.addMacro(text: macro.text, content: macro.content)
         }
     }
     
@@ -110,7 +126,7 @@ class MacroManagementViewModel: ObservableObject {
         
         // Find and update the macro
         if let index = macros.firstIndex(where: { $0.id == macro.id }) {
-            macros[index] = MacroItem(id: macro.id, text: newText, content: newContent)
+            macros[index] = MacroItem(id: macro.id, text: newText, content: newContent, isEnabled: macro.isEnabled)
             macros.sort { $0.text < $1.text }
             
             // Save to plist first
@@ -135,6 +151,36 @@ class MacroManagementViewModel: ObservableObject {
         
         // Always post notification to ensure engine reloads macros
         log("   📢 Posting macrosDidChange notification...")
+        NotificationCenter.default.post(name: .macrosDidChange, object: nil)
+    }
+    
+    func toggleMacro(_ macro: MacroItem) {
+        log("toggleMacro called: '\(macro.text)' → \(!macro.isEnabled)")
+        if let index = macros.firstIndex(where: { $0.id == macro.id }) {
+            macros[index].isEnabled.toggle()
+            
+            saveMacros()
+            
+            log("   📢 Posting macrosDidChange notification...")
+            NotificationCenter.default.post(name: .macrosDidChange, object: nil)
+        }
+    }
+    
+    func enableAllMacros() {
+        log("enableAllMacros called")
+        for index in macros.indices {
+            macros[index].isEnabled = true
+        }
+        saveMacros()
+        NotificationCenter.default.post(name: .macrosDidChange, object: nil)
+    }
+    
+    func disableAllMacros() {
+        log("disableAllMacros called")
+        for index in macros.indices {
+            macros[index].isEnabled = false
+        }
+        saveMacros()
         NotificationCenter.default.post(name: .macrosDidChange, object: nil)
     }
     

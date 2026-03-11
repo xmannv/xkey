@@ -8,13 +8,13 @@
 import SwiftUI
 
 enum DonationMethod: String, CaseIterable {
-    case momo = "Momo"
     case bank = "Bank"
+    case momo = "Momo"
 }
 
 struct DonationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedMethod: DonationMethod = .momo
+    @State private var selectedMethod: DonationMethod = .bank
     @State private var isLoadingQR = false
     
     var body: some View {
