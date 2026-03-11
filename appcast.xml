@@ -6,25 +6,31 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.20 (Build 20260311)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260311</link>
-      <sparkle:version>20260311</sparkle:version>
-      <sparkle:shortVersionString>1.2.20</sparkle:shortVersionString>
+      <title>Version 1.2.21 (Build 20260311.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260311.1</link>
+      <sparkle:version>20260311.1</sparkle:version>
+      <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Refine Macro UI with toggle and bulk actions</p>
+<p>feat: Add translate-to-source hotkey with glassmorphism result overlay</p>
 <ul>
-<li>Add per-macro enable/disable toggle with visual state feedback</li>
-<li>Add Enable All / Disable All / Clear All bulk action buttons</li>
-<li>Add confirmation dialog for Clear All action</li>
-<li>Improve macro row layout with toggle switch and opacity states</li>
-<li>Bump version</li>
+<li>Add new hotkey to translate selected text back to source language</li>
+<li>Create TranslationResultOverlay with glassmorphism UI (ultraThinMaterial)</li>
+<li>Overlay features: copy button, font size +/- controls, close button</li>
+<li>Draggable header and resizable window (min 200x80, max 600x500)</li>
+<li>Configurable auto-hide timer with countdown progress bar (0 = no auto-hide)</li>
+<li>Fade in/out animations, screen bounds clamping</li>
+<li>Add translateToSourceHotkey and translationResultAutoHideSeconds to Preferences</li>
+<li>Add corresponding keys and computed properties to SharedSettings</li>
+<li>Add hotkey detection in EventTapManager</li>
+<li>Update TranslationSection UI with new hotkey recorder and auto-hide input</li>
+<li>Update README.md to document new translation features</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.20-20260311">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260311.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 11 Mar 2026 05:45:02 +0000</pubDate>
+      <pubDate>Wed, 11 Mar 2026 06:47:05 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.20-20260311/XKey.dmg" sparkle:version="20260311" sparkle:shortVersionString="1.2.20" length="11592559" type="application/octet-stream" sparkle:edSignature="DcpGzTHKsxdQiIJJUa+4+1WB6mUljmjdgDcFvGxdREgXXSLsOTYdxxIvd6Mz25VLj8ZnDYVkaWWATaA5YpwXBg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260311.1/XKey.dmg" sparkle:version="20260311.1" sparkle:shortVersionString="1.2.21" length="11676583" type="application/octet-stream" sparkle:edSignature="BPlOjL9KoUXgH8QPNGe1jPXIgcQ0+movf+p8eoO1jJMCodeCIf6D87JHCps4qXJfRFeOeg/bR+wnVvAyPExOCQ==" />
     </item>
   </channel>
 </rss>
