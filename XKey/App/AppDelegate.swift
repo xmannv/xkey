@@ -1975,10 +1975,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
             
             // Update and log injection method if changed
-            if previousMethod.method != injectionInfo.method {
+            // Compare both method AND description because different contexts can use the same method
+            // but with different flags (e.g., Default fast vs Chromium Address Bar fast has different needsEmptyCharPrefix)
+            let methodChanged = previousMethod.method != injectionInfo.method
+                || previousMethod.description != injectionInfo.description
+            if methodChanged {
                 detector.setConfirmedInjectionMethod(injectionInfo)
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) [\(textMethodName)]")
+                let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
+                debugWindowController?.logEvent("   Injection: \(previousMethod.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
             } else {
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged)")
@@ -2095,10 +2100,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
             
             // Update and log injection method if changed
-            if previousMethod.method != injectionInfo.method {
+            // Compare both method AND description because different contexts can use the same method
+            // but with different flags (e.g., Default fast vs Chromium Address Bar fast has different needsEmptyCharPrefix)
+            let methodChanged = previousMethod.method != injectionInfo.method
+                || previousMethod.description != injectionInfo.description
+            if methodChanged {
                 detector.setConfirmedInjectionMethod(injectionInfo)
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                debugWindowController?.logEvent("   Injection: \(previousMethod.method.rawValue) → \(injectionInfo.method.rawValue) [\(textMethodName)]")
+                let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
+                debugWindowController?.logEvent("   Injection: \(previousMethod.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
             } else {
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged)")

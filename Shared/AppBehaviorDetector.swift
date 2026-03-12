@@ -621,10 +621,42 @@ class AppBehaviorDetector {
     /// This improves performance and avoids AX API timing issues
     private var confirmedInjectionMethod: InjectionMethodInfo?
     
-    /// Set confirmed injection method (call from mouse click handler or app switch)
+    // MARK: - Address Bar Context Cache
+    // When user focuses on a browser address bar (Chromium/Firefox), the injection method
+    // and needsEmptyCharPrefix flag are cached. This is needed because autocomplete suggestions
+    // cause focus to shift away from the address bar (AXTextField → AXWindow/AXStaticText),
+    // which would cause isChromiumAddressBar()/isFirefoxStyleAddressBar() to return false.
+    // The cache is cleared when:
+    // 1. User switches to a different app
+    // 2. User clicks on a different text input (mouse click → setConfirmedInjectionMethod)
+    // 3. Focus moves to a real text input element within the browser (not address bar)
+    
+    /// Cached injection method when in address bar context
+    private var cachedAddressBarInjection: InjectionMethodInfo?
+    /// Bundle ID of the app where address bar was cached
+    private var cachedAddressBarBundleId: String?
+    
+    /// Clear the address bar context cache
+    func clearAddressBarCache() {
+        cachedAddressBarInjection = nil
+        cachedAddressBarBundleId = nil
+    }
+    
+    /// Set confirmed injection method (call from mouse click handler, app switch, or focus change)
     /// - Parameter methodInfo: The injection method to use for subsequent keystrokes
     func setConfirmedInjectionMethod(_ methodInfo: InjectionMethodInfo) {
         confirmedInjectionMethod = methodInfo
+        // Only clear address bar cache if the new confirmed method is NOT an address bar method.
+        // When focus changes TO an address bar, detectInjectionMethod() caches the result,
+        // then setConfirmedInjectionMethod is called. We must NOT clear the cache in this case.
+        // Cache is still cleared when:
+        // - User clicks on non-address-bar element (mouse click handler)
+        // - User switches apps
+        // - detectInjectionMethod() detects focus on new text input that's not an address bar
+        let isAddressBarMethod = methodInfo.description.contains("Address Bar")
+        if !isAddressBarMethod {
+            clearAddressBarCache()
+        }
     }
     
     /// Get confirmed injection method, or detect if not set
@@ -1028,6 +1060,29 @@ class AppBehaviorDetector {
         }
         
         return false
+    }
+    
+    /// Create InjectionMethodInfo for browser address bars (Chromium/Firefox) with caching.
+    /// Both browser families use the same injection strategy: .fast + emptyCharPrefix to break autocomplete.
+    /// The result is cached to persist through transient focus shifts caused by autocomplete popups.
+    /// - Parameters:
+    ///   - browserType: Display name for the browser family (e.g., "Chromium", "Firefox")
+    ///   - bundleId: The browser app's bundle identifier for cache keying
+    /// - Returns: InjectionMethodInfo configured for address bar input
+    private func makeAddressBarInjection(browserType: String, bundleId: String) -> InjectionMethodInfo {
+        let info = InjectionMethodInfo(
+            method: .fast,
+            delays: InjectionMethod.fast.defaultDelays,
+            textSendingMethod: .chunked,
+            description: "\(browserType) Address Bar",
+            needsEmptyCharPrefix: true
+        )
+        // Cache: Autocomplete causes focus shift away from address bar
+        // (AXTextField → AXWindow/AXStaticText). Cache the injection method
+        // so it persists through these transient focus changes.
+        cachedAddressBarInjection = info
+        cachedAddressBarBundleId = bundleId
+        return info
     }
     
     /// Check if focused element is Dia Browser's address bar (Command Bar)
@@ -1675,13 +1730,10 @@ class AppBehaviorDetector {
             }
             
             // Chromium address bar (Chrome, Edge, Brave, etc.)
+            // Use .fast + emptyCharPrefix to break autocomplete
+            // Selection method (Shift+Left) causes race conditions with browser autocomplete
             if isChromiumAddressBar() {
-                return InjectionMethodInfo(
-                    method: .selection,
-                    delays: InjectionMethod.selection.defaultDelays,
-                    textSendingMethod: .chunked,
-                    description: "Chromium Address Bar"
-                )
+                return makeAddressBarInjection(browserType: "Chromium", bundleId: bundleId)
             }
             
             // Dia Browser address bar (AX Identifier: commandBarTextField)
@@ -1696,16 +1748,32 @@ class AppBehaviorDetector {
             
             // Firefox-based browsers address bar (AXDOMIdentifier: "urlbar-input")
             // Use .fast + emptyCharPrefix to break autocomplete
-            // AX Direct was failing (no selected text range) and proxy fallback caused "diịch" bug
             if Self.firefoxBasedBrowsers.contains(bundleId) && isFirefoxStyleAddressBar() {
-                return InjectionMethodInfo(
-                    method: .fast,
-                    delays: InjectionMethod.fast.defaultDelays,
-                    textSendingMethod: .chunked,
-                    description: "Firefox Address Bar",
-                    needsEmptyCharPrefix: true
-                )
+                return makeAddressBarInjection(browserType: "Firefox", bundleId: bundleId)
             }
+            
+            // Check address bar cache: If user was in a browser address bar and
+            // focus shifted to a non-text-input element (autocomplete popup etc.),
+            // keep using the cached address bar injection method.
+            // This handles Chromium/Firefox autocomplete causing AXTextField → AXWindow shift.
+            if let cached = cachedAddressBarInjection,
+               cachedAddressBarBundleId == bundleId {
+                // Focus shifted but still in same browser - check if it's an autocomplete artifact
+                let isTextInput = currentRole == "AXTextField" || currentRole == "AXTextArea"
+                    || currentRole == "AXComboBox" || currentRole == "AXSearchField"
+                if !isTextInput {
+                    // Non-text-input focus (AXWindow, AXStaticText, AXGroup, AXList etc.)
+                    // This is likely an autocomplete popup - keep cached address bar method
+                    return cached
+                } else {
+                    // Focused on a new text input that's NOT the address bar
+                    // User navigated away from address bar - clear cache
+                    clearAddressBarCache()
+                }
+            }
+        } else {
+            // Different app type - clear address bar cache
+            clearAddressBarCache()
         }
 
         // Priority 1: Check Window Title Rules for context-specific injection method (merged cascade)
