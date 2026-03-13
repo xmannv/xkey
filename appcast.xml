@@ -6,27 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260313)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313</link>
-      <sparkle:version>20260313</sparkle:version>
+      <title>Version 1.2.21 (Build 20260313.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313.1</link>
+      <sparkle:version>20260313.1</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: per-direction translation settings & fix popup focus</p>
+<p>feat: add auto-check for updates toggle in Appearance settings</p>
 <ul>
-<li>Rename sections: 'Dịch & thay thế text' / 'Dịch & xem nghĩa' → 'Dịch sang ngôn ngữ đích' / 'Dịch sang ngôn ngữ nguồn'</li>
-<li>Add per-direction options: replace, copy, show popup, auto-hide for each direction</li>
-<li>Extract shared TranslationDirectionOptions component to eliminate duplicate UI code</li>
-<li>Extract shared handleTranslationResult() in AppDelegate for reusable translation logic</li>
-<li>Add new settings keys: translationShowPopup, translateToSourceReplaceOriginal, translateToSourceCopyToClipboard, translateToSourceShowPopup, translateToSourceAutoHideSeconds</li>
-<li>Fix popup stealing focus: change NSWindow → NSPanel with .nonactivatingPanel</li>
-<li>Update README.md to reflect new per-direction translation settings</li>
+<li>Add autoCheckForUpdates property to Preferences model (default: true)</li>
+<li>Add SharedSettings key, accessor with default-true logic, load/save support</li>
+<li>Update AppDelegate to sync Sparkle updater.automaticallyChecksForUpdates</li>
+<li>Add toggle in Appearance > Khởi động section</li>
+<li>Manual check for updates remains available regardless of toggle state</li>
+<li>Bump version to 1.2.21 (20260313.1)</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 13 Mar 2026 08:13:58 +0000</pubDate>
+      <pubDate>Fri, 13 Mar 2026 13:13:04 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260313/XKey.dmg" sparkle:version="20260313" sparkle:shortVersionString="1.2.21" length="11712039" type="application/octet-stream" sparkle:edSignature="ljztNFpufvrZ3RCnV+QGaP0c/OpzZzbi1KtHYpORI1KCouSmT5NIqOFLAX6nTgItDinIjUxFhEuWSZJdldtmBg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260313.1/XKey.dmg" sparkle:version="20260313.1" sparkle:shortVersionString="1.2.21" length="11714679" type="application/octet-stream" sparkle:edSignature="sQCx+C8eFq2yGmqZVWGzVCdTaEonvQ/oD9vHQCA+6HeA1UadOPzoeCHvIEtUq9kMHD+TzNn5OS+fDWR/YDSZAw==" />
     </item>
   </channel>
 </rss>
