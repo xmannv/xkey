@@ -71,6 +71,7 @@ struct Preferences: Codable {
     var showDockIcon: Bool = false               // Show icon in Dock (menu bar always visible)
     var startAtLogin: Bool = false
     var menuBarIconStyle: MenuBarIconStyle = .x  // Icon style for menubar
+    var autoCheckForUpdates: Bool = true
     
     // Excluded apps - apps where Vietnamese input is disabled
     var excludedApps: [ExcludedApp] = []

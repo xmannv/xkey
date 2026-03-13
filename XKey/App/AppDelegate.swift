@@ -714,6 +714,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update menu bar icon style
         statusBarManager?.updateMenuBarIconStyle(preferences.menuBarIconStyle)
         
+        // Update auto-check for updates setting
+        updaterController?.updater.automaticallyChecksForUpdates = preferences.autoCheckForUpdates
+        
         // Update Dock icon visibility
         updateDockIconVisibility(show: preferences.showDockIcon)
         
@@ -1751,19 +1754,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugWindowController?.logEvent("   Auto-check: \(Bundle.main.object(forInfoDictionaryKey: "SUEnableAutomaticChecks") as? Bool ?? false)")
         debugWindowController?.logEvent("   Update delegate: SparkleUpdateDelegate (settings will be saved before restart)")
         
+        // Apply auto-check setting from preferences
+        let autoCheckEnabled = SharedSettings.shared.autoCheckForUpdates
+        updaterController?.updater.automaticallyChecksForUpdates = autoCheckEnabled
+        debugWindowController?.logEvent("   Auto-check (user setting): \(autoCheckEnabled)")
+        
         // Check for updates immediately on app launch (silently in background)
-        // This ensures updates are always checked at startup, not just on schedule
-        // The dialog will only appear if a new update is found
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let updater = self?.updaterController?.updater else { return }
-            
-            // Use background check - won't show UI if no update available
-            if updater.canCheckForUpdates {
-                self?.debugWindowController?.logEvent("Checking for updates in background (startup check)...")
-                updater.checkForUpdatesInBackground()
-            } else {
-                self?.debugWindowController?.logEvent("Skipping startup update check (already checking or in progress)")
+        // Only if auto-check is enabled
+        if autoCheckEnabled {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                guard let updater = self?.updaterController?.updater else { return }
+                
+                // Use background check - won't show UI if no update available
+                if updater.canCheckForUpdates {
+                    self?.debugWindowController?.logEvent("Checking for updates in background (startup check)...")
+                    updater.checkForUpdatesInBackground()
+                } else {
+                    self?.debugWindowController?.logEvent("Skipping startup update check (already checking or in progress)")
+                }
             }
+        } else {
+            debugWindowController?.logEvent("Skipping startup update check (auto-check disabled by user)")
         }
     }
 

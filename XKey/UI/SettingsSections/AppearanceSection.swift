@@ -45,6 +45,7 @@ struct AppearanceSection: View {
                 
                 SettingsGroup(title: "Khởi động") {
                     Toggle("Khởi động cùng hệ thống", isOn: $viewModel.preferences.startAtLogin)
+                    Toggle("Tự động kiểm tra bản cập nhật", isOn: $viewModel.preferences.autoCheckForUpdates)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
