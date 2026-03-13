@@ -96,9 +96,15 @@ enum SharedSettingsKey: String {
     case translationSourceLanguage = "XKey.translationSourceLanguage"
     case translationTargetLanguage = "XKey.translationTargetLanguage"
     case translationReplaceOriginal = "XKey.translationReplaceOriginal"
+    case translationCopyToClipboard = "XKey.translationCopyToClipboard"
+    case translationShowPopup = "XKey.translationShowPopup"                            // Show popup for target direction
     case translationToolbarEnabled = "XKey.translationToolbarEnabled"
     case translateToSourceHotkeyCode = "XKey.translateToSourceHotkeyCode"
     case translateToSourceHotkeyModifiers = "XKey.translateToSourceHotkeyModifiers"
+    case translateToSourceReplaceOriginal = "XKey.translateToSourceReplaceOriginal"    // Replace text for source direction
+    case translateToSourceCopyToClipboard = "XKey.translateToSourceCopyToClipboard"    // Copy to clipboard for source direction
+    case translateToSourceShowPopup = "XKey.translateToSourceShowPopup"                // Show popup for source direction
+    case translateToSourceAutoHideSeconds = "XKey.translateToSourceAutoHideSeconds"    // Auto-hide seconds for source popup
     case translationResultAutoHideSeconds = "XKey.translationResultAutoHideSeconds"
 }
 
@@ -126,7 +132,10 @@ class SharedSettings {
         SharedSettingsKey.quickTelexEnabled.rawValue: false,
         SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
         SharedSettingsKey.freeMarkEnabled.rawValue: false,
-        SharedSettingsKey.imkitUseMarkedText.rawValue: true
+        SharedSettingsKey.imkitUseMarkedText.rawValue: true,
+        SharedSettingsKey.translationCopyToClipboard.rawValue: true,
+        SharedSettingsKey.translateToSourceShowPopup.rawValue: true,
+        SharedSettingsKey.translateToSourceAutoHideSeconds.rawValue: 4
     ]
     
     /// Cache of plist URL (computed once)
@@ -606,6 +615,36 @@ class SharedSettings {
         set { writeBool(newValue, forKey: SharedSettingsKey.translationReplaceOriginal.rawValue) }
     }
 
+    var translationCopyToClipboard: Bool {
+        get { readBool(forKey: SharedSettingsKey.translationCopyToClipboard.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translationCopyToClipboard.rawValue) }
+    }
+
+    var translationShowPopup: Bool {
+        get { readBool(forKey: SharedSettingsKey.translationShowPopup.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translationShowPopup.rawValue) }
+    }
+
+    var translateToSourceReplaceOriginal: Bool {
+        get { readBool(forKey: SharedSettingsKey.translateToSourceReplaceOriginal.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translateToSourceReplaceOriginal.rawValue) }
+    }
+
+    var translateToSourceCopyToClipboard: Bool {
+        get { readBool(forKey: SharedSettingsKey.translateToSourceCopyToClipboard.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translateToSourceCopyToClipboard.rawValue) }
+    }
+
+    var translateToSourceShowPopup: Bool {
+        get { readBool(forKey: SharedSettingsKey.translateToSourceShowPopup.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.translateToSourceShowPopup.rawValue) }
+    }
+
+    var translateToSourceAutoHideSeconds: Int {
+        get { readInt(forKey: SharedSettingsKey.translateToSourceAutoHideSeconds.rawValue) }
+        set { writeInt(newValue, forKey: SharedSettingsKey.translateToSourceAutoHideSeconds.rawValue) }
+    }
+
     var translationToolbarEnabled: Bool {
         get {
             // Default is true (as defined in Preferences.swift)
@@ -1019,6 +1058,8 @@ class SharedSettings {
         prefs.translationSourceLanguageCode = translationSourceLanguage
         prefs.translationTargetLanguageCode = translationTargetLanguage
         prefs.translationReplaceOriginal = translationReplaceOriginal
+        prefs.translationCopyToClipboard = translationCopyToClipboard
+        prefs.translationShowPopup = translationShowPopup
         prefs.translationToolbarEnabled = translationToolbarEnabled
         let transToSrcHotkeyCode = translateToSourceHotkeyCode
         let transToSrcHotkeyModifiers = translateToSourceHotkeyModifiers
@@ -1028,6 +1069,10 @@ class SharedSettings {
                 modifiers: ModifierFlags(rawValue: transToSrcHotkeyModifiers)
             )
         }
+        prefs.translateToSourceReplaceOriginal = translateToSourceReplaceOriginal
+        prefs.translateToSourceCopyToClipboard = translateToSourceCopyToClipboard
+        prefs.translateToSourceShowPopup = translateToSourceShowPopup
+        prefs.translateToSourceAutoHideSeconds = translateToSourceAutoHideSeconds
         prefs.translationResultAutoHideSeconds = translationResultAutoHideSeconds
 
         // Debug settings
@@ -1141,9 +1186,15 @@ class SharedSettings {
         translationSourceLanguage = prefs.translationSourceLanguageCode
         translationTargetLanguage = prefs.translationTargetLanguageCode
         translationReplaceOriginal = prefs.translationReplaceOriginal
+        translationCopyToClipboard = prefs.translationCopyToClipboard
+        translationShowPopup = prefs.translationShowPopup
         translationToolbarEnabled = prefs.translationToolbarEnabled
         translateToSourceHotkeyCode = prefs.translateToSourceHotkey.keyCode
         translateToSourceHotkeyModifiers = prefs.translateToSourceHotkey.modifiers.rawValue
+        translateToSourceReplaceOriginal = prefs.translateToSourceReplaceOriginal
+        translateToSourceCopyToClipboard = prefs.translateToSourceCopyToClipboard
+        translateToSourceShowPopup = prefs.translateToSourceShowPopup
+        translateToSourceAutoHideSeconds = prefs.translateToSourceAutoHideSeconds
         translationResultAutoHideSeconds = prefs.translationResultAutoHideSeconds
 
         // Batch update is done - settings are already written to plist via setters

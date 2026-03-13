@@ -158,6 +158,14 @@ class TranslationService {
                     from: sourceLanguageCode,
                     to: targetLanguageCode
                 )
+                
+                // Validate: provider returned non-empty translation
+                if result.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    log("Provider \(provider.name) returned empty translation, trying next provider")
+                    lastError = TranslationError.invalidResponse
+                    continue
+                }
+                
                 log("Translation successful via \(provider.name): '\(result.translatedText.prefix(50))...'")
                 return result
             } catch {

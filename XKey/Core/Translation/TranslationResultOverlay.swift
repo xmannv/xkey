@@ -14,7 +14,7 @@ class TranslationResultOverlay {
     
     static let shared = TranslationResultOverlay()
     
-    private var window: NSWindow?
+    private var panel: NSPanel?
     private var isShowing = false
     private let lock = NSLock()
     private var autoHideTimer: DispatchWorkItem?
@@ -85,13 +85,13 @@ class TranslationResultOverlay {
         removeMonitors()
         
         // Fade out animation
-        if let w = window {
+        if let p = panel {
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.15
-                w.animator().alphaValue = 0
+                p.animator().alphaValue = 0
             }, completionHandler: { [weak self] in
-                w.orderOut(nil)
-                self?.window = nil
+                p.orderOut(nil)
+                self?.panel = nil
             })
         }
     }
@@ -99,8 +99,8 @@ class TranslationResultOverlay {
     private func createAndShowWindow(text: String, autoHideSeconds: Int) {
         // Dismiss any existing window immediately
         removeMonitors()
-        window?.orderOut(nil)
-        window = nil
+        panel?.orderOut(nil)
+        panel = nil
         
         let mouseLocation = NSEvent.mouseLocation
         
@@ -141,33 +141,36 @@ class TranslationResultOverlay {
             }
         }
         
-        let newWindow = NSWindow(
+        // Use NSPanel with .nonactivatingPanel to prevent stealing focus from the active app
+        let newPanel = NSPanel(
             contentRect: NSRect(origin: NSPoint(x: originX, y: originY), size: contentSize),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
         
-        newWindow.isOpaque = false
-        newWindow.backgroundColor = .clear
-        newWindow.hasShadow = true
-        newWindow.level = .floating
-        newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
-        newWindow.ignoresMouseEvents = false
-        newWindow.isMovableByWindowBackground = true
-        newWindow.minSize = NSSize(width: 200, height: 80)
-        newWindow.maxSize = NSSize(width: 600, height: 500)
-        newWindow.contentView = hostingView
+        newPanel.isOpaque = false
+        newPanel.backgroundColor = .clear
+        newPanel.hasShadow = true
+        newPanel.level = .floating
+        newPanel.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        newPanel.ignoresMouseEvents = false
+        newPanel.isMovableByWindowBackground = true
+        newPanel.hidesOnDeactivate = false
+        newPanel.becomesKeyOnlyIfNeeded = true
+        newPanel.minSize = NSSize(width: 200, height: 80)
+        newPanel.maxSize = NSSize(width: 600, height: 500)
+        newPanel.contentView = hostingView
         
-        // Fade in
-        newWindow.alphaValue = 0
-        newWindow.orderFront(nil)
+        // Fade in — use orderFrontRegardless to show without activating
+        newPanel.alphaValue = 0
+        newPanel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
-            newWindow.animator().alphaValue = 1
+            newPanel.animator().alphaValue = 1
         }
         
-        self.window = newWindow
+        self.panel = newPanel
         self.isShowing = true
         
         // Setup click-outside-to-dismiss monitor

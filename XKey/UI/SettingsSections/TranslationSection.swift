@@ -34,46 +34,6 @@ struct TranslationSection: View {
                 }
                 
                 if viewModel.preferences.translationEnabled {
-                    // Hotkey Settings
-                    SettingsGroup(title: "Phím tắt") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Dịch text về ngôn ngữ đích:")
-                                Spacer()
-                                HotkeyRecorderView(hotkey: $viewModel.preferences.translationHotkey, minimumModifiers: 2)
-                                    .frame(width: 150)
-                            }
-
-                            HStack {
-                                Text("Dịch text về ngôn ngữ nguồn:")
-                                Spacer()
-                                HotkeyRecorderView(hotkey: $viewModel.preferences.translateToSourceHotkey, minimumModifiers: 2)
-                                    .frame(width: 150)
-                            }
-
-                            Divider()
-
-                            HStack {
-                                Text("Thời gian tự ẩn kết quả dịch:")
-                                Spacer()
-                                TextField("", value: $viewModel.preferences.translationResultAutoHideSeconds, format: .number)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 50)
-                                    .multilineTextAlignment(.center)
-                                Text("giây")
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Text("Bằng 0 = không tự ẩn, click bên ngoài để ẩn")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text("Chọn text và nhấn phím tắt để dịch. Nếu không chọn text, sẽ dịch toàn bộ nội dung.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
                     // Language Settings
                     SettingsGroup(title: "Ngôn ngữ") {
                         VStack(alignment: .leading, spacing: 16) {
@@ -173,14 +133,6 @@ struct TranslationSection: View {
                             }
                             .font(.caption)
                             
-                            Toggle("Thay thế text gốc bằng bản dịch", isOn: $viewModel.preferences.translationReplaceOriginal)
-                            
-                            if !viewModel.preferences.translationReplaceOriginal {
-                                Text("Bản dịch sẽ được copy vào clipboard")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
                             Divider()
                                 .padding(.vertical, 4)
                             
@@ -193,6 +145,56 @@ struct TranslationSection: View {
                             Text("Khi focus vào ô nhập liệu, thanh công cụ nhỏ sẽ hiện ra cho phép bạn đổi ngôn ngữ nguồn/đích nhanh chóng mà không cần mở Thiết lập.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // Feature 1: Translate to Target Language
+                    SettingsGroup(title: "🌐 Dịch sang ngôn ngữ đích") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Dịch text đang chọn từ ngôn ngữ nguồn sang ngôn ngữ đích. Nếu không chọn text, sẽ dịch toàn bộ nội dung.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            HStack {
+                                Text("Phím tắt:")
+                                Spacer()
+                                HotkeyRecorderView(hotkey: $viewModel.preferences.translationHotkey, minimumModifiers: 2)
+                                    .frame(width: 150)
+                            }
+                            
+                            Divider()
+                            
+                            TranslationDirectionOptions(
+                                replaceOriginal: $viewModel.preferences.translationReplaceOriginal,
+                                copyToClipboard: $viewModel.preferences.translationCopyToClipboard,
+                                showPopup: $viewModel.preferences.translationShowPopup,
+                                autoHideSeconds: $viewModel.preferences.translationResultAutoHideSeconds
+                            )
+                        }
+                    }
+                    
+                    // Feature 2: Translate to Source Language (reverse direction)
+                    SettingsGroup(title: "🔄 Dịch sang ngôn ngữ nguồn") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Dịch ngược text đang chọn từ ngôn ngữ đích sang ngôn ngữ nguồn. Text gốc được giữ nguyên theo mặc định.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            HStack {
+                                Text("Phím tắt:")
+                                Spacer()
+                                HotkeyRecorderView(hotkey: $viewModel.preferences.translateToSourceHotkey, minimumModifiers: 2)
+                                    .frame(width: 150)
+                            }
+                            
+                            Divider()
+                            
+                            TranslationDirectionOptions(
+                                replaceOriginal: $viewModel.preferences.translateToSourceReplaceOriginal,
+                                copyToClipboard: $viewModel.preferences.translateToSourceCopyToClipboard,
+                                showPopup: $viewModel.preferences.translateToSourceShowPopup,
+                                autoHideSeconds: $viewModel.preferences.translateToSourceAutoHideSeconds
+                            )
                         }
                     }
                     
@@ -347,6 +349,55 @@ struct CustomLanguageInputView: View {
         }
         .padding(24)
         .frame(width: 400)
+    }
+}
+
+// MARK: - Translation Direction Options (reusable component)
+
+@available(macOS 13.0, *)
+private struct TranslationDirectionOptions: View {
+    @Binding var replaceOriginal: Bool
+    @Binding var copyToClipboard: Bool
+    @Binding var showPopup: Bool
+    @Binding var autoHideSeconds: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Thay thế text gốc bằng bản dịch", isOn: $replaceOriginal)
+            
+            Text("Text đang chọn sẽ bị thay thế bằng bản dịch trong ô nhập liệu.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Toggle("Tự động copy bản dịch vào clipboard", isOn: $copyToClipboard)
+            
+            Text("Bản dịch sẽ được copy vào clipboard để bạn có thể dán (paste) ở nơi khác.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Toggle("Hiển thị popup kết quả dịch", isOn: $showPopup)
+            
+            Text("Hiển thị bản dịch trong popup overlay — không thay đổi nội dung gốc.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            if showPopup {
+                HStack {
+                    Text("Tự ẩn popup sau:")
+                    Spacer()
+                    TextField("", value: $autoHideSeconds, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 50)
+                        .multilineTextAlignment(.center)
+                    Text("giây")
+                        .foregroundStyle(.secondary)
+                }
+                
+                Text("Bằng 0 = không tự ẩn, click bên ngoài để ẩn")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 }
 
