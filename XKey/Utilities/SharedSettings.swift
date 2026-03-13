@@ -73,6 +73,7 @@ enum SharedSettingsKey: String {
     case showDockIcon = "XKey.showDockIcon"
     case startAtLogin = "XKey.startAtLogin"
     case menuBarIconStyle = "XKey.menuBarIconStyle"
+    case autoCheckForUpdates = "XKey.autoCheckForUpdates"
 
     // Excluded apps
     case excludedApps = "XKey.excludedApps"
@@ -574,6 +575,18 @@ class SharedSettings {
         set { writeString(newValue, forKey: SharedSettingsKey.menuBarIconStyle.rawValue) }
     }
 
+    var autoCheckForUpdates: Bool {
+        get {
+            let dict = readPlistDict()
+            // Default to true if key not found
+            if let value = dict[SharedSettingsKey.autoCheckForUpdates.rawValue] as? Bool {
+                return value
+            }
+            return true
+        }
+        set { writeBool(newValue, forKey: SharedSettingsKey.autoCheckForUpdates.rawValue) }
+    }
+
     // MARK: - Translation Settings
 
     var translationEnabled: Bool {
@@ -1037,6 +1050,7 @@ class SharedSettings {
         if let style = MenuBarIconStyle(rawValue: menuBarIconStyle) {
             prefs.menuBarIconStyle = style
         }
+        prefs.autoCheckForUpdates = autoCheckForUpdates
 
         // Excluded apps
         if let data = getExcludedApps(),
@@ -1173,6 +1187,7 @@ class SharedSettings {
         showDockIcon = prefs.showDockIcon
         startAtLogin = prefs.startAtLogin
         menuBarIconStyle = prefs.menuBarIconStyle.rawValue
+        autoCheckForUpdates = prefs.autoCheckForUpdates
 
         // Excluded apps
         if let data = try? JSONEncoder().encode(prefs.excludedApps) {
