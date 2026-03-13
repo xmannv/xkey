@@ -80,9 +80,15 @@ struct Preferences: Codable {
     var translationHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .shift])  // Default: Cmd+Shift+T
     var translationSourceLanguageCode: String = "auto"     // ISO 639-1 code
     var translationTargetLanguageCode: String = "vi"       // ISO 639-1 code
-    var translationReplaceOriginal: Bool = true  // Replace selected text with translation
+    var translationReplaceOriginal: Bool = true  // Replace selected text with translation (target direction)
+    var translationCopyToClipboard: Bool = true  // Auto copy translation to clipboard (target direction)
+    var translationShowPopup: Bool = false        // Show popup overlay (target direction)
     var translationToolbarEnabled: Bool = true   // Show floating toolbar for quick language selection
     var translateToSourceHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
+    var translateToSourceReplaceOriginal: Bool = false  // Replace text (source direction, default off)
+    var translateToSourceCopyToClipboard: Bool = false  // Copy to clipboard (source direction, default off)
+    var translateToSourceShowPopup: Bool = true         // Show popup overlay (source direction, default on)
+    var translateToSourceAutoHideSeconds: Int = 4      // Auto-hide seconds for source popup
     var translationResultAutoHideSeconds: Int = 4  // 0 = don't auto-hide, click outside to dismiss
     
     /// Get source language as TranslationLanguage object

@@ -2369,7 +2369,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get selected text or full value via AX (with source info)
         guard let textResult = service.getSelectedTextWithSource(), !textResult.text.isEmpty else {
             debugWindowController?.logEvent("   No text to translate")
-            // Show notification to user
             showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
             return
         }
@@ -2392,7 +2391,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 
                 await MainActor.run {
-                    // Hide loading overlay
                     TranslationLoadingOverlay.shared.hide()
                     
                     // Preserve case pattern from original text
@@ -2400,46 +2398,109 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     debugWindowController?.logEvent("   Translated: \"\(result.translatedText.prefix(50))...\"")
                     debugWindowController?.logEvent("   Case preserved: \"\(finalText.prefix(50))...\"")
                     
-                    if preferences.translationReplaceOriginal {
-                        // Replace selected text with translation
-                        // Use selectAllBeforePaste when text was from full value (no selection)
-                        if service.replaceSelectedText(with: finalText, selectAllBeforePaste: needsSelectAll) {
-                            debugWindowController?.logEvent("   Replaced original text (selectAll: \(needsSelectAll))")
-                        } else {
-                            // Fallback: copy to clipboard
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(finalText, forType: .string)
-                            debugWindowController?.logEvent("   Could not replace, copied to clipboard")
-                            showTranslationNotification(message: "Đã copy bản dịch vào clipboard")
-                        }
-                    } else {
-                        // Copy to clipboard
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(finalText, forType: .string)
-                        debugWindowController?.logEvent("   Copied to clipboard")
-                        showTranslationNotification(message: "Đã copy bản dịch vào clipboard")
-                    }
+                    // Use shared handler with per-direction settings
+                    handleTranslationResult(
+                        translatedText: finalText,
+                        needsSelectAll: needsSelectAll,
+                        shouldReplace: preferences.translationReplaceOriginal,
+                        shouldCopy: preferences.translationCopyToClipboard,
+                        shouldShowPopup: preferences.translationShowPopup,
+                        autoHideSeconds: preferences.translationResultAutoHideSeconds,
+                        logPrefix: "Translation"
+                    )
                 }
             } catch {
                 await MainActor.run {
-                    // Hide loading overlay on error
                     TranslationLoadingOverlay.shared.hide()
-                    
-                    debugWindowController?.logEvent("   Translation failed: \(error.localizedDescription)")
-                    showTranslationNotification(message: "Lỗi dịch: \(error.localizedDescription)")
+                    let message = self.translationErrorMessage(for: error)
+                    self.debugWindowController?.logEvent("   Translation failed: \(error.localizedDescription)")
+                    self.showTranslationNotification(message: message)
                 }
             }
         }
     }
     
+    /// Shared handler for translation results — used by both target and source direction
+    private func handleTranslationResult(
+        translatedText: String,
+        needsSelectAll: Bool,
+        shouldReplace: Bool,
+        shouldCopy: Bool,
+        shouldShowPopup: Bool,
+        autoHideSeconds: Int,
+        logPrefix: String
+    ) {
+        let service = TranslationService.shared
+        
+        // 1. Replace original text if enabled
+        var replaceSucceeded = false
+        if shouldReplace {
+            if service.replaceSelectedText(with: translatedText, selectAllBeforePaste: needsSelectAll) {
+                debugWindowController?.logEvent("   [\(logPrefix)] Replaced original text (selectAll: \(needsSelectAll))")
+                replaceSucceeded = true
+            } else {
+                debugWindowController?.logEvent("   [\(logPrefix)] Could not replace text in this application")
+                showTranslationNotification(message: "Không thể thay thế text trong ứng dụng này")
+            }
+        }
+        
+        // 2. Copy to clipboard if enabled (independent of replace)
+        if shouldCopy {
+            if replaceSucceeded {
+                // replaceViaClipboardPaste restores old clipboard after 0.5s
+                // We need to set clipboard AFTER that restore completes
+                let textToCopy = translatedText
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(textToCopy, forType: .string)
+                }
+                debugWindowController?.logEvent("   [\(logPrefix)] Will copy to clipboard after replace (delayed)")
+            } else {
+                // No replace or replace failed - copy immediately
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(translatedText, forType: .string)
+                debugWindowController?.logEvent("   [\(logPrefix)] Copied to clipboard")
+                TranslationLoadingOverlay.shared.showBrief(message: "Copied")
+            }
+        }
+        
+        // 3. Show popup overlay if enabled
+        if shouldShowPopup {
+            TranslationResultOverlay.shared.show(text: translatedText, autoHideSeconds: autoHideSeconds)
+            debugWindowController?.logEvent("   [\(logPrefix)] Showing popup (autoHide: \(autoHideSeconds)s)")
+        }
+    }
+    
     /// Show a brief notification to user about translation result
     private func showTranslationNotification(message: String) {
-        // Use NSUserNotification or a simple overlay
-        // For now, just use status bar tooltip update
         DispatchQueue.main.async {
-            // Simple approach: update status bar tooltip temporarily
-            // Could be enhanced with proper notification banner
+            // Show error/notification message using the translation result overlay
+            TranslationResultOverlay.shared.show(text: message, autoHideSeconds: 5)
             print("[Translation] \(message)")
+        }
+    }
+    
+    /// Convert translation error to user-friendly Vietnamese message
+    private func translationErrorMessage(for error: Error) -> String {
+        guard let translationError = error as? TranslationError else {
+            return "Lỗi dịch: \(error.localizedDescription)"
+        }
+        
+        switch translationError {
+        case .providerDisabled:
+            return "Không có nhà cung cấp dịch nào khả dụng. Vui lòng bật ít nhất một nhà cung cấp trong Thiết lập → Dịch thuật."
+        case .networkError:
+            return "Lỗi kết nối mạng. Vui lòng kiểm tra kết nối Internet."
+        case .rateLimited:
+            return "Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau."
+        case .invalidResponse:
+            return "Nhà cung cấp dịch trả về kết quả không hợp lệ. Vui lòng thử lại."
+        case .emptyText:
+            return "Không có text để dịch."
+        case .unsupportedLanguage:
+            return "Ngôn ngữ này chưa được hỗ trợ bởi nhà cung cấp dịch."
+        case .unknown(let message):
+            return "Lỗi dịch: \(message)"
         }
     }
 
@@ -2476,7 +2537,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     /// Perform translation of selected text back to source language
-    /// Shows result in overlay (does not replace text)
+    /// Uses per-direction settings for replace, copy, and popup behavior
     private func performTranslateToSource() {
         let preferences = SharedSettings.shared.loadPreferences()
         let service = TranslationService.shared
@@ -2491,8 +2552,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let textToTranslate = textResult.text
+        let needsSelectAll = textResult.needsSelectAllForReplace
         
-        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\" (source: \(textResult.source))")
+        debugWindowController?.logEvent("   Text: \"\(textToTranslate.prefix(50))...\" (source: \(textResult.source), needsSelectAll: \(needsSelectAll))")
         
         // Determine languages: translate FROM target TO source (reverse direction)
         let fromLang = preferences.translationTargetLanguage
@@ -2519,23 +2581,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 
                 await MainActor.run {
-                    // Hide loading overlay
                     TranslationLoadingOverlay.shared.hide()
                     
                     let finalText = result.translatedText
                     debugWindowController?.logEvent("   Reverse translated: \"\(finalText.prefix(50))...\"")
                     
-                    // Show result in overlay (don't replace text)
-                    let autoHide = preferences.translationResultAutoHideSeconds
-                    TranslationResultOverlay.shared.show(text: finalText, autoHideSeconds: autoHide)
+                    // Use shared handler with per-direction settings
+                    handleTranslationResult(
+                        translatedText: finalText,
+                        needsSelectAll: needsSelectAll,
+                        shouldReplace: preferences.translateToSourceReplaceOriginal,
+                        shouldCopy: preferences.translateToSourceCopyToClipboard,
+                        shouldShowPopup: preferences.translateToSourceShowPopup,
+                        autoHideSeconds: preferences.translateToSourceAutoHideSeconds,
+                        logPrefix: "Reverse"
+                    )
                 }
             } catch {
                 await MainActor.run {
-                    // Hide loading overlay on error
                     TranslationLoadingOverlay.shared.hide()
-                    
-                    debugWindowController?.logEvent("   Reverse translation failed: \(error.localizedDescription)")
-                    showTranslationNotification(message: "Lỗi dịch: \(error.localizedDescription)")
+                    let message = self.translationErrorMessage(for: error)
+                    self.debugWindowController?.logEvent("   Reverse translation failed: \(error.localizedDescription)")
+                    self.showTranslationNotification(message: message)
                 }
             }
         }

@@ -111,17 +111,66 @@ Truy cập nhanh với phím tắt tùy chỉnh:
 
 ### 9. Dịch thuật nhanh (Translation)
 
-Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh:
+Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh. XKey cung cấp **hai hướng dịch**, mỗi hướng có phím tắt riêng và các tùy chọn **hoạt động độc lập**:
+
+#### 🌐 Dịch sang ngôn ngữ đích
+
+Dịch văn bản đang chọn (hoặc toàn bộ nội dung) **từ ngôn ngữ nguồn sang ngôn ngữ đích**.
+
+**Cách sử dụng:**
+1. Chọn (bôi đen) text cần dịch trong bất kỳ ứng dụng nào
+2. Nhấn phím tắt (mặc định: `⌘ + ⇧ + T`)
+3. Kết quả được xử lý theo các tùy chọn đã bật
+
+> 💡 Nếu không chọn text, XKey sẽ dịch toàn bộ nội dung trong ô nhập liệu.
+
+**Tùy chọn (bật/tắt độc lập):**
+
+| Tùy chọn | Mặc định | Mô tả |
+|-----------|----------|-------|
+| **Thay thế text gốc** | ✅ Bật | Thay thế text đang chọn bằng bản dịch |
+| **Copy vào clipboard** | ✅ Bật | Copy bản dịch vào clipboard để dán ở nơi khác |
+| **Hiển thị popup** | ❌ Tắt | Hiển thị bản dịch trong overlay popup |
+| **Tự ẩn popup** | 4 giây | Thời gian tự ẩn (0 = không tự ẩn, chỉ hiện khi bật popup) |
+
+#### 🔄 Dịch sang ngôn ngữ nguồn
+
+Dịch ngược văn bản **từ ngôn ngữ đích sang ngôn ngữ nguồn** — hữu ích để xem nghĩa hoặc kiểm tra bản dịch.
+
+**Cách sử dụng:**
+1. Chọn text cần dịch ngược
+2. Nhấn phím tắt (cần cấu hình trong Settings)
+3. Kết quả được xử lý theo các tùy chọn đã bật
+
+**Tùy chọn (bật/tắt độc lập):**
+
+| Tùy chọn | Mặc định | Mô tả |
+|-----------|----------|-------|
+| **Thay thế text gốc** | ❌ Tắt | Thay thế text đang chọn bằng bản dịch ngược |
+| **Copy vào clipboard** | ❌ Tắt | Copy bản dịch vào clipboard |
+| **Hiển thị popup** | ✅ Bật | Hiển thị bản dịch trong overlay popup |
+| **Tự ẩn popup** | 4 giây | Thời gian tự ẩn (0 = không tự ẩn, chỉ hiện khi bật popup) |
+
+> 💡 Mỗi tùy chọn hoạt động **hoàn toàn độc lập** — bạn có thể bật đồng thời thay thế text, copy clipboard, và hiển thị popup nếu muốn.
+
+#### Tính năng overlay popup
+
+- 🪟 Glassmorphism UI — nền mờ, tự động phù hợp Light/Dark mode
+- 📋 Nút copy nhanh bản dịch vào clipboard
+- 🔤 Nút tăng/giảm cỡ chữ (+/−) để đọc dễ hơn
+- ↔️ Kéo header để di chuyển overlay, kéo cạnh để resize
+- ⏱️ Thời gian tự ẩn tùy chỉnh riêng cho mỗi hướng dịch
+- 📊 Thanh countdown hiển thị thời gian còn lại
+
+#### Ngôn ngữ hỗ trợ
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| **Dịch về ngôn ngữ đích** | Chọn văn bản và nhấn phím tắt để dịch, tự động thay thế văn bản gốc |
-| **Dịch về ngôn ngữ nguồn** | Phím tắt riêng để dịch ngược lại về ngôn ngữ nguồn, hiển thị kết quả trong overlay |
 | **Tự động nhận diện** | Nhận diện ngôn ngữ nguồn tự động |
 | **Đa ngôn ngữ** | Hỗ trợ 30+ ngôn ngữ phổ biến (Anh, Việt, Trung, Nhật, Hàn, Pháp, Đức...) |
 | **Ngôn ngữ tùy chỉnh** | Nhập mã ISO 639-1 để sử dụng bất kỳ ngôn ngữ nào |
 
-**Nhà cung cấp dịch thuật:**
+#### Nhà cung cấp dịch thuật
 
 | Nhà cung cấp | Mô tả |
 |--------------|-------|
@@ -129,19 +178,15 @@ Dịch văn bản ngay trong mọi ứng dụng với phím tắt tùy chỉnh:
 | **Tencent Transmart** | Miễn phí, tối ưu cho các ngôn ngữ Châu Á |
 | **Volcano Engine** | Miễn phí, chất lượng cao cho tiếng Trung ↔ Việt |
 
-**Overlay kết quả dịch (cho phím tắt "Dịch về ngôn ngữ nguồn"):**
-- 🪟 Glassmorphism UI — nền mờ, tự động phù hợp Light/Dark mode
-- 📋 Nút copy nhanh bản dịch vào clipboard
-- 🔤 Nút tăng/giảm cỡ chữ (+/−) để đọc dễ hơn
-- ↔️ Kéo header để di chuyển overlay, kéo cạnh để resize
-- ⏱️ Thời gian tự ẩn tùy chỉnh (0 = không tự ẩn, click outside để ẩn)
-- 📊 Thanh countdown hiển thị thời gian còn lại
+> 💡 Bạn có thể bật/tắt từng nhà cung cấp và thay đổi thứ tự ưu tiên trong **Thiết lập → Dịch thuật**.
 
-**Tính năng nổi bật:**
-- ✅ Fallback tự động: Nếu nhà cung cấp này lỗi, tự động thử nhà cung cấp khác
-- ✅ Giữ nguyên định dạng chữ hoa/thường (ALL CAPS, Capitalize, lowercase)
-- ✅ Overlay loading hiển thị trạng thái đang dịch
-- ✅ Lấy văn bản thông minh: Accessibility API với fallback sang Clipboard
+#### Tính năng nâng cao
+
+- ✅ **Fallback tự động**: Nếu nhà cung cấp ưu tiên lỗi hoặc trả về kết quả rỗng, tự động thử nhà cung cấp tiếp theo
+- ✅ **Thông báo lỗi rõ ràng**: Thông báo cụ thể bằng tiếng Việt cho từng loại lỗi (mạng, giới hạn tần suất, kết quả không hợp lệ...)
+- ✅ **Giữ nguyên định dạng chữ**: Hoa/thường (ALL CAPS, Capitalize, lowercase)
+- ✅ **Overlay loading**: Hiển thị trạng thái đang dịch tại vị trí con trỏ
+- ✅ **Lấy văn bản thông minh**: Accessibility API với fallback sang Clipboard
 
 **Cấu hình:** Settings → Dịch thuật
 
