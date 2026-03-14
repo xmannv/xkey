@@ -441,14 +441,15 @@ struct RuleRowView: View {
     @State private var showCopiedFeedback = false
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Status indicator
-            Circle()
-                .fill(rule.isEnabled ? Color.green : Color.gray)
-                .frame(width: 8, height: 8)
-            
-            // Rule info
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
+            // Row 1: Status dot + Name + Actions (always visible)
+            HStack(spacing: 12) {
+                // Status indicator
+                Circle()
+                    .fill(rule.isEnabled ? Color.green : Color.gray)
+                    .frame(width: 8, height: 8)
+                
+                // Rule name
                 HStack(spacing: 6) {
                     Text(rule.name)
                         .font(.subheadline)
@@ -466,103 +467,114 @@ struct RuleRowView: View {
                     }
                 }
                 
-                HStack(spacing: 4) {
-                    Text("Pattern:")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    if rule.titlePattern.isEmpty {
-                        Text("(Tất cả windows)")
-                            .font(.caption2)
-                            .foregroundColor(.orange)
-                            .fontWeight(.medium)
-                    } else {
-                        Text("\"\(rule.titlePattern)\"")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Text("(\(rule.matchMode.rawValue))")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .fixedSize()
-                    }
+                Spacer()
+                
+                // Toggle for both built-in and custom rules
+                if let onToggle = onToggle {
+                    Toggle("", isOn: Binding(
+                        get: { rule.isEnabled },
+                        set: { onToggle($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .help(rule.isEnabled ? "Tắt quy tắc này" : "Bật quy tắc này")
                 }
-            }
-            .frame(minWidth: 150, maxWidth: 250, alignment: .leading)
-            
-            Spacer()
-            
-            // Behavior badges - use fixedSize to prevent compression
-            HStack(spacing: 4) {
-                // AX Patterns badge (show if rule uses AX matching)
-                if rule.hasAXPatterns {
-                    BehaviorBadge(text: "🎯AX", color: .mint)
-                        .help(rule.axPatternsSummary)
-                }
-                // Force Accessibility badge
-                if rule.enableForceAccessibility == true {
-                    BehaviorBadge(text: "AX", color: .indigo)
-                }
-                if rule.useMarkedText == false {
-                    BehaviorBadge(text: "NoMark", color: .orange)
-                }
-                if let method = rule.injectionMethod {
-                    BehaviorBadge(text: methodString(method), color: method == .passthrough ? .red : .purple)
-                }
-                if let textMethod = rule.textSendingMethod {
-                    BehaviorBadge(text: textMethod == .oneByOne ? "1x1" : "Chunk", color: .cyan)
-                }
-                // Input source badge - show abbreviated name
-                if let inputSourceId = rule.targetInputSourceId, !inputSourceId.isEmpty {
-                    BehaviorBadge(text: "→\(inputSourceShortName(inputSourceId))", color: .teal)
-                }
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            
-            // Toggle for both built-in and custom rules
-            if let onToggle = onToggle {
-                Toggle("", isOn: Binding(
-                    get: { rule.isEnabled },
-                    set: { onToggle($0) }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .labelsHidden()
-                .help(rule.isEnabled ? "Tắt quy tắc này" : "Bật quy tắc này")
-            }
-            
-            // Edit/Delete/Copy actions (only for custom rules)
-            if !isBuiltIn {
-                HStack(spacing: 8) {
-                    // Copy JSON button
-                    Button(action: copyRuleJSON) {
-                        Image(systemName: showCopiedFeedback ? "checkmark" : "doc.on.doc")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(showCopiedFeedback ? .green : .purple)
-                    .help("Copy JSON của quy tắc")
-                    
-                    if let onEdit = onEdit {
-                        Button(action: onEdit) {
-                            Image(systemName: "pencil")
+                
+                // Edit/Delete/Copy actions (only for custom rules)
+                if !isBuiltIn {
+                    HStack(spacing: 8) {
+                        // Copy JSON button
+                        Button(action: copyRuleJSON) {
+                            Image(systemName: showCopiedFeedback ? "checkmark" : "doc.on.doc")
                                 .font(.caption)
                         }
                         .buttonStyle(.plain)
-                        .foregroundColor(.blue)
+                        .foregroundColor(showCopiedFeedback ? .green : .purple)
+                        .help("Copy JSON của quy tắc")
+                        
+                        if let onEdit = onEdit {
+                            Button(action: onEdit) {
+                                Image(systemName: "pencil")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundColor(.blue)
+                        }
+                        
+                        if let onDelete = onDelete {
+                            Button(action: onDelete) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .opacity(isHovered ? 1 : 0.5)
+                }
+            }
+            
+            // Row 2: Pattern + Behavior badges (below name, indented to align with text)
+            HStack(spacing: 0) {
+                // Indent to align with name (8px dot + 12px spacing)
+                Color.clear.frame(width: 20, height: 1)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    // Pattern info
+                    HStack(spacing: 4) {
+                        Text("Pattern:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        if rule.titlePattern.isEmpty {
+                            Text("(Tất cả windows)")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                        } else {
+                            Text("\"\(rule.titlePattern)\"")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Text("(\(rule.matchMode.rawValue))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fixedSize()
+                        }
                     }
                     
-                    if let onDelete = onDelete {
-                        Button(action: onDelete) {
-                            Image(systemName: "trash")
-                                .font(.caption)
+                    // Behavior badges - wrap naturally
+                    let hasBadges = rule.hasAXPatterns || rule.enableForceAccessibility == true || rule.useMarkedText == false || rule.injectionMethod != nil || rule.textSendingMethod != nil || (rule.targetInputSourceId != nil && !rule.targetInputSourceId!.isEmpty)
+                    
+                    if hasBadges {
+                        FlowLayoutView(spacing: 4) {
+                            // AX Patterns badge
+                            if rule.hasAXPatterns {
+                                BehaviorBadge(text: "🎯AX", color: .mint)
+                                    .help(rule.axPatternsSummary)
+                            }
+                            // Force Accessibility badge
+                            if rule.enableForceAccessibility == true {
+                                BehaviorBadge(text: "AX", color: .indigo)
+                            }
+                            if rule.useMarkedText == false {
+                                BehaviorBadge(text: "NoMark", color: .orange)
+                            }
+                            if let method = rule.injectionMethod {
+                                BehaviorBadge(text: methodString(method), color: method == .passthrough ? .red : .purple)
+                            }
+                            if let textMethod = rule.textSendingMethod {
+                                BehaviorBadge(text: textMethod == .oneByOne ? "1x1" : "Chunk", color: .cyan)
+                            }
+                            // Input source badge
+                            if let inputSourceId = rule.targetInputSourceId, !inputSourceId.isEmpty {
+                                BehaviorBadge(text: "→\(inputSourceShortName(inputSourceId))", color: .teal)
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .foregroundColor(.red)
                     }
                 }
-                .opacity(isHovered ? 1 : 0.5)
             }
         }
         .padding(.horizontal, 12)
@@ -639,6 +651,55 @@ struct RuleRowView: View {
         } catch {
             print("Failed to encode rule to JSON: \(error)")
         }
+    }
+}
+
+
+// MARK: - Flow Layout for wrapping badges
+@available(macOS 13.0, *)
+struct FlowLayoutView: Layout {
+    var spacing: CGFloat = 4
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrangeSubviews(proposal: ProposedViewSize(width: bounds.width, height: bounds.height), subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
+                proposal: ProposedViewSize(subviews[index].sizeThatFits(.unspecified))
+            )
+        }
+    }
+    
+    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint]) {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+        
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            
+            if currentX + size.width > maxWidth && currentX > 0 {
+                // Wrap to next line
+                currentX = 0
+                currentY += lineHeight + spacing
+                lineHeight = 0
+            }
+            
+            positions.append(CGPoint(x: currentX, y: currentY))
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + spacing
+            maxX = max(maxX, currentX - spacing)
+        }
+        
+        return (CGSize(width: maxX, height: currentY + lineHeight), positions)
     }
 }
 
