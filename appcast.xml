@@ -6,26 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260313.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313.1</link>
-      <sparkle:version>20260313.1</sparkle:version>
+      <title>Version 1.2.21 (Build 20260314)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260314</link>
+      <sparkle:version>20260314</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: add auto-check for updates toggle in Appearance settings</p>
+<p>Redesign menu bar with NSPopover + SwiftUI, improve window rules UI layout</p>
 <ul>
-<li>Add autoCheckForUpdates property to Preferences model (default: true)</li>
-<li>Add SharedSettings key, accessor with default-true logic, load/save support</li>
-<li>Update AppDelegate to sync Sparkle updater.automaticallyChecksForUpdates</li>
-<li>Add toggle in Appearance > Khởi động section</li>
-<li>Manual check for updates remains available regardless of toggle state</li>
-<li>Bump version to 1.2.21 (20260313.1)</li>
+<li>Replace NSMenu-based status bar with modern NSPopover containing SwiftUI view</li>
+<li>Add new StatusBarPopoverView with glass design and toggle for Vietnamese input</li>
+<li>Redesign WindowTitleRulesView with improved layout for multiple options display</li>
+<li>Bump build version to 20260314</li>
 </ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260313.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260314">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 13 Mar 2026 13:13:04 +0000</pubDate>
+      <pubDate>Sat, 14 Mar 2026 08:17:05 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260313.1/XKey.dmg" sparkle:version="20260313.1" sparkle:shortVersionString="1.2.21" length="11714679" type="application/octet-stream" sparkle:edSignature="sQCx+C8eFq2yGmqZVWGzVCdTaEonvQ/oD9vHQCA+6HeA1UadOPzoeCHvIEtUq9kMHD+TzNn5OS+fDWR/YDSZAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260314/XKey.dmg" sparkle:version="20260314" sparkle:shortVersionString="1.2.21" length="11756720" type="application/octet-stream" sparkle:edSignature="wxvW1qdt1hQ7j7eK69bv7MNpAQZ08MSsqSBwHGJsOhz+72qxD5JNQcbPHOuz1ZEBfCLUnS+M+BqUVsB1qmHmCw==" />
     </item>
   </channel>
 </rss>
