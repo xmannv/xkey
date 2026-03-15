@@ -6,24 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260314)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260314</link>
-      <sparkle:version>20260314</sparkle:version>
+      <title>Version 1.2.21 (Build 20260315)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260315</link>
+      <sparkle:version>20260315</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Redesign menu bar with NSPopover + SwiftUI, improve window rules UI layout</p>
-<ul>
-<li>Replace NSMenu-based status bar with modern NSPopover containing SwiftUI view</li>
-<li>Add new StatusBarPopoverView with glass design and toggle for Vietnamese input</li>
-<li>Redesign WindowTitleRulesView with improved layout for multiple options display</li>
-<li>Bump build version to 20260314</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260314">Xem chi tiết trên GitHub</a></p>
+<p>Lower deployment target to macOS 12.0, bump build version</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260315">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 14 Mar 2026 08:17:05 +0000</pubDate>
+      <pubDate>Sun, 15 Mar 2026 06:54:50 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260314/XKey.dmg" sparkle:version="20260314" sparkle:shortVersionString="1.2.21" length="11756720" type="application/octet-stream" sparkle:edSignature="wxvW1qdt1hQ7j7eK69bv7MNpAQZ08MSsqSBwHGJsOhz+72qxD5JNQcbPHOuz1ZEBfCLUnS+M+BqUVsB1qmHmCw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260315/XKey.dmg" sparkle:version="20260315" sparkle:shortVersionString="1.2.21" length="11814334" type="application/octet-stream" sparkle:edSignature="ghoGniJdH8iG5j1fcVdajozh6Yq74Yg11Xi++nAV5tdYGiKU0l1V/2PLPVwCZ1qjktX3Qp7QHenexb4WJ1uXDQ==" />
     </item>
   </channel>
 </rss>
