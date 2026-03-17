@@ -55,7 +55,6 @@ enum SharedSettingsKey: String {
 
     // Smart switch settings
     case smartSwitchEnabled = "XKey.smartSwitchEnabled"
-    case detectOverlayApps = "XKey.detectOverlayApps"
 
     // Debug settings
     case debugModeEnabled = "XKey.debugModeEnabled"
@@ -485,11 +484,6 @@ class SharedSettings {
     var smartSwitchEnabled: Bool {
         get { readBool(forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
         set { writeBool(newValue, forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
-    }
-
-    var detectOverlayApps: Bool {
-        get { readBool(forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
-        set { writeBool(newValue, forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
     }
 
     // MARK: - Debug Settings
@@ -1023,9 +1017,7 @@ class SharedSettings {
         prefs.autoCapsMacro = autoCapsMacro
         prefs.addSpaceAfterMacro = addSpaceAfterMacro
 
-        // Smart switch
         prefs.smartSwitchEnabled = smartSwitchEnabled
-        prefs.detectOverlayApps = detectOverlayApps
 
         // Debug
         prefs.debugModeEnabled = debugModeEnabled
@@ -1160,9 +1152,7 @@ class SharedSettings {
         autoCapsMacro = prefs.autoCapsMacro
         addSpaceAfterMacro = prefs.addSpaceAfterMacro
 
-        // Smart switch
         smartSwitchEnabled = prefs.smartSwitchEnabled
-        detectOverlayApps = prefs.detectOverlayApps
 
         // Debug
         debugModeEnabled = prefs.debugModeEnabled

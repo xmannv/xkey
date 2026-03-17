@@ -278,8 +278,16 @@ class EventTapManager {
         // Key repeat events occur when user holds a key (spring-loaded tools in Adobe apps)
         // These must bypass ALL checks (hotkeys, delegate) to avoid any delay
         // Only the first keyDown needs processing for Vietnamese input
+        //
+        // EXCEPTION: Backspace repeat MUST reach delegate for engine buffer sync!
+        // When user holds Backspace, each repeat deletes a character on screen.
+        // The engine must process each deletion to keep its buffer synchronized,
+        // otherwise Vietnamese input (e.g., Telex ] and [ keys) breaks after hold-backspace.
         if type == .keyDown && event.isKeyRepeat {
-            return Unmanaged.passUnretained(event)
+            if event.keyCode != VietnameseData.KEY_DELETE {
+                return Unmanaged.passUnretained(event)
+            }
+            // Fall through for backspace repeat - delegate needs to process each deletion
         }
 
         debugLogCallback?("EventTapManager.eventCallback: type=\(type.rawValue), delegate=\(delegate != nil)")
@@ -504,6 +512,29 @@ class EventTapManager {
                         // Fall through to delegate processing
                     }
                 }
+            }
+        }
+
+        // MARK: Overlay Probe Arming
+        // Arm overlay detection probe when events suggest overlay state may change.
+        // This runs BEFORE delegate processing so the probe is ready for
+        // isOverlayAppVisible() calls within KeyboardEventHandler.
+        if type == .flagsChanged {
+            // Modifier key changed — potential overlay open (Cmd+Space etc.)
+            let flags = event.flags
+            if flags.contains(.maskCommand) || flags.contains(.maskControl) ||
+               flags.contains(.maskAlternate) || flags.contains(.maskSecondaryFn) {
+                OverlayAppDetector.shared.armProbe()
+            }
+        } else if type == .keyDown {
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if keyCode == 0x35 || keyCode == 0x24 || keyCode == 0x4C { // Esc, Return, or Keypad Enter — potential overlay close
+                // Deferred: CGEventTap fires BEFORE the app processes the key,
+                // so immediate probe would still see overlay as focused.
+                OverlayAppDetector.shared.armProbeDeferred()
+            } else if event.flags.contains(.maskCommand) {
+                // keyDown with Cmd — potential overlay shortcut (Cmd+Space, Cmd+K, etc.)
+                OverlayAppDetector.shared.armProbe()
             }
         }
 

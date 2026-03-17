@@ -467,6 +467,16 @@ if [ "$ENABLE_NOTARIZE" = true ] && [ "$ENABLE_CODESIGN" = true ]; then
     if [ $NOTARIZE_EXIT -ne 0 ] && ! echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
         echo ""
         echo "⚠️  notarytool exited with code $NOTARIZE_EXIT"
+        
+        # Check for 403 agreement error — no point continuing
+        if echo "$NOTARIZE_OUTPUT" | grep -q "HTTP status code: 403"; then
+            echo ""
+            echo "❌ Apple Developer agreement expired or missing!"
+            echo ""
+            echo "💡 Fix: Go to https://developer.apple.com/account"
+            echo "   and accept the updated agreement, then re-run this script."
+            exit 1
+        fi
     fi
     
     # Extract submission ID
