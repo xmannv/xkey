@@ -311,15 +311,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return false
         }
 
-        // CRITICAL: Skip processing for key repeat events (key being held down)
-        // This fixes issues with spring-loaded tools in apps like Adobe Illustrator:
-        // - Holding Z for Zoom tool, Space for Hand tool
-        // - Key repeat events should pass through immediately without any delay
-        // - Only the first keyDown is processed for potential Vietnamese conversion
-        // - This prevents timing issues where keyUp arrives before delayed repeat keyDowns
-        if type == .keyDown && event.isKeyRepeat {
-            return false
-        }
+        // Key repeat events are filtered by EventTapManager.eventCallback():
+        // - All non-backspace repeats are bypassed immediately (Adobe spring-loaded tools etc.)
+        // - Only backspace repeats pass through to here for engine buffer sync
+        // No additional filtering needed here.
 
         // Check if we should process in English mode (for macro support)
         let shouldProcessInEnglishMode = !isVietnameseEnabled && macroEnabled && macroInEnglishMode

@@ -215,28 +215,6 @@ struct AdvancedSection: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-
-                        // Overlay app detection (sub-option, only shown when Smart Switch is enabled)
-                        if viewModel.preferences.smartSwitchEnabled {
-                            Divider()
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                Toggle("Hỗ trợ phát hiện Spotlight/Raycast/Alfred", isOn: $viewModel.preferences.detectOverlayApps)
-
-                                // Info message
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Tránh ghi đè ngôn ngữ của app bên dưới khi bạn toggle trong Spotlight/Raycast")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    .padding(.top, 4)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 6)
-                                    .background(Color.green.opacity(0.05))
-                                    .cornerRadius(6)
-                                }
-                            }
-                            .padding(.leading, 20)  // Indent sub-option
-                        }
                     }
                 }
                 

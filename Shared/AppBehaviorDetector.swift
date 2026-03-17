@@ -686,6 +686,7 @@ class AppBehaviorDetector {
     /// Clear confirmed injection method (call when context changes significantly)
     func clearConfirmedInjectionMethod() {
         confirmedInjectionMethod = nil
+        clearAddressBarCache()
     }
     
     // MARK: - Cache (only for detect() which is used for UI display)
@@ -2079,20 +2080,19 @@ extension AppBehaviorDetector {
     /// - Google Workspace in browsers (Sheets, Docs, Slides)
     /// The AX check ensures we only send Forward Delete when there's no real text after cursor
     var needsForwardDeleteWithAXCheck: Bool {
-        // Check Microsoft Office apps
-        if detect() == .microsoftOffice {
+        guard let bundleId = getCurrentBundleId() else { return false }
+        
+        // O(1) check: Microsoft Office apps via static Set
+        if Self.microsoftOfficeApps.contains(bundleId) {
             return true
         }
         
-        // Check Google Workspace apps via Window Title Rules
-        // These rules are matched by window title pattern "Google (Sheets|Docs|Slides|...)"
-        if let ruleName = activeWindowTitleRuleName {
-            let googleWorkspaceRules = ["Google Sheets"]
-            for googleRule in googleWorkspaceRules {
-                if ruleName.contains(googleRule) {
-                    return true
-                }
-            }
+        // Check Google Workspace apps via confirmed injection method description
+        // Uses getConfirmedInjectionMethod() which auto-detects if confirmedInjectionMethod is nil
+        // (e.g., after clearConfirmedInjectionMethod() on focus change)
+        let methodDescription = getConfirmedInjectionMethod().description
+        if methodDescription.contains("Google Sheets") {
+            return true
         }
         
         return false

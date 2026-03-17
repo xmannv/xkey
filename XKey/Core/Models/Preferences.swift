@@ -56,7 +56,7 @@ struct Preferences: Codable {
     
     // Smart switch settings
     var smartSwitchEnabled: Bool = false         // Remember language per app
-    var detectOverlayApps: Bool = false          // Detect Spotlight/Raycast/Alfred overlay apps
+
     
     // Debug settings
     var debugModeEnabled: Bool = false           // Show debug window (even in production)

@@ -376,7 +376,6 @@ class DebugViewModel: ObservableObject {
         // Smart Switch
         lines.append("[Smart Switch]")
         lines.append("  Smart Switch: \(settings.smartSwitchEnabled ? "ON" : "OFF")")
-        lines.append("  Detect Overlay Apps: \(settings.detectOverlayApps ? "ON" : "OFF")")
         lines.append("")
         
         // IMKit

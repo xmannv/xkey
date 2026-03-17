@@ -37,6 +37,22 @@ class OverlayAppDetector {
     
     /// Last detected overlay app name (for logging)
     private var lastDetectedOverlay: String?
+    
+    /// Cached overlay state (updated by probe and timer)
+    private var cachedOverlayVisible = false
+    private var cachedOverlayName: String?
+    
+    // MARK: - Event-Driven Probe State
+    
+    /// Whether an AX probe is needed on next isOverlayAppVisible() call
+    /// Armed by external signals (modifier keys, Esc, mouse clicks)
+    private var probeNeeded = false
+    
+    /// Deadline after which the probe auto-disarms (safety net)
+    private var probeDeadline: CFAbsoluteTime = 0
+    
+    /// Duration to keep a probe armed before auto-disarming (seconds)
+    private static let probeTimeout: CFAbsoluteTime = 0.8
 
     private init() {
         // Start monitoring overlay state changes
@@ -63,27 +79,86 @@ class OverlayAppDetector {
     private static let axPlaceholderPatterns: [String] = [
         "Spotlight Search",         // Spotlight
     ]
+    
+    // MARK: - Probe Arming (called from EventTapManager / AppDelegate)
+    
+    /// Arm a probe immediately for the next isOverlayAppVisible() call.
+    /// Use for OPEN signals: modifier keys, Cmd+keyDown — overlay may appear
+    /// before the next keyDown arrives.
+    func armProbe() {
+        probeNeeded = true
+        probeDeadline = CFAbsoluteTimeGetCurrent() + Self.probeTimeout
+    }
+    
+    /// Arm a probe with a short delay for CLOSE signals (Esc, Return).
+    /// CGEventTap intercepts the key BEFORE the target app processes it,
+    /// so an immediate probe would still see the overlay as focused.
+    /// The 50ms delay lets the overlay process the key and close first.
+    func armProbeDeferred() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self = self else { return }
+            self.probeNeeded = true
+            self.probeDeadline = CFAbsoluteTimeGetCurrent() + Self.probeTimeout
+        }
+    }
 
     // MARK: - Primary Detection Method
 
     /// Check if any overlay app is currently active
-    /// Uses AX attributes of focused element (most accurate - only detects when overlay is focused)
-    /// - Returns: True if an overlay app is detected
+    /// Uses event-driven probing for both zero detection gap AND O(1) steady-state:
+    /// - No probe → return cached value immediately (O(1))
+    /// - Probe armed → do fresh AX check, update cache both directions
+    ///
+    /// Probes are armed by external signals (modifier keys, Esc, mouse clicks)
+    /// that indicate overlay state MAY have just changed.
     func isOverlayAppVisible() -> Bool {
-        if let overlayName = detectOverlayViaAXAttributes() {
-            logDebug("Overlay detected via AX: '\(overlayName)'")
-            lastDetectedOverlay = overlayName
-            return true
+        if probeNeeded {
+            let now = CFAbsoluteTimeGetCurrent()
+            if now > probeDeadline {
+                // Probe expired — safety net, disarm
+                probeNeeded = false
+            } else {
+                // Execute AX probe
+                if let overlayName = detectOverlayViaAXAttributes() {
+                    // Overlay found — update cache, disarm
+                    lastDetectedOverlay = overlayName
+                    cachedOverlayVisible = true
+                    cachedOverlayName = overlayName
+                    probeNeeded = false
+                    logDebug("found (probe): '\(overlayName)'")
+                    
+                    if !wasOverlayVisible {
+                        wasOverlayVisible = true
+                        onOverlayVisibilityChanged?(true)
+                    }
+                    return true
+                } else if cachedOverlayVisible {
+                    // Was visible, now gone — clear cache, disarm
+                    // Fixes stale-positive: no more waiting for timer poll
+                    cachedOverlayVisible = false
+                    cachedOverlayName = nil
+                    lastDetectedOverlay = nil
+                    probeNeeded = false
+                    logDebug("Overlay dismissed (probe)")
+                    
+                    if wasOverlayVisible {
+                        wasOverlayVisible = false
+                        onOverlayVisibilityChanged?(false)
+                    }
+                    return false
+                }
+                // cache=false + AX nil → overlay hasn't appeared yet
+                // Keep probe armed — it might appear on next keyDown
+                return false
+            }
         }
-        
-        lastDetectedOverlay = nil
-        return false
+        return cachedOverlayVisible
     }
     
     /// Get the name of the currently visible overlay app, if any
     /// - Returns: Name of the overlay app, or nil if none visible
     func getVisibleOverlayAppName() -> String? {
-        return detectOverlayViaAXAttributes()
+        return cachedOverlayName
     }
 
     // MARK: - AX Attribute Detection
@@ -148,40 +223,7 @@ class OverlayAppDetector {
         return value
     }
 
-    /// Helper to get bundle ID of the app that owns an AX element
-    private func getAppBundleIdFromElement(_ element: AXUIElement) -> String? {
-        var pid: pid_t = 0
-        guard AXUIElementGetPid(element, &pid) == .success else {
-            return nil
-        }
-        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
-    }
 
-    /// Get bundle ID of the app that owns the currently focused element
-    /// This is more accurate than frontmostApplication when floating windows are involved
-    private func getFocusedElementAppBundleId() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
-            return nil
-        }
-
-        let axElement = focusedElement as! AXUIElement
-        var pid: pid_t = 0
-
-        guard AXUIElementGetPid(axElement, &pid) == .success else {
-            return nil
-        }
-
-        // Get bundle ID from PID
-        if let app = NSRunningApplication(processIdentifier: pid) {
-            return app.bundleIdentifier
-        }
-
-        return nil
-    }
 
     // MARK: - Logging
 
@@ -209,6 +251,10 @@ class OverlayAppDetector {
     /// Check if overlay state has changed and notify callback
     private func checkOverlayStateChange() {
         let isCurrentlyVisible = isOverlayVisibleQuiet()
+        
+        // Update cached state for hot path consumers (O(1) reads)
+        cachedOverlayVisible = isCurrentlyVisible
+        cachedOverlayName = isCurrentlyVisible ? lastDetectedOverlay : nil
 
         // Detect state change
         if isCurrentlyVisible != wasOverlayVisible {

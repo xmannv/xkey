@@ -1152,10 +1152,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreLanguageForCurrentApp() {
         guard let handler = keyboardHandler else { return }
 
-        // Check if overlay detection is enabled
-        let prefs = SharedSettings.shared.loadPreferences()
-        guard prefs.detectOverlayApps else { return }
-
         // IMPORTANT: Check Input Source config first - it takes priority
         // If current Input Source is configured as disabled, don't restore Vietnamese
         if let currentSource = InputSourceManager.getCurrentInputSource() {
@@ -1286,6 +1282,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Global monitor - catches clicks in OTHER apps
         mouseClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp, .otherMouseUp]) { [weak self] event in
+            // Arm overlay probe — mouse clicks can dismiss overlays (Spotlight, Raycast, Alfred)
+            OverlayAppDetector.shared.armProbe()
+            
             // Reset engine when mouse is released (click completed or drag finished)
             // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
             self?.keyboardHandler?.resetWithCursorMoved()
