@@ -802,7 +802,9 @@ class AppBehaviorDetector {
         "com.pushplaylabs.sidekick",
         "com.firstversionist.polypane",
         "ai.perplexity.comet",
-        "com.duckduckgo.macos.browser"
+        "com.duckduckgo.macos.browser",
+        // Helium (Chromium-based)
+        "net.imput.helium"
     ]
 
     /// Firefox-based browsers - need special handling for content area
@@ -903,13 +905,17 @@ class AppBehaviorDetector {
     /// 2. Window title might change (e.g., switching tabs)
     /// 3. The detection logic is very fast
     /// 4. Simpler code without cache = fewer bugs
-    func detectIMKitBehavior() -> IMKitBehavior {
+    /// - Parameter focusedInfo: Pre-queried AX element info. If nil, queries internally.
+    func detectIMKitBehavior(focusedInfo: FocusedElementInfo? = nil) -> IMKitBehavior {
         guard let bundleId = getCurrentBundleId() else {
             return .standard
         }
         
+        // OPTIMIZED: Use pre-queried focusedInfo if available, otherwise query once
+        let focusedInfo = focusedInfo ?? getFocusedElementInfo()
+        
         // Priority 1: Check Window Title Rules for context-specific behavior (merged cascade)
-        let mergedResult = getMergedRuleResult()
+        let mergedResult = getMergedRuleResult(focusedInfo: focusedInfo)
         if mergedResult.hasMatches {
             return IMKitBehavior(
                 useMarkedText: mergedResult.useMarkedText ?? true,
@@ -934,13 +940,16 @@ class AppBehaviorDetector {
     /// Struct containing all relevant AX attributes of the focused element
     /// Queried once to avoid multiple AXUIElementCreateSystemWide() calls
     struct FocusedElementInfo {
+        let element: AXUIElement?      // For hasCaret check (optional - nil when created without element)
         let role: String?
         let subrole: String?
         let description: String?
-        let identifier: String?       // AXIdentifier
-        let domIdentifier: String?    // AXDOMIdentifier (used by Firefox, Chromium for DOM element ID)
-        let domClasses: [String]?     // AXDOMClassList
+        let identifier: String?        // AXIdentifier
+        let domIdentifier: String?     // AXDOMIdentifier (used by Firefox, Chromium for DOM element ID)
+        let domClasses: [String]?      // AXDOMClassList
         let textValue: String?
+        let roleDescription: String?   // For isTextInput contenteditable check
+        let windowTitle: String?       // For rule matching + signature (avoid re-querying)
         
         /// Check if this element is empty (no text or empty string)
         var isEmpty: Bool {
@@ -948,9 +957,149 @@ class AppBehaviorDetector {
             return text.isEmpty
         }
         
+        /// Unique signature for detecting focus changes
+        /// Includes role, subrole, description (truncated), DOM ID, and window title
+        var signature: String {
+            var parts: [String] = []
+            if let role = role {
+                parts.append(role)
+            }
+            if let subrole = subrole {
+                parts.append(subrole)
+            }
+            if let desc = description, !desc.isEmpty {
+                let truncated = String(desc.prefix(50))
+                parts.append("desc:\(truncated)")
+            }
+            if let domId = domIdentifier, !domId.isEmpty {
+                parts.append("dom:\(domId)")
+            }
+            // Include window title to detect Chrome profile switches
+            if let title = windowTitle, !title.isEmpty {
+                let truncated = String(title.prefix(100))
+                parts.append("win:\(truncated)")
+            }
+            return parts.joined(separator: "|")
+        }
+        
+        /// Check if element is a text input field
+        var isTextInput: Bool {
+            guard let role = role else { return false }
+            
+            let textRoles = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"]
+            if textRoles.contains(role) {
+                return true
+            }
+            
+            if let subrole = subrole {
+                if subrole == "AXSearchField" || subrole == "AXSecureTextField" {
+                    return true
+                }
+            }
+            
+            // For contenteditable web elements (role=AXGroup or AXWebArea)
+            if role == "AXGroup" || role == "AXWebArea" {
+                if let roleDesc = roleDescription {
+                    let lowerDesc = roleDesc.lowercased()
+                    if lowerDesc.contains("field") || lowerDesc.contains("editor") || lowerDesc.contains("input") {
+                        return true
+                    }
+                }
+            }
+            
+            return false
+        }
+        
+        /// Check if element has a text caret (insertion point)
+        var hasCaret: Bool {
+            guard let el = element else { return isTextInput }
+            
+            var rangeRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(el, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success {
+                return rangeRef != nil
+            }
+            
+            return isTextInput
+        }
+        
+        /// Check if element is an editable text field with caret
+        var isEditableTextInput: Bool {
+            return isTextInput && hasCaret
+        }
+        
+        /// Create from AXUIElement by querying all needed attributes once
+        /// This is the unified query point - queries ALL attributes needed by both
+        /// focus tracking (signature, isTextInput) and injection detection (address bar, rules)
+        static func from(_ element: AXUIElement) -> FocusedElementInfo {
+            var role: String?
+            var subrole: String?
+            var description: String?
+            var identifier: String?
+            var domIdentifier: String?
+            var domClasses: [String]?
+            var textValue: String?
+            var roleDescription: String?
+            var windowTitle: String?
+            
+            var ref: CFTypeRef?
+            
+            if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &ref) == .success {
+                role = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &ref) == .success {
+                subrole = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &ref) == .success {
+                description = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, kAXIdentifierAttribute as CFString, &ref) == .success {
+                identifier = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, "AXDOMIdentifier" as CFString, &ref) == .success {
+                domIdentifier = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, "AXDOMClassList" as CFString, &ref) == .success {
+                domClasses = ref as? [String]
+            }
+            if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &ref) == .success {
+                textValue = ref as? String
+            }
+            if AXUIElementCopyAttributeValue(element, kAXRoleDescriptionAttribute as CFString, &ref) == .success {
+                roleDescription = ref as? String
+            }
+            
+            // Get window title from frontmost app's focused window
+            if let app = NSWorkspace.shared.frontmostApplication {
+                let appElement = AXUIElementCreateApplication(app.processIdentifier)
+                var focusedWindow: CFTypeRef?
+                if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
+                   let windowElement = focusedWindow as! AXUIElement? {
+                    var titleValue: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success {
+                        windowTitle = titleValue as? String
+                    }
+                }
+            }
+            
+            return FocusedElementInfo(
+                element: element,
+                role: role,
+                subrole: subrole,
+                description: description,
+                identifier: identifier,
+                domIdentifier: domIdentifier,
+                domClasses: domClasses,
+                textValue: textValue,
+                roleDescription: roleDescription,
+                windowTitle: windowTitle
+            )
+        }
+        
         static let empty = FocusedElementInfo(
+            element: nil,
             role: nil, subrole: nil, description: nil,
-            identifier: nil, domIdentifier: nil, domClasses: nil, textValue: nil
+            identifier: nil, domIdentifier: nil, domClasses: nil, textValue: nil,
+            roleDescription: nil, windowTitle: nil
         )
     }
     
@@ -966,40 +1115,8 @@ class AppBehaviorDetector {
             return .empty
         }
         
-        let axEl = el as! AXUIElement
-        
-        // Query all attributes at once
-        var roleVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, kAXRoleAttribute as CFString, &roleVal)
-        
-        var subroleVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, kAXSubroleAttribute as CFString, &subroleVal)
-        
-        var descVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, kAXDescriptionAttribute as CFString, &descVal)
-        
-        var identifierVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, kAXIdentifierAttribute as CFString, &identifierVal)
-        
-        // AXDOMIdentifier is used by Firefox, Chromium for DOM element ID (e.g., "urlbar-input")
-        var domIdentifierVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, "AXDOMIdentifier" as CFString, &domIdentifierVal)
-        
-        var domClassRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, "AXDOMClassList" as CFString, &domClassRef)
-        
-        var textVal: CFTypeRef?
-        AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &textVal)
-        
-        return FocusedElementInfo(
-            role: roleVal as? String,
-            subrole: subroleVal as? String,
-            description: descVal as? String,
-            identifier: identifierVal as? String,
-            domIdentifier: domIdentifierVal as? String,
-            domClasses: domClassRef as? [String],
-            textValue: textVal as? String
-        )
+        // Delegate to FocusedElementInfo.from() which queries all attributes
+        return FocusedElementInfo.from(el as! AXUIElement)
     }
     
     // MARK: - Address Bar Detection (Using Single AX Query)
@@ -1009,8 +1126,7 @@ class AppBehaviorDetector {
     /// 1. DOM ID/Identifier: "urlbar-input" (Firefox/Zen Browser standard) - stored in AXDOMIdentifier
     /// 2. AX Description Pattern: "Search with <search_engine> or enter address"
     /// - Returns: true if focused element is a Zen-style address bar
-    func isFirefoxStyleAddressBar() -> Bool {
-        let info = getFocusedElementInfo()
+    func isFirefoxStyleAddressBar(info: FocusedElementInfo) -> Bool {
         
         // Check DOM ID first (most reliable for Firefox-based browsers)
         // Firefox stores DOM element ID in AXDOMIdentifier, not AXIdentifier
@@ -1033,8 +1149,8 @@ class AppBehaviorDetector {
     /// Check if focused element is Safari's address bar
     /// Detection via AX Identifier: "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
     /// - Returns: true if focused element is Safari's address bar
-    func isSafariAddressBar() -> Bool {
-        guard let identifier = getFocusedElementInfo().identifier else { return false }
+    func isSafariAddressBar(info: FocusedElementInfo) -> Bool {
+        guard let identifier = info.identifier else { return false }
         return identifier == "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
     }
     
@@ -1043,8 +1159,7 @@ class AppBehaviorDetector {
     /// 1. AX Description: "Address and search bar"
     /// 2. AX DOM Classes: contains "OmniboxViewViews"
     /// - Returns: true if focused element is Chromium's address bar (Omnibox)
-    func isChromiumAddressBar() -> Bool {
-        let info = getFocusedElementInfo()
+    func isChromiumAddressBar(info: FocusedElementInfo) -> Bool {
         
         // Check AX Description
         if let desc = info.description, desc == "Address and search bar" {
@@ -1088,16 +1203,16 @@ class AppBehaviorDetector {
     /// Check if focused element is Dia Browser's address bar (Command Bar)
     /// Detection via AX Identifier: "commandBarTextField"
     /// - Returns: true if focused element is Dia's address bar
-    func isDiaAddressBar() -> Bool {
-        guard let identifier = getFocusedElementInfo().identifier else { return false }
+    func isDiaAddressBar(info: FocusedElementInfo) -> Bool {
+        guard let identifier = info.identifier else { return false }
         return identifier == "commandBarTextField"
     }
     
     /// Check if focused element is a Terminal panel in VSCode/Cursor/etc
     /// Detection via AX Description: starts with "Terminal"
     /// - Returns: true if focused element is an integrated terminal panel
-    func isInTerminalPanel() -> Bool {
-        guard let desc = getFocusedElementInfo().description else { return false }
+    func isInTerminalPanel(info: FocusedElementInfo) -> Bool {
+        guard let desc = info.description else { return false }
         return desc.hasPrefix("Terminal")
     }
     
@@ -1105,8 +1220,8 @@ class AppBehaviorDetector {
     /// Detection via AX DOM Class List containing "notranslate"
     /// Code blocks in Notion have class: "content-editable-leaf-rtl, notranslate"
     /// - Returns: true if focused element is a Notion code block
-    func isNotionCodeBlock() -> Bool {
-        guard let domClasses = getFocusedElementInfo().domClasses else { return false }
+    func isNotionCodeBlock(info: FocusedElementInfo) -> Bool {
+        guard let domClasses = info.domClasses else { return false }
         return domClasses.contains("notranslate")
     }
 
@@ -1201,12 +1316,13 @@ class AppBehaviorDetector {
         windowTitle: String,
         cachedAXInfo: inout FocusedElementInfo?,
         matches: inout [WindowTitleRule],
-        returnFirst: Bool = false
+        returnFirst: Bool = false,
+        focusedInfo: FocusedElementInfo? = nil
     ) -> WindowTitleRule? {
         for rule in rules {
             let axInfo = rule.hasAXPatterns ? {
                 if cachedAXInfo == nil {
-                    cachedAXInfo = getFocusedElementInfo()
+                    cachedAXInfo = focusedInfo ?? getFocusedElementInfo()
                 }
                 return cachedAXInfo!
             }() : nil
@@ -1229,19 +1345,20 @@ class AppBehaviorDetector {
     /// 2. Window title might change (e.g., switching tabs)
     /// 3. The detection logic (string comparisons) is very fast
     /// 4. Simpler code without cache = fewer bugs
-    func findMatchingRule() -> WindowTitleRule? {
+    func findMatchingRule(focusedInfo: FocusedElementInfo? = nil) -> WindowTitleRule? {
         guard let bundleId = getCurrentBundleId() else {
             return nil
         }
         
-        let windowTitle = getCurrentWindowTitle() ?? ""
+        let windowTitle = focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""
         var cachedAXInfo: FocusedElementInfo? = nil
         var matches: [WindowTitleRule] = []  // not used for returnFirst, but required by matchRules
         
         // Search in custom rules first (higher priority)
         let activeCustomRules = customRules.filter { $0.isEnabled }
         if let match = matchRules(activeCustomRules, bundleId: bundleId, windowTitle: windowTitle,
-                                  cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true) {
+                                  cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true,
+                                  focusedInfo: focusedInfo) {
             return match
         }
         
@@ -1253,7 +1370,8 @@ class AppBehaviorDetector {
         }
         
         return matchRules(activeBuiltInRules, bundleId: bundleId, windowTitle: windowTitle,
-                          cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true)
+                          cachedAXInfo: &cachedAXInfo, matches: &matches, returnFirst: true,
+                          focusedInfo: focusedInfo)
     }
     
     /// Find ALL matching Window Title Rules for current context
@@ -1261,12 +1379,12 @@ class AppBehaviorDetector {
     /// Later rules can override earlier rules' properties (cascade behavior)
     ///
     /// Note: No caching is used here for same reasons as findMatchingRule()
-    func findAllMatchingRules() -> [WindowTitleRule] {
+    func findAllMatchingRules(focusedInfo: FocusedElementInfo? = nil) -> [WindowTitleRule] {
         guard let bundleId = getCurrentBundleId() else {
             return []
         }
         
-        let windowTitle = getCurrentWindowTitle() ?? ""
+        let windowTitle = focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""
         var matchingRules: [WindowTitleRule] = []
         var cachedAXInfo: FocusedElementInfo? = nil
         
@@ -1278,12 +1396,14 @@ class AppBehaviorDetector {
             isBuiltInRuleActive($0, disabledRules: disabledBuiltInRules, enabledRules: enabledBuiltInRules)
         }
         matchRules(activeBuiltInRules, bundleId: bundleId, windowTitle: windowTitle,
-                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules)
+                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules,
+                   focusedInfo: focusedInfo)
         
         // THEN: Search in custom rules (higher priority - can override)
         let activeCustomRules = customRules.filter { $0.isEnabled }
         matchRules(activeCustomRules, bundleId: bundleId, windowTitle: windowTitle,
-                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules)
+                   cachedAXInfo: &cachedAXInfo, matches: &matchingRules,
+                   focusedInfo: focusedInfo)
         
         return matchingRules
     }
@@ -1298,8 +1418,8 @@ class AppBehaviorDetector {
     /// This allows creating flexible configurations:
     /// - A base rule setting injectionMethod for all Firefox windows
     /// - A specific rule enabling Force Accessibility for specific websites
-    func getMergedRuleResult() -> MergedRuleResult {
-        let matchingRules = findAllMatchingRules()
+    func getMergedRuleResult(focusedInfo: FocusedElementInfo? = nil) -> MergedRuleResult {
+        let matchingRules = findAllMatchingRules(focusedInfo: focusedInfo)
         
         var result = MergedRuleResult()
         for rule in matchingRules {
@@ -1467,9 +1587,13 @@ class AppBehaviorDetector {
     }
     
     private func detectBehavior(for bundleId: String) -> AppBehavior {
+        // Query AX focused element info ONCE and reuse throughout this function
+        // to avoid duplicate AX API calls (each getFocusedElementInfo() = 7 AX calls)
+        let focusedInfo = getFocusedElementInfo()
+        
         // Priority 0: Check if in Terminal panel (VSCode/Cursor/etc) directly via AX Description
         // This is more reliable than overlay detection and doesn't interfere with overlay logic
-        if isInTerminalPanel() {
+        if isInTerminalPanel(info: focusedInfo) {
             return .terminal
         }
         
@@ -1521,7 +1645,7 @@ class AppBehaviorDetector {
         if isBrowserApp {
             // Safari: Use AX Identifier for accurate detection (avoids web content inputs)
             if bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview" {
-                if isSafariAddressBar() {
+                if isSafariAddressBar(info: focusedInfo) {
                     return .browserAddressBar
                 }
                 return .standard
@@ -1529,7 +1653,7 @@ class AppBehaviorDetector {
             
             // Firefox-style address bar (detected via DOM ID or AX Description)
             if Self.firefoxBasedBrowsers.contains(bundleId) || Self.axAttributeDetectForBrowsers.contains(bundleId) {
-                if isFirefoxStyleAddressBar() {
+                if isFirefoxStyleAddressBar(info: focusedInfo) {
                     return .browserAddressBar
                 }
                 return .standard
@@ -1537,12 +1661,12 @@ class AppBehaviorDetector {
             
             // Chromium-based browsers: Use AX Description for accurate detection
             // This matches "Address and search bar" which is Chrome's Omnibox identifier
-            if isChromiumAddressBar() {
+            if isChromiumAddressBar(info: focusedInfo) {
                 return .browserAddressBar
             }
             
             // Dia Browser address bar (AX Identifier: commandBarTextField)
-            if bundleId == "company.thebrowser.dia" && isDiaAddressBar() {
+            if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: focusedInfo) {
                 return .browserAddressBar
             }
             
@@ -1647,7 +1771,7 @@ class AppBehaviorDetector {
     /// 1. We must always call AX APIs to get current role (focus can change via keyboard)
     /// 2. The detection logic (string comparisons, Set lookups) is very fast
     /// 3. Simpler code without cache = fewer bugs
-    func detectInjectionMethod() -> InjectionMethodInfo {
+    func detectInjectionMethod(focusedInfo: FocusedElementInfo? = nil) -> InjectionMethodInfo {
         // Priority 0: Check force override (set by Injection Test)
         if let forcedMethod = forceInjectionMethod {
             let delays = forceDelays ?? getDefaultDelays(for: forcedMethod)
@@ -1664,11 +1788,14 @@ class AppBehaviorDetector {
             return .defaultFast
         }
 
-        let currentRole = getFocusedElementInfo().role
+        // OPTIMIZED: Use pre-queried focusedInfo if available (from focus change handler)
+        // This avoids redundant AX API calls (~10 calls saved per focus change)
+        let focusedInfo = focusedInfo ?? getFocusedElementInfo()
+        let currentRole = focusedInfo.role
 
         // Priority 0.2: Terminal panels in VSCode/Cursor/etc
         // Check directly via AX Description - doesn't go through overlay detection if it's a terminal panel (VSCode/Cursor)
-        if isInTerminalPanel() {
+        if isInTerminalPanel(info: focusedInfo) {
             return InjectionMethodInfo(
                 method: .slow,
                 delays: Self.terminalDelays,
@@ -1681,7 +1808,7 @@ class AppBehaviorDetector {
         // Code blocks need higher delays and oneByOne text mode to prevent race conditions
         // Also applies to AXRole: Unknown as fallback - these are often problematic input areas
         if bundleId == "notion.id" {
-            let isCodeBlock = isNotionCodeBlock()
+            let isCodeBlock = isNotionCodeBlock(info: focusedInfo)
             let isUnknownRole = currentRole == "AXUnknown" || currentRole == nil
             
             if isCodeBlock || isUnknownRole {
@@ -1720,7 +1847,7 @@ class AppBehaviorDetector {
         if isBrowserApp {
             // Safari address bar
             if (bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview")
-                && isSafariAddressBar() {
+                && isSafariAddressBar(info: focusedInfo) {
                 return InjectionMethodInfo(
                     method: .selection,
                     delays: InjectionMethod.selection.defaultDelays,
@@ -1732,12 +1859,12 @@ class AppBehaviorDetector {
             // Chromium address bar (Chrome, Edge, Brave, etc.)
             // Use .fast + emptyCharPrefix to break autocomplete
             // Selection method (Shift+Left) causes race conditions with browser autocomplete
-            if isChromiumAddressBar() {
+            if isChromiumAddressBar(info: focusedInfo) {
                 return makeAddressBarInjection(browserType: "Chromium", bundleId: bundleId)
             }
             
             // Dia Browser address bar (AX Identifier: commandBarTextField)
-            if bundleId == "company.thebrowser.dia" && isDiaAddressBar() {
+            if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: focusedInfo) {
                 return InjectionMethodInfo(
                     method: .axDirect,
                     delays: InjectionMethod.axDirect.defaultDelays,
@@ -1748,7 +1875,7 @@ class AppBehaviorDetector {
             
             // Firefox-based browsers address bar (AXDOMIdentifier: "urlbar-input")
             // Use .fast + emptyCharPrefix to break autocomplete
-            if Self.firefoxBasedBrowsers.contains(bundleId) && isFirefoxStyleAddressBar() {
+            if Self.firefoxBasedBrowsers.contains(bundleId) && isFirefoxStyleAddressBar(info: focusedInfo) {
                 return makeAddressBarInjection(browserType: "Firefox", bundleId: bundleId)
             }
             
@@ -1777,7 +1904,7 @@ class AppBehaviorDetector {
         }
 
         // Priority 1: Check Window Title Rules for context-specific injection method (merged cascade)
-        let mergedResult = getMergedRuleResult()
+        let mergedResult = getMergedRuleResult(focusedInfo: focusedInfo)
         if let injectionMethod = mergedResult.injectionMethod {
             let delays: InjectionDelays
             if let d = mergedResult.injectionDelays, d.count >= 3 {
@@ -1799,7 +1926,7 @@ class AppBehaviorDetector {
         }
 
         // Priority 2: Fall back to bundle ID based detection
-        return getInjectionMethod(for: bundleId, role: currentRole)
+        return getInjectionMethod(for: bundleId, role: currentRole, info: focusedInfo)
     }
     
     /// Get default delays for an injection method
@@ -1808,7 +1935,7 @@ class AppBehaviorDetector {
         return method.defaultDelays
     }
 
-    private func getInjectionMethod(for bundleId: String, role: String?) -> InjectionMethodInfo {        
+    private func getInjectionMethod(for bundleId: String, role: String?, info: FocusedElementInfo) -> InjectionMethodInfo {
         // Priority 1: Selection method for autocomplete UI elements (ComboBox, SearchField)
         if role == "AXComboBox" || role == "AXSearchField" {
             return InjectionMethodInfo(
@@ -1823,7 +1950,7 @@ class AppBehaviorDetector {
         // Address bar detected via AX Description: "Search with xx or enter address"
         // Only use axDirect for address bar, content area uses default fast method
         if Self.axAttributeDetectForBrowsers.contains(bundleId) {
-            if isFirefoxStyleAddressBar() {
+            if isFirefoxStyleAddressBar(info: info) {
                 return InjectionMethodInfo(
                     method: .axDirect,
                     delays: InjectionMethod.axDirect.defaultDelays,
@@ -1945,26 +2072,6 @@ extension AppBehaviorDetector {
             || Self.axAttributeDetectForBrowsers.contains(bundleId)
     }
     
-    /// Check if current app has marked text issues
-    var hasMarkedTextIssues: Bool {
-        return detectIMKitBehavior().hasMarkedTextIssues
-    }
-    
-    /// Check if should prefer direct insertion over marked text for current app
-    var shouldPreferDirectInsertion: Bool {
-        let behavior = detectIMKitBehavior()
-        return behavior.hasMarkedTextIssues
-    }
-    
-    /// Check if current app needs selection method (for CharacterInjector)
-    var needsSelectionMethod: Bool {
-        return detectInjectionMethod().method == .selection
-    }
-    
-    /// Check if current app needs slow injection (for CharacterInjector)
-    var needsSlowInjection: Bool {
-        return detectInjectionMethod().method == .slow
-    }
     
     /// Check if current context needs Forward Delete with AX check before backspaces
     /// This applies to apps with autocomplete suggestions that can interfere with backspace:

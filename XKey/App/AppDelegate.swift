@@ -29,156 +29,11 @@ private func axFocusChangedCallback(
     }
 }
 
-// MARK: - Focused Element Info (cached AX attributes)
+// MARK: - Focused Element Info (typealias to AppBehaviorDetector)
 
-/// Cached information about a focused AX element
-/// Used to avoid redundant AX API calls during focus check
-private struct FocusedElementInfo {
-    let element: AXUIElement
-    let role: String?
-    let subrole: String?
-    let description: String?
-    let domId: String?
-    let roleDescription: String?
-    let windowTitle: String?
-    
-    /// Unique signature for detecting focus changes
-    /// Includes role, subrole, description (truncated), DOM ID, and window title
-    /// Window title is included to detect Chrome profile switches (same app, different windows)
-    var signature: String {
-        var parts: [String] = []
-        if let role = role {
-            parts.append(role)
-        }
-        if let subrole = subrole {
-            parts.append(subrole)
-        }
-        if let desc = description, !desc.isEmpty {
-            let truncated = String(desc.prefix(50))
-            parts.append("desc:\(truncated)")
-        }
-        if let domId = domId, !domId.isEmpty {
-            parts.append("dom:\(domId)")
-        }
-        // Include window title to detect Chrome profile switches
-        // When user switches between Chrome profiles, window title changes
-        // This ensures injection method is re-detected immediately
-        if let title = windowTitle, !title.isEmpty {
-            // Truncate to avoid overly long signatures
-            let truncated = String(title.prefix(100))
-            parts.append("win:\(truncated)")
-        }
-        return parts.joined(separator: "|")
-    }
-    
-    /// Check if element is a text input field
-    var isTextInput: Bool {
-        guard let role = role else { return false }
-        
-        // Text input roles - only these are true text inputs
-        let textRoles = ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"]
-        if textRoles.contains(role) {
-            return true
-        }
-        
-        // Check subrole for web content text fields
-        if let subrole = subrole {
-            if subrole == "AXSearchField" || subrole == "AXSecureTextField" {
-                return true
-            }
-        }
-        
-        // For contenteditable web elements (role=AXGroup or AXWebArea),
-        // check if RoleDescription contains text input keywords
-        if role == "AXGroup" || role == "AXWebArea" {
-            if let roleDesc = roleDescription {
-                let lowerDesc = roleDesc.lowercased()
-                if lowerDesc.contains("field") || lowerDesc.contains("editor") || lowerDesc.contains("input") {
-                    return true
-                }
-            }
-        }
-        
-        return false
-    }
-    
-    /// Check if element has a text caret (insertion point)
-    /// Fallback to isTextInput if kAXSelectedTextRangeAttribute is not supported
-    var hasCaret: Bool {
-        // Try to get selected text range - if this exists, element has a caret
-        var rangeRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success {
-            return rangeRef != nil
-        }
-        
-        // Fallback: if can't check caret, use role-based check
-        // Some apps (e.g., Electron, some web apps) don't support kAXSelectedTextRangeAttribute
-        return isTextInput
-    }
-    
-    /// Check if element is an editable text field with caret
-    /// More strict check: must be text input AND have caret
-    var isEditableTextInput: Bool {
-        return isTextInput && hasCaret
-    }
-    
-    /// Create from AXUIElement by querying all needed attributes once
-    static func from(_ element: AXUIElement) -> FocusedElementInfo {
-        var role: String?
-        var subrole: String?
-        var description: String?
-        var domId: String?
-        var roleDescription: String?
-        var windowTitle: String?
-        
-        // Query all attributes in one pass
-        var ref: CFTypeRef?
-        
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &ref) == .success {
-            role = ref as? String
-        }
-        
-        if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &ref) == .success {
-            subrole = ref as? String
-        }
-        
-        if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &ref) == .success {
-            description = ref as? String
-        }
-        
-        if AXUIElementCopyAttributeValue(element, "AXDOMIdentifier" as CFString, &ref) == .success {
-            domId = ref as? String
-        }
-        
-        if AXUIElementCopyAttributeValue(element, kAXRoleDescriptionAttribute as CFString, &ref) == .success {
-            roleDescription = ref as? String
-        }
-        
-        // Get window title from frontmost app's focused window
-        // This is important for detecting Chrome profile switches
-        if let app = NSWorkspace.shared.frontmostApplication {
-            let appElement = AXUIElementCreateApplication(app.processIdentifier)
-            var focusedWindow: CFTypeRef?
-            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
-               let windowElement = focusedWindow as! AXUIElement? {
-                var titleValue: CFTypeRef?
-                if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success {
-                    windowTitle = titleValue as? String
-                }
-            }
-        }
-        
-        return FocusedElementInfo(
-            element: element,
-            role: role,
-            subrole: subrole,
-            description: description,
-            domId: domId,
-            roleDescription: roleDescription,
-            windowTitle: windowTitle
-        )
-    }
-}
+/// Use the unified FocusedElementInfo struct from AppBehaviorDetector
+/// to avoid redundant struct definitions and AX queries
+private typealias FocusedElementInfo = AppBehaviorDetector.FocusedElementInfo
 
 class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -225,6 +80,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Used to detect when user switches from web content to address bar, etc.
     /// Signature includes role, subrole, and description/identifier
     private var lastFocusedElementSignature: String = ""
+    
+    /// Throttle AXObserver focus change callbacks to prevent rapid-fire AX queries
+    /// When apps have animations or autocomplete, AXObserver can fire many times per second
+    private var lastAXFocusChangeTime: CFAbsoluteTime = 0
+    private let axFocusChangeThrottleInterval: CFAbsoluteTime = 0.1 // 100ms
 
     // MARK: - Initialization
 
@@ -1469,10 +1329,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func detectBehaviorWithRetry(attempt: Int, maxAttempts: Int, interval: TimeInterval) {
         let detector = AppBehaviorDetector.shared
         
+        // OPTIMIZED: Query focusedInfo ONCE, pass to detectInjectionMethod
+        let focusedInfo = detector.getFocusedElementInfo()
+        
         // Get current detection results
         let behavior = detector.detect()
         let behaviorName = getBehaviorName(behavior)
-        let injectionInfo = detector.detectInjectionMethod()
+        let injectionInfo = detector.detectInjectionMethod(focusedInfo: focusedInfo)
         
         // IMMEDIATELY set confirmed injection method so keystrokes use this method
         // This applies the best available method at each retry attempt
@@ -1499,11 +1362,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Final attempt OR not overlay behavior - log the result
-        logFinalMouseClickDetection(attempt: attempt, wasRetried: attempt > 1)
+        // OPTIMIZED: Pass pre-queried data to avoid redundant AX queries in logging
+        logFinalMouseClickDetection(attempt: attempt, wasRetried: attempt > 1, injectionInfo: injectionInfo, focusedInfo: focusedInfo)
     }
     
     /// Log final mouse click detection result
-    private func logFinalMouseClickDetection(attempt: Int, wasRetried: Bool) {
+    /// OPTIMIZED: Accepts pre-queried injectionInfo and focusedInfo to avoid redundant AX queries
+    /// This is a pure logging function — all detection is already done by detectBehaviorWithRetry
+    private func logFinalMouseClickDetection(attempt: Int, wasRetried: Bool, injectionInfo: InjectionMethodInfo, focusedInfo: FocusedElementInfo) {
+        // Early return if debug window is not open — pure logging function
+        // Injection method is already set by detectBehaviorWithRetry, no need to re-detect
+        guard debugWindowController != nil else { return }
+        
         // Get frontmost app info
         guard let app = NSWorkspace.shared.frontmostApplication,
               let bundleId = app.bundleIdentifier else {
@@ -1512,39 +1382,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let appName = app.localizedName ?? "Unknown"
-
-        // Get focused element info from Accessibility API (single query for all attributes)
         let detector = AppBehaviorDetector.shared
-        let elementInfo = detector.getFocusedElementInfo()
-        let elementRole = elementInfo.role ?? "Unknown"
-        let elementSubrole = elementInfo.subrole
-        let axDescription = elementInfo.description
-        let axIdentifier = elementInfo.identifier
-        let domClasses = elementInfo.domClasses
-        
-        // Get window title
-        let windowTitle = detector.getCachedWindowTitle()
 
-        // Get app behavior type
+        // OPTIMIZED: Use pre-queried focusedInfo instead of re-querying AX API
+        let elementRole = focusedInfo.role ?? "Unknown"
+        let elementSubrole = focusedInfo.subrole
+        let axDescription = focusedInfo.description
+        let axIdentifier = focusedInfo.identifier
+        let domClasses = focusedInfo.domClasses
+        
+        // Get window title from focusedInfo (already queried) or cache
+        let windowTitle = focusedInfo.windowTitle ?? detector.getCachedWindowTitle()
+
+        // Get app behavior type (cached, no AX query)
         let behavior = detector.detect()
         let behaviorName = getBehaviorName(behavior)
 
-        // Get injection method info
-        let injectionInfo = detector.detectInjectionMethod()
+        // OPTIMIZED: Use pre-queried injectionInfo instead of calling detectInjectionMethod() again
         let injectionMethodName = getInjectionMethodName(injectionInfo.method)
-        
-        // Set as confirmed injection method (final result after all retries)
-        detector.setConfirmedInjectionMethod(injectionInfo)
 
         // Get current input source
         let inputSource = InputSourceManager.getCurrentInputSource()
         let inputSourceName = inputSource?.displayName ?? "Unknown"
         
-        // Get matched Window Title Rule (if any)
-        let matchedRule = detector.findMatchingRule()
-        
-        // Get IMKit behavior
-        let imkitBehavior = detector.detectIMKitBehavior()
+        // OPTIMIZED: Pass pre-queried focusedInfo to avoid redundant AX queries
+        let matchedRule = detector.findMatchingRule(focusedInfo: focusedInfo)
+        let imkitBehavior = detector.detectIMKitBehavior(focusedInfo: focusedInfo)
 
         // Log everything with nice formatting
         if wasRetried {
@@ -1573,7 +1436,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugWindowController?.logEvent("   Behavior: \(behaviorName)")
-        let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+        let textMethodName: String = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
         debugWindowController?.logEvent("   Injection: \(injectionMethodName) [bs:\(injectionInfo.delays.backspace)µs, wait:\(injectionInfo.delays.wait)µs, txt:\(injectionInfo.delays.text)µs] [\(textMethodName)] ✓ confirmed")
         debugWindowController?.logEvent("   IMKit: markedText=\(imkitBehavior.useMarkedText), issues=\(imkitBehavior.hasMarkedTextIssues), delay=\(imkitBehavior.commitDelay)µs")
         debugWindowController?.logEvent("   Input Source: \(inputSourceName)")
@@ -1979,7 +1842,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Re-detect injection method (needed for address bar, terminal, etc.)
             let detector = AppBehaviorDetector.shared
-            let injectionInfo = detector.detectInjectionMethod()
+            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
             let previousMethod = detector.getConfirmedInjectionMethod()
             
             // Log focus change
@@ -2095,6 +1958,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// This is called by the C callback function
     /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes
     func handleAXFocusChanged(_ element: AXUIElement) {
+        // Throttle: Skip if called too rapidly (< 100ms since last call)
+        // This prevents blocking the main thread when AXObserver fires rapidly
+        // (e.g., during autocomplete, animations, or rapid UI updates)
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastAXFocusChangeTime > axFocusChangeThrottleInterval else {
+            return
+        }
+        lastAXFocusChangeTime = now
+        
         // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
         let elementInfo = FocusedElementInfo.from(element)
         let currentSignature = elementInfo.signature
@@ -2104,7 +1976,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Re-detect injection method (needed for address bar, terminal, etc.)
             let detector = AppBehaviorDetector.shared
-            let injectionInfo = detector.detectInjectionMethod()
+            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
             let previousMethod = detector.getConfirmedInjectionMethod()
             
             // Log focus change

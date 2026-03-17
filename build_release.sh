@@ -450,14 +450,24 @@ if [ "$ENABLE_NOTARIZE" = true ] && [ "$ENABLE_CODESIGN" = true ]; then
     fi
     
     # Submit for notarization and capture output
+    # NOTE: notarytool may return non-zero exit code on failure,
+    # so we temporarily disable set -e to capture output and handle errors ourselves
     echo "⏳ Submitting to Apple for notarization (this may take several minutes)..."
+    set +e
     NOTARIZE_OUTPUT=$(xcrun notarytool submit "$NOTARIZE_TARGET" \
         --apple-id "$APPLE_ID" \
         --team-id "$APPLE_TEAM_ID" \
         --password "$APPLE_APP_PASSWORD" \
         --wait 2>&1)
+    NOTARIZE_EXIT=$?
+    set -e
     
     echo "$NOTARIZE_OUTPUT"
+    
+    if [ $NOTARIZE_EXIT -ne 0 ] && ! echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
+        echo ""
+        echo "⚠️  notarytool exited with code $NOTARIZE_EXIT"
+    fi
     
     # Extract submission ID
     SUBMISSION_ID=$(echo "$NOTARIZE_OUTPUT" | grep -E "^\s*id:" | head -1 | awk '{print $2}')

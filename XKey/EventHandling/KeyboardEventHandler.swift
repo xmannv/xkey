@@ -827,6 +827,15 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // so NSWorkspace.shared.frontmostApplication would return the excluded app underneath.
         // We must check overlay visibility FIRST to avoid blocking Vietnamese in overlays.
         if OverlayAppDetector.shared.isOverlayAppVisible() {
+            // FIX: When overlay is visible, ensure confirmedInjectionMethod reflects the overlay context.
+            // Without this, there's a 0-500ms gap between overlay becoming visible and timer polling
+            // updating the injection method. During this gap, keystrokes use the stale method from
+            // the previous app (e.g., .fast from Chrome instead of .autocomplete for Spotlight).
+            let currentMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
+            if !currentMethod.description.contains("Overlay") {
+                let updatedMethod = AppBehaviorDetector.shared.detectInjectionMethod()
+                AppBehaviorDetector.shared.setConfirmedInjectionMethod(updatedMethod)
+            }
             return false  // Overlay apps are never excluded - allow Vietnamese typing
         }
         
