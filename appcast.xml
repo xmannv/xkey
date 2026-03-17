@@ -6,18 +6,58 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260315)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260315</link>
-      <sparkle:version>20260315</sparkle:version>
+      <title>Version 1.2.21 (Build 20260317)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317</link>
+      <sparkle:version>20260317</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Lower deployment target to macOS 12.0, bump build version</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260315">Xem chi tiết trên GitHub</a></p>
+<p>refactor: Unify FocusedElementInfo and optimize AX API queries</p>
+<ul>
+<li>Move FocusedElementInfo from AppDelegate to AppBehaviorDetector as a</li>
+</ul>
+<p>  public struct, eliminating duplicate struct definition. AppDelegate now</p>
+<p>  uses a typealias to the unified struct.</p>
+<ul>
+<li>Add new fields to FocusedElementInfo: element (for hasCaret check),</li>
+</ul>
+<p>  roleDescription (for contenteditable detection), windowTitle (for rule</p>
+<p>  matching and signature), plus computed properties (signature,</p>
+<p>  isTextInput, hasCaret, isEditableTextInput) and factory method from().</p>
+<ul>
+<li>Pass pre-queried FocusedElementInfo through detection chain to avoid</li>
+</ul>
+<p>  redundant AX API calls (~10 calls saved per focus change):</p>
+<p>  * detectInjectionMethod(focusedInfo:)</p>
+<p>  * detectIMKitBehavior(focusedInfo:)</p>
+<p>  * getMergedRuleResult(focusedInfo:)</p>
+<p>  * Browser address bar checks (Safari, Chromium, Firefox, Dia)</p>
+<p>  * getInjectionMethod(for:role:info:)</p>
+<ul>
+<li>Optimize AppDelegate focus handling:</li>
+</ul>
+<p>  * Throttle AXObserver callbacks (100ms interval) to prevent rapid-fire</p>
+<p>    AX queries during autocomplete/animations</p>
+<p>  * logFinalMouseClickDetection now accepts pre-queried data and early</p>
+<p>    returns when debug window is not open</p>
+<p>  * Remove redundant detectInjectionMethod() calls in logging path</p>
+<ul>
+<li>Fix overlay injection method delay: When overlay becomes visible,</li>
+</ul>
+<p>  immediately update confirmedInjectionMethod to prevent 0-500ms gap</p>
+<p>  where keystrokes use stale method from previous app</p>
+<ul>
+<li>Remove unused convenience properties (hasMarkedTextIssues,</li>
+</ul>
+<p>  shouldPreferDirectInsertion, needsSelectionMethod, needsSlowInjection)</p>
+<ul>
+<li>Bump build version to 20260317</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 15 Mar 2026 06:54:50 +0000</pubDate>
+      <pubDate>Tue, 17 Mar 2026 14:11:50 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260315/XKey.dmg" sparkle:version="20260315" sparkle:shortVersionString="1.2.21" length="11814334" type="application/octet-stream" sparkle:edSignature="ghoGniJdH8iG5j1fcVdajozh6Yq74Yg11Xi++nAV5tdYGiKU0l1V/2PLPVwCZ1qjktX3Qp7QHenexb4WJ1uXDQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260317/XKey.dmg" sparkle:version="20260317" sparkle:shortVersionString="1.2.21" length="11824481" type="application/octet-stream" sparkle:edSignature="L191F3ZUPyf9NYOtAIN/pYcQH1sA+erEQuo4IcsYV0HZiUeLcsYFuCClkTrYog4H8/FfbZx9A3QFJg6w6lo6Cw==" />
     </item>
   </channel>
 </rss>
