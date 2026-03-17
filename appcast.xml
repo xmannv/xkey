@@ -6,58 +6,43 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260317)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317</link>
-      <sparkle:version>20260317</sparkle:version>
+      <title>Version 1.2.21 (Build 20260317.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317.1</link>
+      <sparkle:version>20260317.1</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>refactor: Unify FocusedElementInfo and optimize AX API queries</p>
+<p>feat: event-driven overlay detection with probe arming</p>
+<p>Replace polling-based overlay detection with an event-driven probe</p>
+<p>mechanism for O(1) steady-state performance:</p>
 <ul>
-<li>Move FocusedElementInfo from AppDelegate to AppBehaviorDetector as a</li>
+<li>Add armProbe() / armProbeDeferred() to OverlayAppDetector for</li>
 </ul>
-<p>  public struct, eliminating duplicate struct definition. AppDelegate now</p>
-<p>  uses a typealias to the unified struct.</p>
+<p>  explicit probe lifecycle management</p>
 <ul>
-<li>Add new fields to FocusedElementInfo: element (for hasCaret check),</li>
+<li>Cache overlay state for instant reads; only perform AX queries</li>
 </ul>
-<p>  roleDescription (for contenteditable detection), windowTitle (for rule</p>
-<p>  matching and signature), plus computed properties (signature,</p>
-<p>  isTextInput, hasCaret, isEditableTextInput) and factory method from().</p>
+<p>  when a probe is armed by external signals (modifier keys, Esc,</p>
+<p>  Return, mouse clicks)</p>
 <ul>
-<li>Pass pre-queried FocusedElementInfo through detection chain to avoid</li>
+<li>armProbeDeferred() adds 50ms delay for close signals (Esc/Return)</li>
 </ul>
-<p>  redundant AX API calls (~10 calls saved per focus change):</p>
-<p>  * detectInjectionMethod(focusedInfo:)</p>
-<p>  * detectIMKitBehavior(focusedInfo:)</p>
-<p>  * getMergedRuleResult(focusedInfo:)</p>
-<p>  * Browser address bar checks (Safari, Chromium, Firefox, Dia)</p>
-<p>  * getInjectionMethod(for:role:info:)</p>
+<p>  to let the overlay process the key and dismiss before probing</p>
 <ul>
-<li>Optimize AppDelegate focus handling:</li>
+<li>Add probe timeout safety net (0.8s) to auto-disarm stale probes</li>
 </ul>
-<p>  * Throttle AXObserver callbacks (100ms interval) to prevent rapid-fire</p>
-<p>    AX queries during autocomplete/animations</p>
-<p>  * logFinalMouseClickDetection now accepts pre-queried data and early</p>
-<p>    returns when debug window is not open</p>
-<p>  * Remove redundant detectInjectionMethod() calls in logging path</p>
+<p>Cleanup:</p>
 <ul>
-<li>Fix overlay injection method delay: When overlay becomes visible,</li>
+<li>Remove detectOverlayApps setting and UI toggle (always enabled)</li>
+<li>Remove unused getAppBundleIdFromElement/getFocusedElementAppBundleId</li>
+<li>Simplify KeyboardEventHandler overlay check flow</li>
+<li>Update StatusBarViewModel overlay state display to use cached values</li>
 </ul>
-<p>  immediately update confirmedInjectionMethod to prevent 0-500ms gap</p>
-<p>  where keystrokes use stale method from previous app</p>
-<ul>
-<li>Remove unused convenience properties (hasMarkedTextIssues,</li>
-</ul>
-<p>  shouldPreferDirectInsertion, needsSelectionMethod, needsSlowInjection)</p>
-<ul>
-<li>Bump build version to 20260317</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 17 Mar 2026 14:11:50 +0000</pubDate>
+      <pubDate>Tue, 17 Mar 2026 17:38:38 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260317/XKey.dmg" sparkle:version="20260317" sparkle:shortVersionString="1.2.21" length="11824481" type="application/octet-stream" sparkle:edSignature="L191F3ZUPyf9NYOtAIN/pYcQH1sA+erEQuo4IcsYV0HZiUeLcsYFuCClkTrYog4H8/FfbZx9A3QFJg6w6lo6Cw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260317.1/XKey.dmg" sparkle:version="20260317.1" sparkle:shortVersionString="1.2.21" length="11819382" type="application/octet-stream" sparkle:edSignature="lrE8WR5w4YvjdvUTZ2mgOvWvK1qYUsz8ORMndFxjYI0ODUeyXzPU241Zn9E4uFEQ9b/lTsRO+wCPvxb4EDYuBQ==" />
     </item>
   </channel>
 </rss>
