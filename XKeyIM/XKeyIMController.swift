@@ -49,6 +49,15 @@ class XKeyIMController: IMKInputController {
     /// Last known cursor selection location for detecting cursor movement
     /// When cursor moves (mouse click, arrow keys from other sources), we reset with cursorMoved flag
     private var lastKnownSelectionLocation: Int = NSNotFound
+    
+    /// Whether the current client has broken cursor tracking (always returns 0)
+    /// Auto-detected: if after setMarkedText, selectedRange().location is still 0 when
+    /// we expect it to be markedTextStartLocation + text.length, the client is broken.
+    /// Examples: Warp terminal, some terminal emulators
+    private var cursorTrackingBroken: Bool = false
+    
+    /// Last known client bundle ID, used to reset cursorTrackingBroken on app switch
+    private var lastClientBundleId: String = ""
 
     // MARK: - Initialization
 
@@ -205,10 +214,18 @@ class XKeyIMController: IMKInputController {
         // Case 2: Has composing text - compare with markedTextStartLocation + composingText length
         var cursorMoved = false
         
-        // CRITICAL FIX: Skip cursor movement detection for overlay apps (Spotlight, Raycast, Alfred)
-        // These apps have autocomplete that changes cursor/selection unpredictably after each keystroke
+        // Reset cursorTrackingBroken flag when switching to a different app
+        if bundleId != lastClientBundleId {
+            cursorTrackingBroken = false
+            lastClientBundleId = bundleId
+            IMKitDebugger.shared.log("App switched to \(bundleId), reset cursorTrackingBroken", category: "CURSOR")
+        }
+        
+        // CRITICAL FIX: Skip cursor movement detection for:
+        // 1. Overlay apps (Spotlight, Raycast, Alfred) - autocomplete changes cursor unpredictably
+        // 2. Apps with broken cursor tracking (Warp, some terminals) - always report location=0
         // Without this fix, engine resets after every character, breaking Vietnamese composition
-        if !isOverlay && lastKnownSelectionLocation != NSNotFound {
+        if !isOverlay && !cursorTrackingBroken && lastKnownSelectionLocation != NSNotFound {
             if composingText.isEmpty {
                 // Not composing - check if cursor jumped more than 1 position
                 if actualLocation != expectedLocation && actualLocation != expectedLocation + 1 {
@@ -801,7 +818,21 @@ class XKeyIMController: IMKInputController {
         // Update cursor tracking: cursor is now at end of marked text
         // markedTextStartLocation + text length = expected cursor position
         if markedTextStartLocation != NSNotFound {
-            lastKnownSelectionLocation = markedTextStartLocation + text.utf16.count
+            let expectedCursorPos = markedTextStartLocation + text.utf16.count
+            lastKnownSelectionLocation = expectedCursorPos
+            
+            // AUTO-DETECT broken cursor tracking:
+            // After setMarkedText, the cursor should be at expectedCursorPos.
+            // If selectedRange().location doesn't match, the client doesn't properly
+            // track cursor position through IMKit API.
+            // Common in terminal emulators: Warp (always 0), iTerm2 (off-by-1), etc.
+            if !cursorTrackingBroken && expectedCursorPos > 0 {
+                let actualAfterMark = client.selectedRange().location
+                if actualAfterMark != expectedCursorPos {
+                    cursorTrackingBroken = true
+                    IMKitDebugger.shared.log("AUTO-DETECTED broken cursor tracking: after setMarkedText('\(text)'), selectedRange().location=\(actualAfterMark) but expected=\(expectedCursorPos). Disabling cursor movement detection for this client.", category: "CURSOR")
+                }
+            }
         }
     }
     
