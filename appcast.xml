@@ -6,43 +6,34 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260317.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317.1</link>
-      <sparkle:version>20260317.1</sparkle:version>
+      <title>Version 1.2.21 (Build 20260318)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318</link>
+      <sparkle:version>20260318</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: event-driven overlay detection with probe arming</p>
-<p>Replace polling-based overlay detection with an event-driven probe</p>
-<p>mechanism for O(1) steady-state performance:</p>
+<p>fix: auto-detect broken cursor tracking in terminal emulators</p>
 <ul>
-<li>Add armProbe() / armProbeDeferred() to OverlayAppDetector for</li>
+<li>Add cursorTrackingBroken flag to detect clients that don't properly</li>
 </ul>
-<p>  explicit probe lifecycle management</p>
+<p>  report cursor position through IMKit API (e.g., Warp, iTerm2)</p>
 <ul>
-<li>Cache overlay state for instant reads; only perform AX queries</li>
+<li>Auto-detect after setMarkedText: if selectedRange().location doesn't</li>
 </ul>
-<p>  when a probe is armed by external signals (modifier keys, Esc,</p>
-<p>  Return, mouse clicks)</p>
+<p>  match expected position, disable cursor movement detection for client</p>
 <ul>
-<li>armProbeDeferred() adds 50ms delay for close signals (Esc/Return)</li>
+<li>Reset detection flag on app switch via bundle ID tracking</li>
+<li>Skip cursor movement detection for broken-tracking clients to prevent</li>
 </ul>
-<p>  to let the overlay process the key and dismiss before probing</p>
+<p>  engine reset during Vietnamese composition</p>
 <ul>
-<li>Add probe timeout safety net (0.8s) to auto-disarm stale probes</li>
+<li>Bump build number to 20260318</li>
 </ul>
-<p>Cleanup:</p>
-<ul>
-<li>Remove detectOverlayApps setting and UI toggle (always enabled)</li>
-<li>Remove unused getAppBundleIdFromElement/getFocusedElementAppBundleId</li>
-<li>Simplify KeyboardEventHandler overlay check flow</li>
-<li>Update StatusBarViewModel overlay state display to use cached values</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260317.1">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 17 Mar 2026 17:48:56 +0000</pubDate>
+      <pubDate>Wed, 18 Mar 2026 10:04:38 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260317.1/XKey.dmg" sparkle:version="20260317.1" sparkle:shortVersionString="1.2.21" length="11821393" type="application/octet-stream" sparkle:edSignature="QlG0pP34aGcPPRzN0XDKzpp22Rz+itI/26gJcf9Mi+BMg26MpxmqbAIq/HgRLQAn9NAICjfaEidttuP9Sk1IAA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260318/XKey.dmg" sparkle:version="20260318" sparkle:shortVersionString="1.2.21" length="11822430" type="application/octet-stream" sparkle:edSignature="z79/X9sMXDKEcY8gdTxxUBksa/Ipgm+wy7OzrYcPsuHY6wf+1w9+7i54p3jvK071PH2un/pNshq4f7kFyszdDA==" />
     </item>
   </channel>
 </rss>
