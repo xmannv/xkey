@@ -105,33 +105,21 @@ class AdvancedInjectionMethods {
     /// - Returns: true if successful, false if caller should fallback to synthetic events
     func injectViaAX(bs: Int, text: String) -> Bool {
         // Get focused element
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let ref = focusedRef else {
+        guard let axEl = AXHelper.getFocusedElement() else {
             debugCallback?("[AX] No focused element")
             return false
         }
-        let axEl = ref as! AXUIElement
         
         // Read current text value
-        var valueRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &valueRef) == .success else {
+        guard let fullText = AXHelper.getString(axEl, attribute: kAXValueAttribute) else {
             debugCallback?("[AX] No value attribute")
             return false
         }
-        let fullText = (valueRef as? String) ?? ""
         
         // Read cursor position and selection
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(axEl, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-              let axRange = rangeRef else {
+        guard let range = AXHelper.getRange(axEl, attribute: kAXSelectedTextRangeAttribute),
+              range.location >= 0 else {
             debugCallback?("[AX] No selected text range")
-            return false
-        }
-        var range = CFRange()
-        guard AXValueGetValue(axRange as! AXValue, .cfRange, &range), range.location >= 0 else {
-            debugCallback?("[AX] Invalid range")
             return false
         }
         
@@ -151,7 +139,7 @@ class AdvancedInjectionMethods {
         let newText = (prefix + text + suffix).precomposedStringWithCanonicalMapping
         
         // Write new value
-        guard AXUIElementSetAttributeValue(axEl, kAXValueAttribute as CFString, newText as CFTypeRef) == .success else {
+        guard AXHelper.setValue(axEl, attribute: kAXValueAttribute, value: newText as CFTypeRef) == .success else {
             debugCallback?("[AX] Write failed")
             return false
         }
@@ -159,7 +147,7 @@ class AdvancedInjectionMethods {
         // Update cursor to end of inserted text
         var newCursor = CFRange(location: deleteStart + text.count, length: 0)
         if let newRange = AXValueCreate(.cfRange, &newCursor) {
-            AXUIElementSetAttributeValue(axEl, kAXSelectedTextRangeAttribute as CFString, newRange)
+            AXHelper.setValue(axEl, attribute: kAXSelectedTextRangeAttribute, value: newRange)
         }
 
         debugCallback?("[AX] Success: bs=\(bs), text=\(text)")

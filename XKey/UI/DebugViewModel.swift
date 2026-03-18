@@ -708,8 +708,8 @@ class DebugViewModel: ObservableObject {
         }
         addAppDetectorLog("  → Behavior: \(behaviorName)")
         
-        // Get injection method info
-        let injectionInfo = detector.detectInjectionMethod()
+        // Get injection method info — reuse focusedInfo to avoid duplicate AX queries
+        let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
         let injectionMethodName: String
 
         switch injectionInfo.method {
@@ -814,11 +814,7 @@ class DebugViewModel: ObservableObject {
         }
         
         // Get focused UI element via AX API
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             DispatchQueue.main.async {
                 self.focusedWindowTitle = "(no focus)"
                 self.focusedInputRole = "(no element)"
@@ -828,80 +824,37 @@ class DebugViewModel: ObservableObject {
             return
         }
         
-        let axElement = focusedElement as! AXUIElement
-        
         // Get window title
         let windowTitle = getWindowTitle(from: axElement, pid: frontmostApp.processIdentifier)
         
         // Get role and subrole
-        var roleRef: CFTypeRef?
-        var role = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let roleStr = roleRef as? String {
-            role = roleStr
-        }
-        
-        var subroleRef: CFTypeRef?
-        var subrole = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-           let subroleStr = subroleRef as? String {
-            subrole = subroleStr
-        }
+        let role = AXHelper.getString(axElement, attribute: kAXRoleAttribute) ?? ""
+        let subrole = AXHelper.getString(axElement, attribute: kAXSubroleAttribute) ?? ""
         
         // Get AX RoleDescription
-        var roleDescRef: CFTypeRef?
-        var roleDescription = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleDescriptionAttribute as CFString, &roleDescRef) == .success,
-           let roleDescStr = roleDescRef as? String {
-            roleDescription = roleDescStr
-        }
+        let roleDescription = AXHelper.getString(axElement, attribute: kAXRoleDescriptionAttribute) ?? ""
 
         // Get AX Description
-        var descRef: CFTypeRef?
-        var axDescription = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXDescriptionAttribute as CFString, &descRef) == .success,
-           let descStr = descRef as? String {
-            axDescription = descStr
-        }
+        let axDescription = AXHelper.getString(axElement, attribute: kAXDescriptionAttribute) ?? ""
 
         // Get AX Placeholder
-        var placeholderRef: CFTypeRef?
-        var placeholder = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXPlaceholderValueAttribute as CFString, &placeholderRef) == .success,
-           let placeholderStr = placeholderRef as? String {
-            placeholder = placeholderStr
-        }
+        let placeholder = AXHelper.getString(axElement, attribute: kAXPlaceholderValueAttribute) ?? ""
         
         // Get AX Title
-        var titleRef: CFTypeRef?
-        var axTitle = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXTitleAttribute as CFString, &titleRef) == .success,
-           let titleStr = titleRef as? String {
-            axTitle = titleStr
-        }
+        let axTitle = AXHelper.getString(axElement, attribute: kAXTitleAttribute) ?? ""
         
         // Get AX Identifier
-        var identifierRef: CFTypeRef?
-        var axIdentifier = ""
-        if AXUIElementCopyAttributeValue(axElement, kAXIdentifierAttribute as CFString, &identifierRef) == .success,
-           let identifierStr = identifierRef as? String {
-            axIdentifier = identifierStr
-        }
+        let axIdentifier = AXHelper.getString(axElement, attribute: kAXIdentifierAttribute) ?? ""
         
         // Get DOM ID (for web content)
-        var domIdRef: CFTypeRef?
-        var domId = ""
-        if AXUIElementCopyAttributeValue(axElement, "AXDOMIdentifier" as CFString, &domIdRef) == .success,
-           let domIdStr = domIdRef as? String {
-            domId = domIdStr
-        }
+        let domId = AXHelper.getString(axElement, attribute: "AXDOMIdentifier") ?? ""
         
         // Get DOM Class List (for web content)
-        var domClassRef: CFTypeRef?
-        var domClasses = ""
-        if AXUIElementCopyAttributeValue(axElement, "AXDOMClassList" as CFString, &domClassRef) == .success,
-           let classList = domClassRef as? [String] {
+        let domClasses: String
+        if let classList = AXHelper.getStringArray(axElement, attribute: "AXDOMClassList") {
             domClasses = classList.joined(separator: ", ")
+        } else {
+            domClasses = ""
         }
         
         // Get available actions
@@ -940,27 +893,17 @@ class DebugViewModel: ObservableObject {
     private func getWindowTitle(from element: AXUIElement, pid: pid_t) -> String {
         // Try to get from focused window of the app
         let appElement = AXUIElementCreateApplication(pid)
-        var windowRef: CFTypeRef?
         
-        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-           let window = windowRef {
-            let windowElement = window as! AXUIElement
-            var titleRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleRef) == .success,
-               let title = titleRef as? String {
-                return title
-            }
+        if let windowElement = AXHelper.getElement(appElement, attribute: kAXFocusedWindowAttribute),
+           let title = AXHelper.getString(windowElement, attribute: kAXTitleAttribute) {
+            return title
         }
         
         // Fallback: try main window
-        var windowsRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-           let windows = windowsRef as? [AXUIElement], let firstWindow = windows.first {
-            var titleRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(firstWindow, kAXTitleAttribute as CFString, &titleRef) == .success,
-               let title = titleRef as? String {
-                return title
-            }
+        if let windows = AXHelper.getElementArray(appElement, attribute: kAXWindowsAttribute),
+           let firstWindow = windows.first,
+           let title = AXHelper.getString(firstWindow, attribute: kAXTitleAttribute) {
+            return title
         }
         
         return "(no title)"
@@ -986,9 +929,7 @@ class DebugViewModel: ObservableObject {
     /// Get text info (caret position, word before/after) from AX element
     private func getTextInfoFromElement(_ element: AXUIElement) {
         // Get full text value
-        var valueRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef) == .success,
-              let text = valueRef as? String else {
+        guard let text = AXHelper.getString(element, attribute: kAXValueAttribute) else {
             DispatchQueue.main.async {
                 self.clearTextInfo()
             }
@@ -996,20 +937,11 @@ class DebugViewModel: ObservableObject {
         }
         
         // Get selected text range (caret position)
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success else {
+        guard let range = AXHelper.getRange(element, attribute: kAXSelectedTextRangeAttribute) else {
             DispatchQueue.main.async {
                 self.externalCaretPosition = 0
                 self.externalWordBeforeCaret = ""
                 self.externalWordAfterCaret = ""
-            }
-            return
-        }
-        
-        var range = CFRange(location: 0, length: 0)
-        if !AXValueGetValue(rangeRef as! AXValue, .cfRange, &range) {
-            DispatchQueue.main.async {
-                self.clearTextInfo()
             }
             return
         }
@@ -1094,10 +1026,10 @@ class DebugViewModel: ObservableObject {
         
         // Try to set AXManualAccessibility = true
         // This tells Chrome/Electron to keep accessibility enabled
-        let result = AXUIElementSetAttributeValue(
+        let result = AXHelper.setValue(
             appElement,
-            "AXManualAccessibility" as CFString,
-            kCFBooleanTrue
+            attribute: "AXManualAccessibility",
+            value: kCFBooleanTrue
         )
         
         DispatchQueue.main.async {
@@ -1127,10 +1059,10 @@ class DebugViewModel: ObservableObject {
         let appElement = AXUIElementCreateApplication(forceAccessibilityPid)
         
         // Set AXManualAccessibility = false
-        let result = AXUIElementSetAttributeValue(
+        let result = AXHelper.setValue(
             appElement,
-            "AXManualAccessibility" as CFString,
-            kCFBooleanFalse
+            attribute: "AXManualAccessibility",
+            value: kCFBooleanFalse
         )
         
         DispatchQueue.main.async {
@@ -1163,10 +1095,10 @@ class DebugViewModel: ObservableObject {
         let appElement = AXUIElementCreateApplication(pid)
         
         // Try AXEnhancedUserInterface
-        let result = AXUIElementSetAttributeValue(
+        let result = AXHelper.setValue(
             appElement,
-            "AXEnhancedUserInterface" as CFString,
-            kCFBooleanTrue
+            attribute: "AXEnhancedUserInterface",
+            value: kCFBooleanTrue
         )
         
         DispatchQueue.main.async {
@@ -1200,9 +1132,8 @@ class DebugViewModel: ObservableObject {
         logEvent("[AX-CHECK] Checking accessibility for \(appName) (\(bundleID)) PID=\(pid)")
         
         // Check AXManualAccessibility current value
-        var manualAxRef: CFTypeRef?
-        let manualAxResult = AXUIElementCopyAttributeValue(appElement, "AXManualAccessibility" as CFString, &manualAxRef)
         let manualAxStatus: String
+        let (manualAxResult, manualAxRef) = AXHelper.query(appElement, attribute: "AXManualAccessibility")
         if manualAxResult == .success {
             if let boolValue = manualAxRef as? Bool {
                 manualAxStatus = boolValue ? "true" : "false"
@@ -1214,9 +1145,8 @@ class DebugViewModel: ObservableObject {
         }
         
         // Check AXEnhancedUserInterface current value
-        var enhancedRef: CFTypeRef?
-        let enhancedResult = AXUIElementCopyAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, &enhancedRef)
         let enhancedStatus: String
+        let (enhancedResult, enhancedRef) = AXHelper.query(appElement, attribute: "AXEnhancedUserInterface")
         if enhancedResult == .success {
             if let boolValue = enhancedRef as? Bool {
                 enhancedStatus = boolValue ? "true" : "false"
@@ -1228,13 +1158,11 @@ class DebugViewModel: ObservableObject {
         }
         
         // Check if we can get focused window (basic accessibility test)
-        var windowRef: CFTypeRef?
-        let windowResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef)
+        let (windowResult, _) = AXHelper.query(appElement, attribute: kAXFocusedWindowAttribute)
         let windowStatus = windowResult == .success ? "✅ Available" : "❌ \(windowResult.humanReadableDescription)"
         
         // Check if we can get menu bar (another accessibility test)
-        var menuRef: CFTypeRef?
-        let menuResult = AXUIElementCopyAttributeValue(appElement, kAXMenuBarAttribute as CFString, &menuRef)
+        let (menuResult, _) = AXHelper.query(appElement, attribute: kAXMenuBarAttribute)
         let menuStatus = menuResult == .success ? "✅ Available" : "❌ \(menuResult.humanReadableDescription)"
         
         // Log results
@@ -1875,24 +1803,10 @@ class DebugViewModel: ObservableObject {
     
     /// Get text from currently focused element
     private func getFocusedElementText() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let element = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             return nil
         }
-        
-        let axElement = element as! AXUIElement
-        
-        // Get text value
-        var valueRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(axElement, kAXValueAttribute as CFString, &valueRef) == .success,
-              let text = valueRef as? String else {
-            return nil
-        }
-        
-        return text
+        return AXHelper.getString(axElement, attribute: kAXValueAttribute)
     }
     
     /// Log detailed AX info about the focused element for development purposes
@@ -1906,77 +1820,53 @@ class DebugViewModel: ObservableObject {
         }
         
         // Get focused element
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let element = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             addInjectionTestLog("(Could not get focused element)")
             return
         }
         
-        let axElement = element as! AXUIElement
-        
         // Get Role
-        var roleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let role = roleRef as? String {
+        if let role = AXHelper.getString(axElement, attribute: kAXRoleAttribute) {
             addInjectionTestLog("Role: \(role)")
         }
         
         // Get Subrole
-        var subroleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-           let subrole = subroleRef as? String {
+        if let subrole = AXHelper.getString(axElement, attribute: kAXSubroleAttribute) {
             addInjectionTestLog("Subrole: \(subrole)")
         }
         
         // Get RoleDescription
-        var roleDescRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleDescriptionAttribute as CFString, &roleDescRef) == .success,
-           let roleDesc = roleDescRef as? String {
+        if let roleDesc = AXHelper.getString(axElement, attribute: kAXRoleDescriptionAttribute) {
             addInjectionTestLog("RoleDesc: \(roleDesc)")
         }
         
         // Get Description
-        var descRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXDescriptionAttribute as CFString, &descRef) == .success,
-           let desc = descRef as? String, !desc.isEmpty {
+        if let desc = AXHelper.getString(axElement, attribute: kAXDescriptionAttribute), !desc.isEmpty {
             addInjectionTestLog("Description: \(desc)")
         }
         
         // Get Placeholder
-        var placeholderRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXPlaceholderValueAttribute as CFString, &placeholderRef) == .success,
-           let placeholder = placeholderRef as? String, !placeholder.isEmpty {
+        if let placeholder = AXHelper.getString(axElement, attribute: kAXPlaceholderValueAttribute), !placeholder.isEmpty {
             addInjectionTestLog("Placeholder: \(placeholder)")
         }
         
         // Get Title
-        var titleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXTitleAttribute as CFString, &titleRef) == .success,
-           let title = titleRef as? String, !title.isEmpty {
+        if let title = AXHelper.getString(axElement, attribute: kAXTitleAttribute), !title.isEmpty {
             addInjectionTestLog("Title: \(title)")
         }
         
         // Get Identifier
-        var identifierRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXIdentifierAttribute as CFString, &identifierRef) == .success,
-           let identifier = identifierRef as? String, !identifier.isEmpty {
+        if let identifier = AXHelper.getString(axElement, attribute: kAXIdentifierAttribute), !identifier.isEmpty {
             addInjectionTestLog("Identifier: \(identifier)")
         }
         
         // Get DOM Identifier (for web content)
-        var domIdRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, "AXDOMIdentifier" as CFString, &domIdRef) == .success,
-           let domId = domIdRef as? String, !domId.isEmpty {
+        if let domId = AXHelper.getString(axElement, attribute: "AXDOMIdentifier"), !domId.isEmpty {
             addInjectionTestLog("DOM ID: \(domId)")
         }
         
         // Get DOM Class List (for web content)
-        var domClassRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, "AXDOMClassList" as CFString, &domClassRef) == .success,
-           let classList = domClassRef as? [String], !classList.isEmpty {
+        if let classList = AXHelper.getStringArray(axElement, attribute: "AXDOMClassList"), !classList.isEmpty {
             addInjectionTestLog("DOM Classes: \(classList.joined(separator: ", "))")
         }
         
@@ -1990,15 +1880,9 @@ class DebugViewModel: ObservableObject {
         // Get Window Title
         if let app = NSWorkspace.shared.frontmostApplication {
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
-            var windowRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-               let window = windowRef {
-                let windowElement = window as! AXUIElement
-                var winTitleRef: CFTypeRef?
-                if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &winTitleRef) == .success,
-                   let winTitle = winTitleRef as? String {
-                    addInjectionTestLog("Window: \(winTitle)")
-                }
+            if let windowElement = AXHelper.getElement(appElement, attribute: kAXFocusedWindowAttribute),
+               let winTitle = AXHelper.getString(windowElement, attribute: kAXTitleAttribute) {
+                addInjectionTestLog("Window: \(winTitle)")
             }
         }
         

@@ -80,10 +80,10 @@ class ForceAccessibilityManager {
         let appElement = AXUIElementCreateApplication(pid)
         
         // Try to set AXManualAccessibility = true
-        let result = AXUIElementSetAttributeValue(
+        let result = AXHelper.setValue(
             appElement,
-            "AXManualAccessibility" as CFString,
-            kCFBooleanTrue
+            attribute: "AXManualAccessibility",
+            value: kCFBooleanTrue
         )
         
         if result == .success {
@@ -109,10 +109,10 @@ class ForceAccessibilityManager {
         let appElement = AXUIElementCreateApplication(enabledPid)
         
         // Set AXManualAccessibility = false
-        let result = AXUIElementSetAttributeValue(
+        let result = AXHelper.setValue(
             appElement,
-            "AXManualAccessibility" as CFString,
-            kCFBooleanFalse
+            attribute: "AXManualAccessibility",
+            value: kCFBooleanFalse
         )
         
         if result == .success {

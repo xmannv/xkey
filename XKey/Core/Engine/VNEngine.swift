@@ -3667,68 +3667,50 @@ extension VNEngine {
         let appElement = AXUIElementCreateApplication(focusedApp.processIdentifier)
         
         // Get focused element
-        var focusedElement: CFTypeRef?
-        let focusResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
-        
-        guard focusResult == .success, let element = focusedElement else {
-            logCallback?("  Cannot get focused element (error: \(focusResult.rawValue))")
+        guard let axElement = AXHelper.getElement(appElement, attribute: kAXFocusedUIElementAttribute) else {
+            logCallback?("  Cannot get focused element")
             return
         }
         
-        let axElement = element as! AXUIElement
-        
         // Get role
-        var roleValue: CFTypeRef?
-        AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleValue)
-        let role = roleValue as? String ?? "Unknown"
+        let role = AXHelper.getString(axElement, attribute: kAXRoleAttribute) ?? "Unknown"
         logCallback?("  Role: \(role)")
         
         // Get selected text range
-        var selectedRangeValue: CFTypeRef?
-        let rangeResult = AXUIElementCopyAttributeValue(axElement, kAXSelectedTextRangeAttribute as CFString, &selectedRangeValue)
-        
-        if rangeResult == .success, let rangeValue = selectedRangeValue {
-            var range = CFRange()
-            if AXValueGetValue(rangeValue as! AXValue, .cfRange, &range) {
-                logCallback?("  Cursor position: \(range.location), selection length: \(range.length)")
+        if let range = AXHelper.getRange(axElement, attribute: kAXSelectedTextRangeAttribute) {
+            logCallback?("  Cursor position: \(range.location), selection length: \(range.length)")
+            
+            // Get full text value
+            if let text = AXHelper.getString(axElement, attribute: kAXValueAttribute) {
+                let cursorPos = range.location
                 
-                // Get full text value
-                var textValue: CFTypeRef?
-                let textResult = AXUIElementCopyAttributeValue(axElement, kAXValueAttribute as CFString, &textValue)
-                
-                if textResult == .success, let text = textValue as? String {
-                    let cursorPos = range.location
+                // Find word before cursor
+                if cursorPos > 0 && cursorPos <= text.count {
+                    let textBeforeCursor = String(text.prefix(cursorPos))
                     
-                    // Find word before cursor
-                    if cursorPos > 0 && cursorPos <= text.count {
-                        let textBeforeCursor = String(text.prefix(cursorPos))
-                        
-                        // Find last word (split by whitespace)
-                        let words = textBeforeCursor.components(separatedBy: .whitespacesAndNewlines)
-                        let lastWord = words.last ?? ""
-                        
-                        logCallback?("  Text before cursor: \"\(textBeforeCursor.suffix(50))\"")
-                        logCallback?("  Last word: \"\(lastWord)\"")
-                        
-                        // Show Unicode code points
-                        if !lastWord.isEmpty {
-                            let codePoints = lastWord.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
-                            logCallback?("  Unicode: \(codePoints)")
-                        }
-                    } else {
-                        logCallback?("  Cursor at position 0 or invalid")
+                    // Find last word (split by whitespace)
+                    let words = textBeforeCursor.components(separatedBy: .whitespacesAndNewlines)
+                    let lastWord = words.last ?? ""
+                    
+                    logCallback?("  Text before cursor: \"\(textBeforeCursor.suffix(50))\"")
+                    logCallback?("  Last word: \"\(lastWord)\"")
+                    
+                    // Show Unicode code points
+                    if !lastWord.isEmpty {
+                        let codePoints = lastWord.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ")
+                        logCallback?("  Unicode: \(codePoints)")
                     }
                 } else {
-                    logCallback?("  Cannot get text value (error: \(textResult.rawValue))")
+                    logCallback?("  Cursor at position 0 or invalid")
                 }
+            } else {
+                logCallback?("  Cannot get text value")
             }
         } else {
-            logCallback?("  Cannot get selected text range (error: \(rangeResult.rawValue))")
+            logCallback?("  Cannot get selected text range")
             
             // Try alternative: get selected text directly
-            var selectedTextValue: CFTypeRef?
-            let selectedResult = AXUIElementCopyAttributeValue(axElement, kAXSelectedTextAttribute as CFString, &selectedTextValue)
-            if selectedResult == .success, let selectedText = selectedTextValue as? String {
+            if let selectedText = AXHelper.getString(axElement, attribute: kAXSelectedTextAttribute) {
                 logCallback?("  Selected text: \"\(selectedText)\"")
             }
         }

@@ -1331,27 +1331,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // OPTIMIZED: Query focusedInfo ONCE, pass to detectInjectionMethod
         let focusedInfo = detector.getFocusedElementInfo()
         
-        // Get current detection results
-        let behavior = detector.detect()
-        let behaviorName = getBehaviorName(behavior)
+        // Detect injection method from current snapshot
         let injectionInfo = detector.detectInjectionMethod(focusedInfo: focusedInfo)
         
         // IMMEDIATELY set confirmed injection method so keystrokes use this method
         // This applies the best available method at each retry attempt
         detector.setConfirmedInjectionMethod(injectionInfo)
         
-        // Check if this is an overlay behavior (may be stale data)
-        let isOverlayBehavior = behavior == .spotlight || behavior == .overlayLauncher
+        // Check if an overlay app is still visible (may be stale AX data after click)
+        // Uses OverlayAppDetector which queries actual AX state, not bundle-cached detect()
+        let isOverlayVisible = OverlayAppDetector.shared.isOverlayAppVisible()
         
-        if attempt < maxAttempts && isOverlayBehavior {
-            // Overlay detected - might be timing issue, retry after interval
-            // Only log on first attempt to avoid spam
+        if attempt < maxAttempts && isOverlayVisible {
+            // Overlay still visible - might be AX timing issue, retry after interval
+            let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() ?? "overlay"
             if attempt == 1 {
                 debugWindowController?.logEvent("Mouse click detected (checking for AX timing...)")
-                debugWindowController?.logEvent("   Attempt \(attempt): \(behaviorName) → \(injectionInfo.method) (applying...)")
-            } else {
-                debugWindowController?.logEvent("   Attempt \(attempt): \(behaviorName) → \(injectionInfo.method) (applying...)")
             }
+            debugWindowController?.logEvent("   Attempt \(attempt): \(overlayName) → \(injectionInfo.method) (applying...)")
             
             // Schedule next attempt
             DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
@@ -1360,7 +1357,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        // Final attempt OR not overlay behavior - log the result
+        // Final attempt OR no overlay - log the result
         // OPTIMIZED: Pass pre-queried data to avoid redundant AX queries in logging
         logFinalMouseClickDetection(attempt: attempt, wasRetried: attempt > 1, injectionInfo: injectionInfo, focusedInfo: focusedInfo)
     }
@@ -1799,20 +1796,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Main focus check handler - gets focused element once and passes to both processors
     /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes in a single query
     private func handleFocusCheck() {
-        let systemWide = AXUIElementCreateSystemWide()
-        
         // Get focused element ONCE (avoid duplicate AX API calls)
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             // No focused element - hide toolbar if visible
             if SharedSettings.shared.tempOffToolbarEnabled && TempOffToolbarController.shared.isVisible {
                 TempOffToolbarController.shared.hide()
             }
             return
         }
-        
-        let axElement = focusedElement as! AXUIElement
         
         // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
         // This reduces AX API calls from ~10 to ~5 per focus check
@@ -1831,35 +1822,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Check if focused element has changed within the same app (e.g., CMD+T in browser)
     /// If so, re-detect injection method (but DO NOT reset engine - that's handled by user actions)
+    /// Also re-primes cache when confirmedInjectionMethod was cleared (e.g., after mouse click)
     /// - Parameter elementInfo: Cached AX element info (passed from handleFocusCheck)
     private func checkIntraAppFocusChange(with elementInfo: FocusedElementInfo) {
         // OPTIMIZED: Use pre-computed signature from FocusedElementInfo
         let currentSignature = elementInfo.signature
+        let detector = AppBehaviorDetector.shared
         
         // Check if signature changed (different element type)
         if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
             
             // Re-detect injection method (needed for address bar, terminal, etc.)
-            let detector = AppBehaviorDetector.shared
+            let previousMethod = detector.confirmedInjectionMethod
             let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
-            let previousMethod = detector.getConfirmedInjectionMethod()
             
             // Log focus change
             debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
             
-            // Update and log injection method if changed
-            // Compare both method AND description because different contexts can use the same method
-            // but with different flags (e.g., Default fast vs Chromium Address Bar fast has different needsEmptyCharPrefix)
-            let methodChanged = previousMethod.method != injectionInfo.method
-                || previousMethod.description != injectionInfo.description
-            if methodChanged {
-                detector.setConfirmedInjectionMethod(injectionInfo)
+            // ALWAYS set confirmed method to ensure cache is populated
+            detector.setConfirmedInjectionMethod(injectionInfo)
+            
+            // Log injection method change
+            if let prev = previousMethod, (prev.method != injectionInfo.method || prev.description != injectionInfo.description) {
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
-                debugWindowController?.logEvent("   Injection: \(previousMethod.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
-            } else {
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged)")
+                debugWindowController?.logEvent("   Injection: \(prev.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
             }
             
             // NOTE: Engine reset is NOT done here!
@@ -1877,6 +1864,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // This is important for suggestion popup scenarios where keystrokes may go to popup
             // causing buffer desync. Engine will use AX verify at next word break.
             keyboardHandler?.engine.notifyFocusChanged()
+        } else if detector.confirmedInjectionMethod == nil {
+            // Cache was cleared (e.g., by mouse click resetWithCursorMoved)
+            // but signature is unchanged (same field).
+            // Re-prime cache to avoid live AX detection on every keystroke.
+            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
+            detector.setConfirmedInjectionMethod(injectionInfo)
         }
         
         // Update last signature
@@ -1956,6 +1949,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle focus changed notification from AXObserver
     /// This is called by the C callback function
     /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes
+    /// ALWAYS re-detects injection method (event-driven path, already throttled)
+    /// to catch same-app context switches (tab/window) where signature stays the same
+    /// but window title rules and injection method may change.
     func handleAXFocusChanged(_ element: AXUIElement) {
         // Throttle: Skip if called too rapidly (< 100ms since last call)
         // This prevents blocking the main thread when AXObserver fires rapidly
@@ -1969,41 +1965,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
         let elementInfo = FocusedElementInfo.from(element)
         let currentSignature = elementInfo.signature
+        let signatureChanged = currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty
         
-        // Only process if signature actually changed
-        if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
-            
-            // Re-detect injection method (needed for address bar, terminal, etc.)
-            let detector = AppBehaviorDetector.shared
-            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
-            let previousMethod = detector.getConfirmedInjectionMethod()
-            
-            // Log focus change
+        // ALWAYS re-detect injection method in event-driven path.
+        // AXObserver fires indicate genuine focus changes (throttle handles spam).
+        // With pre-fetched focusedInfo, re-detection is pure logic (no extra AX calls).
+        // This ensures same-app tab/window switches re-evaluate window title rules
+        // even when AX role/subrole/description are identical.
+        let detector = AppBehaviorDetector.shared
+        // Read cache BEFORE re-detection to compare correctly
+        let previousMethod = detector.confirmedInjectionMethod
+        let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
+        
+        // Log focus change (only when signature actually changed)
+        if signatureChanged {
             debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
-            
-            // Update and log injection method if changed
-            // Compare both method AND description because different contexts can use the same method
-            // but with different flags (e.g., Default fast vs Chromium Address Bar fast has different needsEmptyCharPrefix)
-            let methodChanged = previousMethod.method != injectionInfo.method
-                || previousMethod.description != injectionInfo.description
-            if methodChanged {
-                detector.setConfirmedInjectionMethod(injectionInfo)
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
-                debugWindowController?.logEvent("   Injection: \(previousMethod.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
-            } else {
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                debugWindowController?.logEvent("   Injection: \(injectionInfo.method.rawValue) [\(textMethodName)] (unchanged)")
-            }
-            
-            // NOTE: Engine reset is NOT done here!
-            // See checkIntraAppFocusChange for explanation.
-            
-            // NEW: Notify engine about focus change during typing
+        }
+        
+        // ALWAYS set confirmed method to ensure cache is populated
+        // (after mouse click clears cache, this re-populates it)
+        detector.setConfirmedInjectionMethod(injectionInfo)
+        
+        // Log injection method change
+        if let prev = previousMethod, (prev.method != injectionInfo.method || prev.description != injectionInfo.description) {
+            let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
+            let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
+            debugWindowController?.logEvent("   Injection: \(prev.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
+        }
+        
+        // NOTE: Engine reset is NOT done here!
+        // See checkIntraAppFocusChange for explanation.
+        
+        // NEW: Notify engine about focus change during typing
+        if signatureChanged {
             keyboardHandler?.engine.notifyFocusChanged()
         }
         
-        // Update last signature
+        // Update last signature (for timer-based checkIntraAppFocusChange)
         lastFocusedElementSignature = currentSignature
         
         // Check toolbar display (only if enabled)

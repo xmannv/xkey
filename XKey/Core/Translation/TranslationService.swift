@@ -219,11 +219,7 @@ class TranslationService {
     /// Read selected text with source information
     /// Returns both the text and how it was retrieved
     func getSelectedTextWithSource() -> TextRetrievalResult? {
-        let systemWide = AXUIElementCreateSystemWide()
-        
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success,
-              let element = focusedElement else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             log("Cannot get focused element, trying clipboard fallback")
             if let text = getTextViaClipboard() {
                 return TextRetrievalResult(text: text, source: .clipboard)
@@ -231,12 +227,8 @@ class TranslationService {
             return nil
         }
         
-        let axElement = element as! AXUIElement
-        
         // First, try to get selected text directly via AX
-        var selectedTextValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextAttribute as CFString, &selectedTextValue) == .success,
-           let selectedText = selectedTextValue as? String,
+        if let selectedText = AXHelper.getString(axElement, attribute: kAXSelectedTextAttribute),
            !selectedText.isEmpty {
             log("Got selected text via AX: '\(selectedText.prefix(50))...'")
             return TextRetrievalResult(text: selectedText, source: .selection)
@@ -249,9 +241,7 @@ class TranslationService {
         }
         
         // Last resort: get entire value (for text fields/areas)
-        var valueRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axElement, kAXValueAttribute as CFString, &valueRef) == .success,
-           let fullText = valueRef as? String,
+        if let fullText = AXHelper.getString(axElement, attribute: kAXValueAttribute),
            !fullText.isEmpty {
             log("Got full text value: '\(fullText.prefix(50))...'")
             return TextRetrievalResult(text: fullText, source: .fullValue)
@@ -357,38 +347,23 @@ class TranslationService {
     ///   - newText: The text to replace with
     ///   - selectAllBeforePaste: If true, performs Cmd+A before paste (for full text replacement)
     func replaceSelectedText(with newText: String, selectAllBeforePaste: Bool = false) -> Bool {
-        let systemWide = AXUIElementCreateSystemWide()
-        
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success,
-              let element = focusedElement else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             log("Cannot get focused element for replacement")
             return false
         }
         
-        let axElement = element as! AXUIElement
-        
         // Get role and app info for debugging
-        var roleRef: CFTypeRef?
-        var role = "Unknown"
-        if AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let roleStr = roleRef as? String {
-            role = roleStr
-        }
+        let role = AXHelper.getString(axElement, attribute: kAXRoleAttribute) ?? "Unknown"
         
         // Get frontmost app bundle ID
         let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "Unknown"
         log("Replacing text in \(bundleId), role: \(role), selectAll: \(selectAllBeforePaste)")
         
         // Check if there's a selection
-        var selectedRangeValue: CFTypeRef?
         var hasSelection = false
-        if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextRangeAttribute as CFString, &selectedRangeValue) == .success {
-            var range = CFRange()
-            if let rangeValue = selectedRangeValue, AXValueGetValue(rangeValue as! AXValue, .cfRange, &range) {
-                hasSelection = range.length > 0
-                log("Selection range: location=\(range.location), length=\(range.length)")
-            }
+        if let range = AXHelper.getRange(axElement, attribute: kAXSelectedTextRangeAttribute) {
+            hasSelection = range.length > 0
+            log("Selection range: location=\(range.location), length=\(range.length)")
         }
         
         // If selectAllBeforePaste is requested, skip AX method and go straight to clipboard
@@ -400,7 +375,7 @@ class TranslationService {
         // UNIVERSAL APPROACH: Try AX first, then verify, then fallback
         if hasSelection {
             // Try AX method
-            let result = AXUIElementSetAttributeValue(axElement, kAXSelectedTextAttribute as CFString, newText as CFTypeRef)
+            let result = AXHelper.setValue(axElement, attribute: kAXSelectedTextAttribute, value: newText as CFTypeRef)
             log("AX set selected text: \(result == .success ? "reported success" : "failed (\(result.rawValue))")")
             
             if result == .success {
@@ -408,9 +383,7 @@ class TranslationService {
                 // Some apps (Chrome, Electron) report success but don't apply the change
                 Thread.sleep(forTimeInterval: 0.05) // Small delay to let the change propagate
                 
-                var verifyTextRef: CFTypeRef?
-                if AXUIElementCopyAttributeValue(axElement, kAXSelectedTextAttribute as CFString, &verifyTextRef) == .success,
-                   let verifyText = verifyTextRef as? String {
+                if let verifyText = AXHelper.getString(axElement, attribute: kAXSelectedTextAttribute) {
                     
                     // Check if selected text now matches what we set
                     // Note: After replacement, selection might be empty or contain the new text

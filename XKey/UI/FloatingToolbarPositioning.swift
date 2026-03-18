@@ -135,16 +135,10 @@ class FloatingToolbarPositioning {
     /// Returns coordinates in Cocoa screen space (origin at bottom-left)
     /// Tries three methods: AXBoundsForRange, insertion point bounds, then falls back to nil
     static func getCursorRectFromAccessibility() -> NSRect? {
-        let systemWide = AXUIElementCreateSystemWide()
-        
         // Get focused element
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             return nil
         }
-        
-        let axElement = focusedElement as! AXUIElement
         
         // Try Method 1: Get cursor position via AXBoundsForRange (works in most apps)
         if let cursorRect = getCursorBoundsViaRange(axElement) {
@@ -164,8 +158,7 @@ class FloatingToolbarPositioning {
     /// Try to get insertion point bounds by combining visible range with element bounds
     static func getInsertionPointBounds(_ element: AXUIElement) -> NSRect? {
         // Get visible character range to estimate line height
-        var visibleRangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXVisibleCharacterRangeAttribute as CFString, &visibleRangeRef) == .success else {
+        guard let visibleRangeRef = AXHelper.getRaw(element, attribute: kAXVisibleCharacterRangeAttribute) else {
             return nil
         }
         
@@ -174,7 +167,7 @@ class FloatingToolbarPositioning {
         guard AXUIElementCopyParameterizedAttributeValue(
             element,
             kAXBoundsForRangeParameterizedAttribute as CFString,
-            visibleRangeRef!,
+            visibleRangeRef,
             &boundsRef
         ) == .success,
               let boundsValue = boundsRef else {
@@ -197,9 +190,7 @@ class FloatingToolbarPositioning {
     /// Get cursor bounds using AXBoundsForRangeParameterizedAttribute
     static func getCursorBoundsViaRange(_ element: AXUIElement) -> NSRect? {
         // Get selected text range (cursor position)
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-              let rangeValue = rangeRef else {
+        guard let rangeValue = AXHelper.getRaw(element, attribute: kAXSelectedTextRangeAttribute) else {
             return nil
         }
         

@@ -67,6 +67,8 @@
 		10FA30B72EFA65B100C41BF8 /* SparkleUpdateDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FA30B62EFA65B100C41BF8 /* SparkleUpdateDelegate.swift */; };
 		10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
 		10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
+		AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
+		AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
 		10FDCC1C2EF5942400B2D9AC /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */; };
 		1A471CE86C0F7A587EF6B590 /* XKeyIMUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608CA8088C2F70FEC4ABA340 /* XKeyIMUpdateManager.swift */; };
 		210B156FF24D4357FC34F023 /* AboutSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A414AFDC35C8357A998491D /* AboutSection.swift */; };
@@ -181,6 +183,7 @@
 		10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VietnameseData.swift; sourceTree = "<group>"; };
 		10FA30B62EFA65B100C41BF8 /* SparkleUpdateDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdateDelegate.swift; sourceTree = "<group>"; };
 		10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBehaviorDetector.swift; sourceTree = "<group>"; };
+		AB12CD332F79A00100FACADE /* AXHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXHelper.swift; sourceTree = "<group>"; };
 		10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
 		1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogFileReader.swift; sourceTree = "<group>"; };
 		2FB7B1CC880090240CFD79B3 /* ExcludedAppsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExcludedAppsSection.swift; sourceTree = "<group>"; };
@@ -353,6 +356,7 @@
 			children = (
 				102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */,
 				10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */,
+				AB12CD332F79A00100FACADE /* AXHelper.swift */,
 				51300ED94BA488E725A6605B /* DebugLogger.swift */,
 			);
 			path = Shared;
@@ -678,6 +682,7 @@
 				100D2BD92EF2C1D800C26B87 /* VNEngine.swift in Sources */,
 				100D2BDA2EF2C1D800C26B87 /* VNWordBuffer.swift in Sources */,
 				10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
+				AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */,
 				102986BC2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */,
 				100D2BDB2EF2C1D800C26B87 /* MacroManager.swift in Sources */,
 				100D2BDC2EF2C1D800C26B87 /* InputProcessor.swift in Sources */,
@@ -701,6 +706,7 @@
 				A1000001 /* XKeyApp.swift in Sources */,
 				A1000002 /* AppDelegate.swift in Sources */,
 				10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
+				AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */,
 				A1000003 /* VNCharacter.swift in Sources */,
 				A1000004 /* VNCharacterMap.swift in Sources */,
 				10A214992ED42DFA005B52BD /* HotkeyRecorderView.swift in Sources */,

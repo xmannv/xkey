@@ -156,8 +156,14 @@ class OverlayAppDetector {
     }
     
     /// Get the name of the currently visible overlay app, if any
-    /// - Returns: Name of the overlay app, or nil if none visible
+    /// Probe-aware: triggers AX check when probe is armed, ensuring
+    /// consumers that only read overlay name still detect new overlays.
+    /// When no probe is pending, returns cached value (O(0)).
     func getVisibleOverlayAppName() -> String? {
+        if probeNeeded {
+            // Delegate to probe-aware check to update cache
+            _ = isOverlayAppVisible()
+        }
         return cachedOverlayName
     }
 
@@ -166,18 +172,12 @@ class OverlayAppDetector {
     /// Detect overlay app by checking focused element's AX attributes
     /// - Returns: Name of detected overlay app, or nil if not found
     private func detectOverlayViaAXAttributes() -> String? {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedElement = focusedRef else {
+        guard let axElement = AXHelper.getFocusedElement() else {
             return nil
         }
 
-        let axElement = focusedElement as! AXUIElement
-
         // Check AX Title
-        if let title = getAXStringAttribute(axElement, attribute: kAXTitleAttribute) {
+        if let title = AXHelper.getString(axElement, attribute: kAXTitleAttribute) {
             for pattern in Self.axTitlePatterns {
                 if title.contains(pattern) {
                     return "Alfred"  // Alfred Search Field
@@ -186,7 +186,7 @@ class OverlayAppDetector {
         }
 
         // Check AX Subrole
-        if let subrole = getAXStringAttribute(axElement, attribute: kAXSubroleAttribute) {
+        if let subrole = AXHelper.getString(axElement, attribute: kAXSubroleAttribute) {
             for pattern in Self.axSubrolePatterns {
                 if subrole.contains(pattern) {
                     return "Raycast"  // raycast_searchField
@@ -195,14 +195,14 @@ class OverlayAppDetector {
         }
 
         // Check AX Identifier for Spotlight (most reliable - persists even when user types)
-        if let identifier = getAXStringAttribute(axElement, attribute: kAXIdentifierAttribute) {
+        if let identifier = AXHelper.getString(axElement, attribute: kAXIdentifierAttribute) {
             if identifier == "SpotlightSearchField" {
                 return "Spotlight"
             }
         }
         
         // Check AX Placeholder (fallback for Spotlight - only visible when input is empty)
-        if let placeholder = getAXStringAttribute(axElement, attribute: kAXPlaceholderValueAttribute) {
+        if let placeholder = AXHelper.getString(axElement, attribute: kAXPlaceholderValueAttribute) {
             for pattern in Self.axPlaceholderPatterns {
                 if placeholder.contains(pattern) {
                     return "Spotlight"  // Spotlight Search
@@ -211,16 +211,6 @@ class OverlayAppDetector {
         }
 
         return nil
-    }
-    
-    /// Helper to get string attribute from AX element
-    private func getAXStringAttribute(_ element: AXUIElement, attribute: String) -> String? {
-        var valueRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &valueRef) == .success,
-              let value = valueRef as? String else {
-            return nil
-        }
-        return value
     }
 
 
@@ -249,25 +239,31 @@ class OverlayAppDetector {
     }
 
     /// Check if overlay state has changed and notify callback
+    /// OPTIMIZED: Only performs AX polling when overlay was previously visible
+    /// (need to detect dismissal). When steady-state (no overlay), this is O(0) — no AX calls.
+    /// Overlay appearance is detected by event-driven probes (armProbe/armProbeDeferred),
+    /// so the timer only needs to catch dismiss events not covered by Esc/Return/click.
     private func checkOverlayStateChange() {
+        // OPTIMIZATION: Skip AX polling entirely when no overlay is visible
+        // Overlay appearance is handled by event-driven probes (armProbe/armProbeDeferred)
+        // Timer only needs to detect dismissal of currently-visible overlays
+        guard wasOverlayVisible else {
+            return
+        }
+        
         let isCurrentlyVisible = isOverlayVisibleQuiet()
         
         // Update cached state for hot path consumers (O(1) reads)
         cachedOverlayVisible = isCurrentlyVisible
         cachedOverlayName = isCurrentlyVisible ? lastDetectedOverlay : nil
 
-        // Detect state change
-        if isCurrentlyVisible != wasOverlayVisible {
-            let overlayName = lastDetectedOverlay ?? "unknown"
-            if isCurrentlyVisible {
-                logDebug("found: '\(overlayName)'")
-            } else {
-                logDebug("Overlay dismissed")
-            }
-            wasOverlayVisible = isCurrentlyVisible
+        // Detect state change (overlay dismissed)
+        if !isCurrentlyVisible {
+            logDebug("Overlay dismissed")
+            wasOverlayVisible = false
 
             // Notify callback
-            onOverlayVisibilityChanged?(isCurrentlyVisible)
+            onOverlayVisibilityChanged?(false)
         }
     }
 

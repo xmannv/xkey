@@ -164,9 +164,7 @@ class TranslationToolbarController {
         guard let panel = panel, panel.isVisible else { return false }
         
         // Get the window of the focused element
-        var windowRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &windowRef) == .success,
-              windowRef != nil else {
+        guard AXHelper.getRaw(element, attribute: kAXWindowAttribute) != nil else {
             return false
         }
         

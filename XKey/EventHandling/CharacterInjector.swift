@@ -654,38 +654,27 @@ class CharacterInjector {
     /// Get the currently focused AXUIElement from the system-wide element.
     /// Returns nil if Accessibility is not available or no focused element exists.
     private func getFocusedAXElement(caller: String = #function) -> AXUIElement? {
-        let systemWideElement = AXUIElementCreateSystemWide()
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
+        guard let element = AXHelper.getFocusedElement() else {
             debugCallback?("  [AX] \(caller): Failed to get focused element")
             return nil
         }
-        // Note: forced downcast always succeeds for AXUIElement (CF type bridging)
-        return focusedElement as! AXUIElement
+        return element
     }
     
     /// Get cursor position and selection length from the focused element's selected text range.
     /// Returns nil if the selected range attribute is not available.
     private func getCursorInfo(element: AXUIElement, caller: String = #function) -> (position: Int, selectionLength: Int)? {
-        var selectedRange: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRange) == .success else {
+        guard let range = AXHelper.getRange(element, attribute: kAXSelectedTextRangeAttribute) else {
             debugCallback?("  [AX] \(caller): Failed to get selected range")
             return nil
         }
-        var rangeValue = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(selectedRange as! AXValue, .cfRange, &rangeValue) else {
-            debugCallback?("  [AX] \(caller): Failed to extract range value")
-            return nil
-        }
-        return (rangeValue.location, rangeValue.length)
+        return (range.location, range.length)
     }
     
     /// Get total character count of the text in the focused element.
     /// Returns nil if the attribute is not available.
     private func getTotalLength(element: AXUIElement, caller: String = #function) -> Int? {
-        var numberOfCharacters: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &numberOfCharacters) == .success,
-              let totalLength = numberOfCharacters as? Int else {
+        guard let totalLength = AXHelper.getInt(element, attribute: kAXNumberOfCharactersAttribute) else {
             debugCallback?("  [AX] \(caller): Failed to get total length")
             return nil
         }

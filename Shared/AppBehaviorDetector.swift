@@ -619,7 +619,7 @@ class AppBehaviorDetector {
     /// Confirmed injection method (set when app is detected via mouse click or app switch)
     /// When set, getConfirmedInjectionMethod() returns this instead of detecting every keystroke
     /// This improves performance and avoids AX API timing issues
-    private var confirmedInjectionMethod: InjectionMethodInfo?
+    private(set) var confirmedInjectionMethod: InjectionMethodInfo?
     
     // MARK: - Address Bar Context Cache
     // When user focuses on a browser address bar (Chromium/Firefox), the injection method
@@ -940,7 +940,7 @@ class AppBehaviorDetector {
     
     /// Struct containing all relevant AX attributes of the focused element
     /// Queried once to avoid multiple AXUIElementCreateSystemWide() calls
-    struct FocusedElementInfo {
+    class FocusedElementInfo {
         let element: AXUIElement?      // For hasCaret check (optional - nil when created without element)
         let role: String?
         let subrole: String?
@@ -948,9 +948,86 @@ class AppBehaviorDetector {
         let identifier: String?        // AXIdentifier
         let domIdentifier: String?     // AXDOMIdentifier (used by Firefox, Chromium for DOM element ID)
         let domClasses: [String]?      // AXDOMClassList
-        let textValue: String?
         let roleDescription: String?   // For isTextInput contenteditable check
-        let windowTitle: String?       // For rule matching + signature (avoid re-querying)
+        
+        // MARK: - Lazy-loaded properties (avoid expensive AX calls on hot path)
+        
+        /// Text value — lazy-loaded because kAXValueAttribute can pull entire document
+        /// content from editors/webviews. Only accessed by DebugViewModel and isEmpty check.
+        private let _textValueProvider: (() -> String?)?
+        private var _textValueCached: String??
+        var textValue: String? {
+            if let cached = _textValueCached {
+                return cached
+            }
+            let value = _textValueProvider?()
+            _textValueCached = .some(value)
+            return value
+        }
+        
+        /// Window title — lazy-loaded because it requires 1-3 AX cascade calls
+        /// (focusedWindow → mainWindow → windows[0]). Only accessed when needed
+        /// by rule matching (findMatchingRule) and debug logging, not by signature.
+        private let _windowTitleProvider: (() -> String?)?
+        private var _windowTitleCached: String??
+        var windowTitle: String? {
+            if let cached = _windowTitleCached {
+                return cached
+            }
+            let value = _windowTitleProvider?()
+            _windowTitleCached = .some(value)
+            return value
+        }
+        
+        /// Whether element has a text caret — lazy-loaded because it requires
+        /// an AX query for kAXSelectedTextRangeAttribute. Only needed by toolbar show/hide.
+        private var _hasCaretCached: Bool?
+        var hasCaret: Bool {
+            if let cached = _hasCaretCached {
+                return cached
+            }
+            let result: Bool
+            if let el = element {
+                if AXHelper.getRaw(el, attribute: kAXSelectedTextRangeAttribute) != nil {
+                    result = true
+                } else {
+                    result = isTextInput
+                }
+            } else {
+                result = isTextInput
+            }
+            _hasCaretCached = result
+            return result
+        }
+        
+        // MARK: - Initializer
+        
+        init(element: AXUIElement?,
+             role: String?, subrole: String?, description: String?,
+             identifier: String?, domIdentifier: String?, domClasses: [String]?,
+             roleDescription: String?,
+             textValueProvider: (() -> String?)? = nil,
+             windowTitleProvider: (() -> String?)? = nil,
+             textValue: String? = nil,
+             windowTitle: String? = nil) {
+            self.element = element
+            self.role = role
+            self.subrole = subrole
+            self.description = description
+            self.identifier = identifier
+            self.domIdentifier = domIdentifier
+            self.domClasses = domClasses
+            self.roleDescription = roleDescription
+            self._textValueProvider = textValueProvider
+            self._windowTitleProvider = windowTitleProvider
+            // Allow direct values for backward compatibility (empty, tests)
+            if textValue != nil || textValueProvider == nil {
+                self._textValueCached = .some(textValue)
+            }
+            if windowTitle != nil || windowTitleProvider == nil {
+                self._windowTitleCached = .some(windowTitle)
+            }
+        }
         
         /// Check if this element is empty (no text or empty string)
         var isEmpty: Bool {
@@ -959,7 +1036,10 @@ class AppBehaviorDetector {
         }
         
         /// Unique signature for detecting focus changes
-        /// Includes role, subrole, description (truncated), DOM ID, and window title
+        /// Uses only eagerly-loaded attributes (role, subrole, description, DOM ID)
+        /// to avoid triggering lazy windowTitle AX cascade on the hot path.
+        /// Window title changes are captured by AX focus observer (always re-detects)
+        /// and app activation notifications, which both call detectInjectionMethod.
         var signature: String {
             var parts: [String] = []
             if let role = role {
@@ -974,11 +1054,6 @@ class AppBehaviorDetector {
             }
             if let domId = domIdentifier, !domId.isEmpty {
                 parts.append("dom:\(domId)")
-            }
-            // Include window title to detect Chrome profile switches
-            if let title = windowTitle, !title.isEmpty {
-                let truncated = String(title.prefix(100))
-                parts.append("win:\(truncated)")
             }
             return parts.joined(separator: "|")
         }
@@ -1011,76 +1086,22 @@ class AppBehaviorDetector {
             return false
         }
         
-        /// Check if element has a text caret (insertion point)
-        var hasCaret: Bool {
-            guard let el = element else { return isTextInput }
-            
-            var rangeRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(el, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success {
-                return rangeRef != nil
-            }
-            
-            return isTextInput
-        }
-        
         /// Check if element is an editable text field with caret
         var isEditableTextInput: Bool {
             return isTextInput && hasCaret
         }
         
         /// Create from AXUIElement by querying all needed attributes once
-        /// This is the unified query point - queries ALL attributes needed by both
-        /// focus tracking (signature, isTextInput) and injection detection (address bar, rules)
+        /// OPTIMIZED: textValue and windowTitle are lazy-loaded — only queried when accessed
+        /// This reduces AX calls from ~10 to ~6 per snapshot on the hot path
         static func from(_ element: AXUIElement) -> FocusedElementInfo {
-            var role: String?
-            var subrole: String?
-            var description: String?
-            var identifier: String?
-            var domIdentifier: String?
-            var domClasses: [String]?
-            var textValue: String?
-            var roleDescription: String?
-            var windowTitle: String?
-            
-            var ref: CFTypeRef?
-            
-            if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &ref) == .success {
-                role = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &ref) == .success {
-                subrole = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &ref) == .success {
-                description = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, kAXIdentifierAttribute as CFString, &ref) == .success {
-                identifier = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, "AXDOMIdentifier" as CFString, &ref) == .success {
-                domIdentifier = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, "AXDOMClassList" as CFString, &ref) == .success {
-                domClasses = ref as? [String]
-            }
-            if AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &ref) == .success {
-                textValue = ref as? String
-            }
-            if AXUIElementCopyAttributeValue(element, kAXRoleDescriptionAttribute as CFString, &ref) == .success {
-                roleDescription = ref as? String
-            }
-            
-            // Get window title from frontmost app's focused window
-            if let app = NSWorkspace.shared.frontmostApplication {
-                let appElement = AXUIElementCreateApplication(app.processIdentifier)
-                var focusedWindow: CFTypeRef?
-                if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
-                   let windowElement = focusedWindow as! AXUIElement? {
-                    var titleValue: CFTypeRef?
-                    if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success {
-                        windowTitle = titleValue as? String
-                    }
-                }
-            }
+            let role = AXHelper.getString(element, attribute: kAXRoleAttribute)
+            let subrole = AXHelper.getString(element, attribute: kAXSubroleAttribute)
+            let description = AXHelper.getString(element, attribute: kAXDescriptionAttribute)
+            let identifier = AXHelper.getString(element, attribute: kAXIdentifierAttribute)
+            let domIdentifier = AXHelper.getString(element, attribute: "AXDOMIdentifier")
+            let domClasses = AXHelper.getStringArray(element, attribute: "AXDOMClassList")
+            let roleDescription = AXHelper.getString(element, attribute: kAXRoleDescriptionAttribute)
             
             return FocusedElementInfo(
                 element: element,
@@ -1090,17 +1111,21 @@ class AppBehaviorDetector {
                 identifier: identifier,
                 domIdentifier: domIdentifier,
                 domClasses: domClasses,
-                textValue: textValue,
                 roleDescription: roleDescription,
-                windowTitle: windowTitle
+                textValueProvider: { AXHelper.getString(element, attribute: kAXValueAttribute) },
+                windowTitleProvider: {
+                    guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+                    let appElement = AXUIElementCreateApplication(app.processIdentifier)
+                    return AXHelper.getWindowTitle(for: appElement)
+                }
             )
         }
         
         static let empty = FocusedElementInfo(
             element: nil,
             role: nil, subrole: nil, description: nil,
-            identifier: nil, domIdentifier: nil, domClasses: nil, textValue: nil,
-            roleDescription: nil, windowTitle: nil
+            identifier: nil, domIdentifier: nil, domClasses: nil,
+            roleDescription: nil
         )
     }
     
@@ -1108,16 +1133,10 @@ class AppBehaviorDetector {
     /// This is more efficient than calling individual getFocused...() functions
     /// - Returns: FocusedElementInfo containing all relevant attributes
     func getFocusedElementInfo() -> FocusedElementInfo {
-        let systemWide = AXUIElementCreateSystemWide()
-        var focused: CFTypeRef?
-        
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let el = focused else {
+        guard let element = AXHelper.getFocusedElement() else {
             return .empty
         }
-        
-        // Delegate to FocusedElementInfo.from() which queries all attributes
-        return FocusedElementInfo.from(el as! AXUIElement)
+        return FocusedElementInfo.from(element)
     }
     
     // MARK: - Address Bar Detection (Using Single AX Query)
@@ -1240,44 +1259,8 @@ class AppBehaviorDetector {
         guard let app = NSWorkspace.shared.frontmostApplication else {
             return nil
         }
-        
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        
-        // Try to get focused window first
-        var focusedWindow: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
-           let windowElement = focusedWindow as! AXUIElement? {
-            // Get window title
-            var titleValue: CFTypeRef?
-            if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success,
-               let title = titleValue as? String {
-                return title
-            }
-        }
-        
-        // Fallback: try to get main window
-        var mainWindow: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &mainWindow) == .success,
-           let windowElement = mainWindow as! AXUIElement? {
-            var titleValue: CFTypeRef?
-            if AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &titleValue) == .success,
-               let title = titleValue as? String {
-                return title
-            }
-        }
-        
-        // Fallback: try to get first window from windows array
-        var windowsValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
-           let windows = windowsValue as? [AXUIElement], let firstWindow = windows.first {
-            var titleValue: CFTypeRef?
-            if AXUIElementCopyAttributeValue(firstWindow, kAXTitleAttribute as CFString, &titleValue) == .success,
-               let title = titleValue as? String {
-                return title
-            }
-        }
-        
-        return nil
+        return AXHelper.getWindowTitle(for: appElement)
     }
     
     /// Find matching Window Title Rule for current context
