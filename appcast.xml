@@ -6,34 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260318)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318</link>
-      <sparkle:version>20260318</sparkle:version>
+      <title>Version 1.2.21 (Build 20260318.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318.1</link>
+      <sparkle:version>20260318.1</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: auto-detect broken cursor tracking in terminal emulators</p>
+<p>refactor: extract AXHelper utility, optimize AX queries with lazy loading, cleanup deprecated code</p>
 <ul>
-<li>Add cursorTrackingBroken flag to detect clients that don't properly</li>
+<li>Add AXHelper.swift: centralized helper for AX API calls (getString, getStringArray, getRange, getFocusedElement, getWindowTitle)</li>
+<li>Optimize FocusedElementInfo: lazy-load textValue and windowTitle via closures, reducing AX calls from ~10 to ~6 per snapshot</li>
+<li>Refactor AppBehaviorDetector: use AXHelper throughout, remove duplicated AX boilerplate</li>
+<li>Refactor TranslationService: replace raw AX calls with AXHelper helpers</li>
+<li>Refactor OverlayAppDetector: simplify with AXHelper, rethink cache logic</li>
+<li>Cleanup VNEngine: remove unused code paths</li>
+<li>Cleanup DebugViewModel: simplify AX inspection with AXHelper</li>
+<li>Cleanup AdvancedInjectionMethods, CharacterInjector, ForceAccessibilityManager: reduce boilerplate</li>
+<li>Cleanup FloatingToolbarPositioning: remove unused imports</li>
+<li>Bump build version to 20260318.1</li>
 </ul>
-<p>  report cursor position through IMKit API (e.g., Warp, iTerm2)</p>
-<ul>
-<li>Auto-detect after setMarkedText: if selectedRange().location doesn't</li>
-</ul>
-<p>  match expected position, disable cursor movement detection for client</p>
-<ul>
-<li>Reset detection flag on app switch via bundle ID tracking</li>
-<li>Skip cursor movement detection for broken-tracking clients to prevent</li>
-</ul>
-<p>  engine reset during Vietnamese composition</p>
-<ul>
-<li>Bump build number to 20260318</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260318.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 18 Mar 2026 10:04:38 +0000</pubDate>
+      <pubDate>Wed, 18 Mar 2026 15:44:04 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260318/XKey.dmg" sparkle:version="20260318" sparkle:shortVersionString="1.2.21" length="11822430" type="application/octet-stream" sparkle:edSignature="z79/X9sMXDKEcY8gdTxxUBksa/Ipgm+wy7OzrYcPsuHY6wf+1w9+7i54p3jvK071PH2un/pNshq4f7kFyszdDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260318.1/XKey.dmg" sparkle:version="20260318.1" sparkle:shortVersionString="1.2.21" length="11813436" type="application/octet-stream" sparkle:edSignature="AVIYUgY/XL0Y2vig7DRfiz4wLuFu6u++RknzUyM/rCikSCYVW2RryahdvX2jYtTofGB83bFBshJv3ZnxL632DQ==" />
     </item>
   </channel>
 </rss>
