@@ -741,7 +741,26 @@ class AppBehaviorDetector {
             textSendingMethod: .chunked,          // Same as Excel
             description: "Google Sheets (all browsers) - fast method like Excel"
         ),
+        
+        // ============================================
+        // Telegram Web (all browsers)
+        // ============================================
+        
+        // Telegram Web's emoji suggestion popup intercepts keydown events,
+        // causing Vietnamese text loss when XKey sends replacement text via CGEvent.
+        // Slow + oneByOne bypasses this by giving popup time to process each character.
+        WindowTitleRule(
+            name: "Telegram Web",
+            bundleIdPattern: "",  // Match all browsers
+            titlePattern: "Telegram",
+            matchMode: .contains,
+            injectionMethod: .slow,
+            injectionDelays: [3000, 6000, 3000],
+            textSendingMethod: .oneByOne,
+            description: "Telegram Web (all browsers) - slow oneByOne to bypass popup interception"
+        ),
     ]
+
     
     // MARK: - Static App Lists (Single Source of Truth)
     
