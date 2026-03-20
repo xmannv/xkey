@@ -169,11 +169,28 @@ class XKeyIMController: IMKInputController {
         return false
     }
     
+    /// Check if current focused element is a secure text field (password field)
+    /// Secure text fields don't support IMKit marked text properly -
+    /// selectedRange() always returns NSNotFound, causing duplicate characters on commit
+    private func isSecureTextField(_ client: IMKTextInput) -> Bool {
+        let bundleId = client.bundleIdentifier() ?? ""
+        // SecurityAgent is Apple's password prompt (System Preferences, Software Update, etc.)
+        if bundleId == "com.apple.SecurityAgent" {
+            return true
+        }
+        return false
+    }
+    
     /// Determine if we should use marked text for this client
-    /// Returns false for overlay apps to avoid "Enter twice" issue
+    /// Returns false for overlay apps and secure text fields
     private func shouldUseMarkedText(_ client: IMKTextInput) -> Bool {
         if isOverlayApp(client) {
             return false  // Use direct mode for overlay apps
+        }
+        // Secure text fields (password fields) don't support marked text properly
+        // selectedRange() always returns NSNotFound, causing duplicate characters on commit
+        if isSecureTextField(client) {
+            return false
         }
         return settings.useMarkedText
     }
