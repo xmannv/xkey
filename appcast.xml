@@ -6,24 +6,27 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260319)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260319</link>
-      <sparkle:version>20260319</sparkle:version>
+      <title>Version 1.2.21 (Build 20260320)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260320</link>
+      <sparkle:version>20260320</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: add Telegram Web Window Title Rule to bypass emoji popup text loss</p>
-<p>Telegram Web's emoji suggestion popup intercepts DOM keydown events,</p>
-<p>causing Vietnamese text loss when XKey sends replacement text via CGEvent.</p>
-<p>Added built-in rule using Slow + oneByOne injection method which gives</p>
-<p>the popup enough time to process each character individually.</p>
-<p>Tested methods: Slow+oneByOne PASSED in Injection Test alongside</p>
-<p>Selection+chunked, Selection+oneByOne, and AX Direct+oneByOne.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260319">Xem chi tiết trên GitHub</a></p>
+<p>fix: disable marked text for SecurityAgent to prevent duplicate chars in password fields</p>
+<ul>
+<li>Add isSecureTextField() to detect com.apple.SecurityAgent</li>
+<li>Update shouldUseMarkedText() to return false for secure text fields</li>
+<li>AXSecureTextField returns NSNotFound for selectedRange(), causing</li>
+</ul>
+<p>  insert instead of replace on commitComposition</p>
+<ul>
+<li>Bump version</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260320">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 19 Mar 2026 07:10:39 +0000</pubDate>
+      <pubDate>Fri, 20 Mar 2026 04:02:54 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260319/XKey.dmg" sparkle:version="20260319" sparkle:shortVersionString="1.2.21" length="11814057" type="application/octet-stream" sparkle:edSignature="yJGYW/z582Cwhf9JxvWsBKRl0h4zajxYtfOL/YPBfwTPPLpdqKc4jYt9O8sCTuzzJEqET9beVpiEoSShxEgJDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260320/XKey.dmg" sparkle:version="20260320" sparkle:shortVersionString="1.2.21" length="11814350" type="application/octet-stream" sparkle:edSignature="cysSuTY2ZDHSCILsiXacpm53A2Bi+yEzStWjGjbnL6ENbH6MW4Opr2Bk7RkteZgjhs9RHkiLJA3XPegvxeeaDw==" />
     </item>
   </channel>
 </rss>
