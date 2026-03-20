@@ -58,3 +58,5 @@ Release/
 appcast.json
 appcast.xml
 .agent/
+.serena/
+.playwright-mcp/
