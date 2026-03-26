@@ -808,7 +808,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     /// Apps that should always pass through all keys (remote devices handle input)
     private static let passthroughApps: Set<String> = [
-        "com.apple.ScreenContinuity",  // iPhone Mirroring - iOS device handles text input
         "com.apple.iphonesimulator"    // Simulator - iOS simulator handles text input
     ]
     
