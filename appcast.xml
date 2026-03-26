@@ -6,30 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260326)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260326</link>
-      <sparkle:version>20260326</sparkle:version>
+      <title>Version 1.2.21 (Build 20260326.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260326.1</link>
+      <sparkle:version>20260326.1</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(opera): add address bar detection for Opera browser</p>
-<ul>
-<li>Add Opera AX patterns to isChromiumAddressBar():</li>
-</ul>
-<p>  AXDescription 'Address field', AXDOMClassList 'AddressTextfieldView'</p>
-<ul>
-<li>Add isOperaSpeedDialAddressBar() for Speed Dial page where AX</li>
-</ul>
-<p>  returns no focused element (role=nil), using direct window title query</p>
-<ul>
-<li>Update app icon assets</li>
-<li>Bump build number to 20260326</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260326">Xem chi tiết trên GitHub</a></p>
+<p>Allow Vietnamese input in iPhone Mirroring (remove ScreenContinuity from passthrough list)</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260326.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 26 Mar 2026 07:57:19 +0000</pubDate>
+      <pubDate>Thu, 26 Mar 2026 15:42:35 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260326/XKey.dmg" sparkle:version="20260326" sparkle:shortVersionString="1.2.21" length="10473948" type="application/octet-stream" sparkle:edSignature="dtmOpcWeXvJiwQX9jQczhn503RThY139jS9meX4fVYVAHrO892hFqYo0hjFwjoLPIKgzTz6WjP+hUk2agUodAA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260326.1/XKey.dmg" sparkle:version="20260326.1" sparkle:shortVersionString="1.2.21" length="10473236" type="application/octet-stream" sparkle:edSignature="08YT/nhYNEn15cjxvLqUzfSjmIw/GytrxVeQl1qVG45nzqtxz0o6gEPK/TQtlxjsWaz5MCiRTHyIzr7R6B06DQ==" />
     </item>
   </channel>
 </rss>
