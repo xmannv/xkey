@@ -1193,27 +1193,57 @@ class AppBehaviorDetector {
         return identifier == "WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD"
     }
     
-    /// Check if focused element is Chromium-based browser's address bar (Chrome, Edge, Brave, etc.)
+    /// Check if focused element is Chromium-based browser's address bar (Chrome, Edge, Brave, Opera, etc.)
     /// Detection methods:
-    /// 1. AX Description: "Address and search bar"
-    /// 2. AX DOM Classes: contains "OmniboxViewViews"
+    /// 1. AX Description: "Address and search bar" (Chrome/Edge/Brave) or "Address field" (Opera)
+    /// 2. AX DOM Classes: contains "OmniboxViewViews", "BraveOmniboxViewViews", or "AddressTextfieldView" (Opera)
     /// - Returns: true if focused element is Chromium's address bar (Omnibox)
     func isChromiumAddressBar(info: FocusedElementInfo) -> Bool {
         
         // Check AX Description
-        if let desc = info.description, desc == "Address and search bar" {
-            return true
+        // Chrome/Edge/Brave: "Address and search bar"
+        // Opera: "Address field"
+        if let desc = info.description {
+            if desc == "Address and search bar" || desc == "Address field" {
+                return true
+            }
         }
         
         // Check DOM Classes for OmniboxViewViews (Chrome, Edge, etc.)
         // or BraveOmniboxViewViews (Brave Browser)
+        // or AddressTextfieldView (Opera)
         if let domClasses = info.domClasses {
-            if domClasses.contains("OmniboxViewViews") || domClasses.contains("BraveOmniboxViewViews") {
+            if domClasses.contains("OmniboxViewViews") || domClasses.contains("BraveOmniboxViewViews")
+                || domClasses.contains("AddressTextfieldView") {
                 return true
             }
         }
         
         return false
+    }
+    /// Check if the current context is Opera's Speed Dial page with degraded AX info.
+    /// On Speed Dial, clicking anywhere focuses the address bar, but AX returns
+    /// no focused element or Unknown role — making isChromiumAddressBar() fail.
+    ///
+    /// Detection: Opera bundle ID + nil/Unknown role + window title "Speed Dial"
+    /// Guards are ordered cheapest-first: bundleId check → role check → AX window title query
+    ///
+    /// NOTE: Uses getCurrentWindowTitle() (direct AX query) because on Speed Dial
+    /// there's no focused element, so FocusedElementInfo.empty has no windowTitleProvider.
+    private func isOperaSpeedDialAddressBar(bundleId: String, role: String?) -> Bool {
+        // 1. Cheapest: Must be Opera (string prefix check)
+        guard bundleId.hasPrefix("com.opera.") || bundleId.hasPrefix("com.operasoftware.") else {
+            return false
+        }
+        
+        // 2. Cheap: AXRole must be nil or Unknown (degraded/no focused element)
+        if let role = role, role != "AXUnknown" && role != "Unknown" {
+            return false
+        }
+        
+        // 3. Expensive: Query window title directly (AX cascade call)
+        guard let windowTitle = getCurrentWindowTitle() else { return false }
+        return windowTitle == "Speed Dial"
     }
     
     /// Create InjectionMethodInfo for browser address bars (Chromium/Firefox) with caching.
@@ -1668,6 +1698,11 @@ class AppBehaviorDetector {
                 return .browserAddressBar
             }
             
+            // Opera Speed Dial: AX returns Unknown role for address bar
+            if isOperaSpeedDialAddressBar(bundleId: bundleId, role: focusedInfo.role) {
+                return .browserAddressBar
+            }
+            
             // Dia Browser address bar (AX Identifier: commandBarTextField)
             if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: focusedInfo) {
                 return .browserAddressBar
@@ -1864,6 +1899,12 @@ class AppBehaviorDetector {
             // Selection method (Shift+Left) causes race conditions with browser autocomplete
             if isChromiumAddressBar(info: focusedInfo) {
                 return makeAddressBarInjection(browserType: "Chromium", bundleId: bundleId)
+            }
+            
+            // Opera Speed Dial: AX returns Unknown role for address bar
+            // Treat same as Chromium address bar
+            if isOperaSpeedDialAddressBar(bundleId: bundleId, role: currentRole) {
+                return makeAddressBarInjection(browserType: "Opera Speed Dial", bundleId: bundleId)
             }
             
             // Dia Browser address bar (AX Identifier: commandBarTextField)
