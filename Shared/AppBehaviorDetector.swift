@@ -779,7 +779,8 @@ class AppBehaviorDetector {
         "dev.warp.Warp-Stable",
         "co.zeit.hyper",
         "org.tabby",
-        "com.termius-dmg.mac"
+        "com.termius-dmg.mac",
+        "com.cmuxterm.app"
     ]
     
     /// Unified terminal delays (backspace, wait, text) in microseconds
