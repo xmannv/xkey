@@ -19,9 +19,7 @@ extension VNEngine {
     var smartSwitchManager: SmartSwitchManager {
         if VNEngine._smartSwitchManager == nil {
             VNEngine._smartSwitchManager = SmartSwitchManager()
-            // Load saved data
-            let path = smartSwitchDataPath
-            _ = VNEngine._smartSwitchManager?.loadFromFile(path: path)
+            VNEngine._smartSwitchManager?.loadFromPlist()
         }
         return VNEngine._smartSwitchManager!
     }
@@ -29,17 +27,6 @@ extension VNEngine {
     /// Set shared smart switch manager (for integration with KeyboardEventHandler)
     static func setSharedSmartSwitchManager(_ manager: SmartSwitchManager) {
         _smartSwitchManager = manager
-    }
-    
-    /// Path to smart switch data file
-    private var smartSwitchDataPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let xkeyDir = appSupport.appendingPathComponent("XKey")
-        
-        // Create directory if needed
-        try? FileManager.default.createDirectory(at: xkeyDir, withIntermediateDirectories: true)
-        
-        return xkeyDir.appendingPathComponent("smart_switch.json").path
     }
     
     // MARK: - Smart Switch Processing
@@ -71,8 +58,7 @@ extension VNEngine {
         
         smartSwitchManager.setAppLanguage(bundleId: bundleId, language: language)
         
-        // Save to file
-        _ = smartSwitchManager.saveToFile(path: smartSwitchDataPath)
+        smartSwitchManager.saveToPlist()
         
         logCallback?("Smart Switch: Saved '\(bundleId)' → Language \(language == 1 ? "Vietnamese" : "English")")
     }

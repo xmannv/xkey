@@ -170,11 +170,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // MARK: - Smart Switch Data Loading
     
     private func loadSmartSwitchData() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let xkeyDir = appSupport.appendingPathComponent("XKey")
-        let path = xkeyDir.appendingPathComponent("smart_switch.json").path
-
-        _ = smartSwitchManager.loadFromFile(path: path)
+        smartSwitchManager.loadFromPlist()
     }
     
     // MARK: - Macro Data Loading

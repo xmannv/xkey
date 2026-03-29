@@ -55,6 +55,7 @@ enum SharedSettingsKey: String {
 
     // Smart switch settings
     case smartSwitchEnabled = "XKey.smartSwitchEnabled"
+    case smartSwitchData = "XKey.smartSwitchData"          // JSON-encoded [String: Int] per-app language map
 
     // Debug settings
     case debugModeEnabled = "XKey.debugModeEnabled"
@@ -106,6 +107,9 @@ enum SharedSettingsKey: String {
     case translateToSourceShowPopup = "XKey.translateToSourceShowPopup"                // Show popup for source direction
     case translateToSourceAutoHideSeconds = "XKey.translateToSourceAutoHideSeconds"    // Auto-hide seconds for source popup
     case translationResultAutoHideSeconds = "XKey.translationResultAutoHideSeconds"
+    
+    // Translation provider configs
+    case translationProviderConfigs = "XKey.translationProviderConfigs"  // JSON-encoded [TranslationProviderConfig]
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -131,7 +135,7 @@ class SharedSettings {
         SharedSettingsKey.spellCheckEnabled.rawValue: false,
         SharedSettingsKey.quickTelexEnabled.rawValue: false,
         SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
-        SharedSettingsKey.freeMarkEnabled.rawValue: false,
+        SharedSettingsKey.freeMarkEnabled.rawValue: true,
         SharedSettingsKey.imkitUseMarkedText.rawValue: true,
         SharedSettingsKey.translationCopyToClipboard.rawValue: true,
         SharedSettingsKey.translateToSourceShowPopup.rawValue: true,
@@ -154,9 +158,7 @@ class SharedSettings {
     
     // MARK: - Initialization
 
-    private init() {
-        // No migration needed - plist is the only source of truth
-    }
+    private init() {}
 
     // MARK: - Plist Read/Write Helpers
     
@@ -485,6 +487,16 @@ class SharedSettings {
         get { readBool(forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
         set { writeBool(newValue, forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
     }
+    
+    // MARK: - Smart Switch Data
+    
+    func getSmartSwitchData() -> Data? {
+        return readData(forKey: SharedSettingsKey.smartSwitchData.rawValue)
+    }
+    
+    func setSmartSwitchData(_ data: Data) {
+        writeData(data, forKey: SharedSettingsKey.smartSwitchData.rawValue)
+    }
 
     // MARK: - Debug Settings
 
@@ -734,6 +746,16 @@ class SharedSettings {
         writeData(data, forKey: SharedSettingsKey.inputSourceConfig.rawValue)
     }
     
+    // MARK: - Translation Provider Configs
+    
+    func getTranslationProviderConfigs() -> Data? {
+        return readData(forKey: SharedSettingsKey.translationProviderConfigs.rawValue)
+    }
+    
+    func setTranslationProviderConfigs(_ data: Data) {
+        writeData(data, forKey: SharedSettingsKey.translationProviderConfigs.rawValue)
+    }
+    
     // MARK: - Macros Data
     
     func getMacrosData() -> Data? {
@@ -937,6 +959,37 @@ class SharedSettings {
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: Date())
         return "XKey-Settings-\(dateString).plist"
+    }
+    
+    // MARK: - Reset to Factory Default
+    
+    /// Reset all settings to factory defaults by deleting the plist file.
+    /// All getters will automatically fall back to `defaultValues`.
+    /// This is the only method needed since ALL config is now centralized in the plist.
+    @discardableResult
+    func resetToDefaults() -> Bool {
+        // Delete the plist file — all getters auto-fallback to defaultValues
+        if let url = plistURL {
+            do {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                }
+            } catch {
+                sharedLogError("Failed to delete plist file: \(error)")
+                return false
+            }
+        }
+        
+        // Notify all observers that settings have been reset
+        notifySettingsChanged()
+        notifyToolbarChanged()
+        notifyConvertToolHotkeyChanged()
+        notifyTranslationSettingsChanged()
+        notifyTranslationToolbarSettingsChanged()
+        notifyDebugSettingsChanged()
+        
+        sharedLogSuccess("Settings reset to factory defaults")
+        return true
     }
     
     // MARK: - Load/Save Preferences Object

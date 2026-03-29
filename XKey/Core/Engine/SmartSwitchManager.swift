@@ -56,89 +56,20 @@ class SmartSwitchManager {
         return appLanguageMap.map { (bundleId: $0.key, language: $0.value) }
     }
     
-    // MARK: - File I/O
+    // MARK: - Persistence
     
-    /// Save to file
-    func saveToFile(path: String) -> Bool {
-        do {
-            let data = try JSONEncoder().encode(appLanguageMap)
-            try data.write(to: URL(fileURLWithPath: path))
-            return true
-        } catch {
-            return false
-        }
+    /// Save to plist via SharedSettings
+    func saveToPlist() {
+        guard let data = try? JSONEncoder().encode(appLanguageMap) else { return }
+        SharedSettings.shared.setSmartSwitchData(data)
     }
     
-    /// Load from file
-    func loadFromFile(path: String) -> Bool {
-        do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            appLanguageMap = try JSONDecoder().decode([String: Int].self, from: data)
-            return true
-        } catch {
-            return false
+    /// Load from plist via SharedSettings
+    func loadFromPlist() {
+        guard let data = SharedSettings.shared.getSmartSwitchData(),
+              let map = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            return
         }
-    }
-    
-    // MARK: - Binary Format (OpenKey compatible)
-    
-    /// Initialize from binary data (OpenKey format)
-    func initFromBinaryData(_ data: Data) {
-        guard data.count >= 2 else { return }
-        
-        var cursor = 0
-        
-        // Read app count (2 bytes)
-        let appCount = data.withUnsafeBytes { $0.load(fromByteOffset: cursor, as: UInt16.self) }
-        cursor += 2
-        
-        appLanguageMap.removeAll()
-        
-        for _ in 0..<appCount {
-            guard cursor < data.count else { break }
-            
-            // Read bundle ID length (1 byte)
-            let bundleIdLength = Int(data[cursor])
-            cursor += 1
-            
-            guard cursor + bundleIdLength <= data.count else { break }
-            
-            // Read bundle ID
-            let bundleIdData = data.subdata(in: cursor..<(cursor + bundleIdLength))
-            guard let bundleId = String(data: bundleIdData, encoding: .utf8) else { continue }
-            cursor += bundleIdLength
-            
-            guard cursor < data.count else { break }
-            
-            // Read language (1 byte)
-            let language = Int(data[cursor])
-            cursor += 1
-            
-            appLanguageMap[bundleId] = language
-        }
-    }
-    
-    /// Convert to binary data (OpenKey format)
-    func toBinaryData() -> Data {
-        var data = Data()
-        
-        // Write app count (2 bytes)
-        var appCount = UInt16(appLanguageMap.count)
-        data.append(contentsOf: withUnsafeBytes(of: &appCount) { Array($0) })
-        
-        // Write each app
-        for (bundleId, language) in appLanguageMap {
-            // Write bundle ID length (1 byte)
-            let bundleIdData = bundleId.data(using: .utf8) ?? Data()
-            data.append(UInt8(bundleIdData.count))
-            
-            // Write bundle ID
-            data.append(bundleIdData)
-            
-            // Write language (1 byte)
-            data.append(UInt8(language))
-        }
-        
-        return data
+        appLanguageMap = map
     }
 }

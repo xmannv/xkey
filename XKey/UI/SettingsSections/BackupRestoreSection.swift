@@ -10,10 +10,12 @@ import SwiftUI
 struct BackupRestoreSection: View {
     @State private var showSuccessAlert = false
     @State private var showCountdownSheet = false
+    @State private var showResetConfirmation = false
     @State private var countdownSeconds = 3
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var countdownTimer: Timer?
+    @State private var restartReason: RestartReason = .importSettings
     
     var body: some View {
         ScrollView {
@@ -74,6 +76,38 @@ struct BackupRestoreSection: View {
                         }
                     }
                 }
+                
+                // Reset to Default Section
+                SettingsGroup(title: "Khôi phục mặc định") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Đặt lại toàn bộ thiết lập về trạng thái ban đầu")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Button(action: { showResetConfirmation = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("Reset")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(.red)
+                        }
+                        
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                            Text("Xoá toàn bộ cài đặt, macro, từ điển, quy tắc tuỳ chỉnh và cấu hình dịch thuật. Thao tác này không thể hoàn tác.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -83,9 +117,20 @@ struct BackupRestoreSection: View {
         } message: {
             Text(alertMessage)
         }
+        .alert("Khôi phục mặc định?", isPresented: $showResetConfirmation) {
+            Button("Huỷ", role: .cancel) { }
+            Button("Khôi phục", role: .destructive) {
+                performReset()
+            }
+        } message: {
+            Text("Toàn bộ cài đặt, macro, từ điển tuỳ chỉnh, quy tắc và cấu hình dịch thuật sẽ bị xoá. XKey sẽ trở về trạng thái như mới cài đặt.\n\nHãy export backup trước nếu bạn muốn giữ lại thiết lập hiện tại.")
+        }
         .sheet(isPresented: $showCountdownSheet) {
             RestartCountdownView(
                 seconds: $countdownSeconds,
+                title: restartReason.title,
+                icon: restartReason.icon,
+                iconColor: restartReason.iconColor,
                 onCancel: {
                     stopCountdown()
                     showCountdownSheet = false
@@ -147,6 +192,7 @@ struct BackupRestoreSection: View {
                 let data = try Data(contentsOf: url)
                 if SharedSettings.shared.importSettings(from: data) {
                     // Show countdown sheet for auto-restart
+                    restartReason = .importSettings
                     countdownSeconds = 3
                     showCountdownSheet = true
                 } else {
@@ -157,6 +203,22 @@ struct BackupRestoreSection: View {
             }
         }
     }
+    
+    // MARK: - Reset to Default
+    
+    private func performReset() {
+        guard SharedSettings.shared.resetToDefaults() else {
+            showAlert(title: "Lỗi", message: "Không thể khôi phục mặc định. Vui lòng thử lại.")
+            return
+        }
+        
+        // Show countdown for restart
+        restartReason = .resetToDefault
+        countdownSeconds = 3
+        showCountdownSheet = true
+    }
+    
+    // MARK: - Countdown & Restart
     
     private func startCountdown() {
         countdownTimer?.invalidate()
@@ -219,20 +281,52 @@ struct BackupRestoreSection: View {
     }
 }
 
+// MARK: - Restart Reason
+
+/// Distinguishes restart context for appropriate UI messaging
+enum RestartReason {
+    case importSettings
+    case resetToDefault
+    
+    var title: String {
+        switch self {
+        case .importSettings: return "Import thành công!"
+        case .resetToDefault: return "Đã khôi phục mặc định!"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .importSettings: return "checkmark.circle.fill"
+        case .resetToDefault: return "arrow.counterclockwise.circle.fill"
+        }
+    }
+    
+    var iconColor: Color {
+        switch self {
+        case .importSettings: return .green
+        case .resetToDefault: return .orange
+        }
+    }
+}
+
 // MARK: - Restart Countdown View
 
 struct RestartCountdownView: View {
     @Binding var seconds: Int
+    let title: String
+    let icon: String
+    let iconColor: Color
     let onCancel: () -> Void
     let onRestart: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: icon)
                 .font(.system(size: 36))
-                .foregroundColor(.green)
+                .foregroundColor(iconColor)
             
-            Text("Import thành công!")
+            Text(title)
                 .font(.headline)
             
             Text("XKey sẽ tự động khởi động lại sau")

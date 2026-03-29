@@ -59,7 +59,7 @@ class TranslationService {
         }
     }
     
-    /// Whether configs have been loaded from UserDefaults
+    /// Whether configs have been loaded
     private var _configsLoaded = false
     
     /// Callback for logging (optional)
@@ -488,7 +488,7 @@ class TranslationService {
         guard !_configsLoaded else { return }
         _configsLoaded = true
         
-        if let data = UserDefaults.standard.data(forKey: "TranslationProviderConfigs"),
+        if let data = SharedSettings.shared.getTranslationProviderConfigs(),
            let configs = try? JSONDecoder().decode([TranslationProviderConfig].self, from: data) {
             _providerConfigs = Dictionary(uniqueKeysWithValues: configs.map { ($0.id, $0) })
             log("Loaded \(configs.count) provider configs")
@@ -498,7 +498,7 @@ class TranslationService {
     private func saveProviderConfigs() {
         let configs = Array(_providerConfigs.values)
         if let data = try? JSONEncoder().encode(configs) {
-            UserDefaults.standard.set(data, forKey: "TranslationProviderConfigs")
+            SharedSettings.shared.setTranslationProviderConfigs(data)
         }
     }
     
