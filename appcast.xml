@@ -6,18 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260327)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260327</link>
-      <sparkle:version>20260327</sparkle:version>
+      <title>Version 1.2.21 (Build 20260329)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260329</link>
+      <sparkle:version>20260329</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: add cmuxterm to terminal apps list & bump build 20260327</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260327">Xem chi tiết trên GitHub</a></p>
+<p>feat: centralize all config into single plist & add factory reset</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260329">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 27 Mar 2026 07:03:47 +0000</pubDate>
+      <pubDate>Sun, 29 Mar 2026 08:15:48 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260327/XKey.dmg" sparkle:version="20260327" sparkle:shortVersionString="1.2.21" length="10473168" type="application/octet-stream" sparkle:edSignature="8Rk4cb8MxY779clDj1NOJ/tG2cZNNv3AsfuEGJghKicdNpwqNGtwCumtlXOhutEZ+KsAwDy9CzAeMXsPh8fzAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260329/XKey.dmg" sparkle:version="20260329" sparkle:shortVersionString="1.2.21" length="10495468" type="application/octet-stream" sparkle:edSignature="HhqDo3wp4NLV3V3joQ7pTPpRI/X6DBjsTUrhsiaoVGTkcrGq30SoCNITluQZGlinXP53XzxDycdiw0/b/aeECA==" />
     </item>
   </channel>
 </rss>
