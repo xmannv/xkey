@@ -6,18 +6,26 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260329)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260329</link>
-      <sparkle:version>20260329</sparkle:version>
+      <title>Version 1.2.21 (Build 20260331)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260331</link>
+      <sparkle:version>20260331</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: centralize all config into single plist & add factory reset</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260329">Xem chi tiết trên GitHub</a></p>
+<p>refactor: replace horizontal TabView with vertical sidebar in PreferencesView (macOS 12)</p>
+<ul>
+<li>Replace TabView (10 truncated tabs) with HStack sidebar layout</li>
+<li>Add PreferencesSection enum with icon, availability gating</li>
+<li>Switch to auto-save pattern matching SettingsView (macOS 13+)</li>
+<li>Update PreferencesWindowController to use closable window style</li>
+<li>Remove unused onClose from SettingsView/SettingsWindowController</li>
+<li>Fix tab indices for Macro (6) and ConvertTool (7) in AppDelegate</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260331">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 29 Mar 2026 08:15:48 +0000</pubDate>
+      <pubDate>Tue, 31 Mar 2026 04:45:49 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260329/XKey.dmg" sparkle:version="20260329" sparkle:shortVersionString="1.2.21" length="10495468" type="application/octet-stream" sparkle:edSignature="HhqDo3wp4NLV3V3joQ7pTPpRI/X6DBjsTUrhsiaoVGTkcrGq30SoCNITluQZGlinXP53XzxDycdiw0/b/aeECA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260331/XKey.dmg" sparkle:version="20260331" sparkle:shortVersionString="1.2.21" length="10495769" type="application/octet-stream" sparkle:edSignature="6llYET3XOBNavgIpV3GF6vfv89+RtiwMynocTVhqHrO+HfI62qjKJb5R9ummayFby4No0ySvYYWmVC8TDj0FCA==" />
     </item>
   </channel>
 </rss>
