@@ -51,12 +51,10 @@ struct SettingsView: View {
     @State private var selectedSection: SettingsSection
 
     var onSave: ((Preferences) -> Void)?
-    var onClose: (() -> Void)?
 
-    init(selectedSection: SettingsSection = .general, onSave: ((Preferences) -> Void)? = nil, onClose: (() -> Void)? = nil) {
+    init(selectedSection: SettingsSection = .general, onSave: ((Preferences) -> Void)? = nil) {
         self._selectedSection = State(initialValue: selectedSection)
         self.onSave = onSave
-        self.onClose = onClose
     }
 
     var body: some View {

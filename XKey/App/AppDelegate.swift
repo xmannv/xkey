@@ -507,7 +507,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if #available(macOS 13.0, *) {
             openSettings(selectedSection: .macro)
         } else {
-            openLegacyPreferences(selectedTab: 2) // Tab 2 = Nâng cao (has Macro section)
+            openLegacyPreferences(selectedTab: 6) // Tab 6 = Macro
         }
     }
     
@@ -515,7 +515,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if #available(macOS 13.0, *) {
             openSettings(selectedSection: .convertTool)
         } else {
-            openLegacyPreferences(selectedTab: 2) // Tab 2 = Nâng cao
+            openLegacyPreferences(selectedTab: 7) // Tab 7 = Chuyển đổi
         }
     }
     

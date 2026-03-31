@@ -16,7 +16,7 @@ extension VNEngine {
         var codeTable: CodeTable = .unicode
         var modernStyle: Bool = true
         var spellCheckEnabled: Bool = true
-        var freeMarking: Bool = false
+        var freeMarking: Bool = true
         
         // Advanced features
         var quickTelexEnabled: Bool = true

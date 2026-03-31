@@ -18,34 +18,27 @@ class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     convenience init(selectedTab: Int = 0, onSave: @escaping (Preferences) -> Void) {
         // Create window first
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 580, height: 500),
-            styleMask: [.titled],
+            contentRect: NSRect(x: 0, y: 0, width: 750, height: 550),
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = "Bảng điều khiển XKey"
+        window.title = "Cài đặt XKey"
+        window.titlebarAppearsTransparent = false
         // Allow window to be released when closed to free memory
         window.isReleasedWhenClosed = true
-        window.level = .floating  // Always on top
+        window.level = .floating
         window.center()
-
-        // Hide traffic light buttons
-        window.standardWindowButton(.closeButton)?.isHidden = true
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        window.standardWindowButton(.zoomButton)?.isHidden = true
 
         self.init(window: window)
         
         // Set window delegate to handle close
         window.delegate = self
 
-        // Create SwiftUI view with close callback
+        // Create SwiftUI view with auto-save callback
         let preferencesView = PreferencesView(
             selectedTab: selectedTab,
-            onSave: onSave,
-            onClose: { [weak self] in
-                self?.close()
-            }
+            onSave: onSave
         )
 
         // Wrap in hosting controller

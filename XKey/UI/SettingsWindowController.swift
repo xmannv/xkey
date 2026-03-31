@@ -40,8 +40,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // Create SwiftUI view with auto-save callback
         let settingsView = SettingsView(
             selectedSection: selectedSection,
-            onSave: onSave,
-            onClose: nil
+            onSave: onSave
         )
 
         // Wrap in hosting controller
