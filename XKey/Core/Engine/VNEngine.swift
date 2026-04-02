@@ -2242,8 +2242,8 @@ class VNEngine {
                 if key == VietnameseData.KEY_N || key == VietnameseData.KEY_C ||
                    key == VietnameseData.KEY_I || key == VietnameseData.KEY_M ||
                    key == VietnameseData.KEY_P || key == VietnameseData.KEY_T {
-                    logCallback?("  → Found end consonant at i=\(i), key=\(key)")
                     if i >= 2 && chr(i - 1) == VietnameseData.KEY_O && chr(i - 2) == VietnameseData.KEY_U {
+                        logCallback?("  → Found ưo+consonant pattern at i=\(i), key=\(key)")
                         let hasToneW1 = (typingWord[i - 1] & VNEngine.TONEW_MASK) != 0
                         let hasToneW2 = (typingWord[i - 2] & VNEngine.TONEW_MASK) != 0
                         logCallback?("  → Checking ưo pattern: o has TONEW=\(hasToneW1), u has TONEW=\(hasToneW2)")

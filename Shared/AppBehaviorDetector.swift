@@ -1874,11 +1874,34 @@ class AppBehaviorDetector {
             )
         }
 
+        // Pre-compute merged Window Title Rule result ONCE for use at multiple priority levels.
+        // This avoids calling getMergedRuleResult() twice (at 0.45 and 1.0).
+        // The call itself is lightweight: string comparisons + Set lookups for bundle/title,
+        // with lazy AX queries only when rules have AX patterns.
+        let mergedResult = getMergedRuleResult(focusedInfo: focusedInfo)
+
+        // Priority 0.45: Passthrough override — checked BEFORE address bar detection
+        // Passthrough means "disable Vietnamese input entirely". Unlike other injection methods
+        // (which control HOW to inject text), passthrough controls WHETHER to process at all.
+        // This semantic difference means it should override address bar detection:
+        // - User sets rule "New Tab → passthrough" = "I don't want Vietnamese here"
+        // - Without this, address bar detection at 0.5 would return .selection/.fast
+        // - The passthrough rule at Priority 1.0 would never be reached
+        if mergedResult.injectionMethod == .passthrough {
+            return InjectionMethodInfo(
+                method: .passthrough,
+                delays: (0, 0, 0),
+                textSendingMethod: .chunked,
+                description: mergedResult.displayName
+            )
+        }
+
         // Priority 0.5: Check if focused element is browser address bar
         // This takes precedence over Window Title Rules because:
         // - User might be in Google Docs tab (Window Title = "Google Docs")
         // - But clicked on address bar (focused element = Omnibox/AXTextField)
         // - Address bar needs different injection method than Google Docs content
+        // Note: Passthrough rules are already handled above at Priority 0.45
         let isBrowserApp = Self.browserApps.contains(bundleId)
             || Self.firefoxBasedBrowsers.contains(bundleId)
             || Self.axAttributeDetectForBrowsers.contains(bundleId)
@@ -1949,7 +1972,8 @@ class AppBehaviorDetector {
         }
 
         // Priority 1: Check Window Title Rules for context-specific injection method (merged cascade)
-        let mergedResult = getMergedRuleResult(focusedInfo: focusedInfo)
+        // Note: mergedResult was pre-computed above (before Priority 0.5) to enable
+        // passthrough check. Reusing it here avoids redundant rule matching.
         if let injectionMethod = mergedResult.injectionMethod {
             let delays: InjectionDelays
             if let d = mergedResult.injectionDelays, d.count >= 3 {
