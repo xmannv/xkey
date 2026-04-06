@@ -24,7 +24,7 @@ extension VNEngine {
         var upperCaseFirstChar: Bool = false
         var restoreIfWrongSpelling: Bool = true
 
-        var allowConsonantZFWJ: Bool = false
+        var customConsonants: Set<UInt16> = []
         
         // Macro settings
         var macroEnabled: Bool = false
@@ -33,7 +33,7 @@ extension VNEngine {
         var addSpaceAfterMacro: Bool = false
         
         // Smart switch
-        var smartSwitchEnabled: Bool = false
+        var smartSwitchEnabled: Bool = true
     }
     
     /// Update engine settings
@@ -65,7 +65,7 @@ extension VNEngine {
         vUpperCaseFirstChar = settings.upperCaseFirstChar ? 1 : 0
         vRestoreIfWrongSpelling = settings.restoreIfWrongSpelling ? 1 : 0
 
-        vAllowConsonantZFWJ = settings.allowConsonantZFWJ ? 1 : 0
+        vCustomConsonants = settings.customConsonants
         
         // Macro settings
         vUseMacro = settings.macroEnabled ? 1 : 0
@@ -108,7 +108,7 @@ extension VNEngine {
         settings.quickEndConsonantEnabled = vQuickEndConsonant == 1
         settings.upperCaseFirstChar = vUpperCaseFirstChar == 1
         settings.restoreIfWrongSpelling = vRestoreIfWrongSpelling == 1
-        settings.allowConsonantZFWJ = vAllowConsonantZFWJ == 1
+        settings.customConsonants = vCustomConsonants
         
         // Macro settings
         settings.macroEnabled = vUseMacro == 1

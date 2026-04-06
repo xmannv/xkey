@@ -45,13 +45,7 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
 
     /// Whether this section is available on the current macOS version
     var isAvailable: Bool {
-        switch self {
-        case .translation:
-            if #available(macOS 13.0, *) { return true }
-            return false
-        default:
-            return true
-        }
+        return true
     }
 
     /// Map from legacy integer tab index to section
@@ -127,9 +121,7 @@ struct PreferencesView: View {
                 case .macro:
                     MacroSection(prefsViewModel: viewModel)
                 case .translation:
-                    if #available(macOS 13.0, *) {
-                        TranslationSection(viewModel: viewModel)
-                    }
+                    TranslationSection(viewModel: viewModel)
                 case .convertTool:
                     ConvertToolSection()
                 case .appearance:

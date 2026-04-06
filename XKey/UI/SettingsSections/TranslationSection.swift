@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(macOS 13.0, *)
 struct TranslationSection: View {
     @ObservedObject var viewModel: PreferencesViewModel
     @StateObject private var translationVM = TranslationSectionViewModel()
@@ -354,7 +353,6 @@ struct CustomLanguageInputView: View {
 
 // MARK: - Translation Direction Options (reusable component)
 
-@available(macOS 13.0, *)
 private struct TranslationDirectionOptions: View {
     @Binding var replaceOriginal: Bool
     @Binding var copyToClipboard: Bool
@@ -490,7 +488,6 @@ class TranslationSectionViewModel: ObservableObject {
 
 // MARK: - Preview
 
-@available(macOS 13.0, *)
 #Preview {
     TranslationSection(viewModel: PreferencesViewModel())
 }

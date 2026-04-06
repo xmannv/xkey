@@ -42,7 +42,18 @@ struct Preferences: Codable {
     var upperCaseFirstChar: Bool = false         // Auto capitalize first letter
     var restoreIfWrongSpelling: Bool = true      // Restore if wrong spelling
     var instantRestoreOnWrongSpelling: Bool = false // Restore immediately when wrong spelling detected
-    var allowConsonantZFWJ: Bool = false         // Allow Z, F, W, J consonants
+    var customConsonantEnabled: Bool = false         // Whether custom consonants feature is enabled
+    var customConsonants: String = "Z,F,W,J"         // Custom consonants list (always stored, even when disabled)
+    
+    /// Default custom consonants when feature is reset
+    static let defaultCustomConsonants = "Z,F,W,J"
+    
+    /// Computed: get individual consonant list from the comma-separated string
+    var customConsonantList: [String] {
+        guard !customConsonants.isEmpty else { return [] }
+        return customConsonants.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).uppercased() }
+    }
+
     var tempOffToolbarEnabled: Bool = false      // Show floating toolbar for temp off controls
     var tempOffToolbarHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .option])  // Default: Cmd+Option+T
     var convertToolHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
@@ -54,7 +65,7 @@ struct Preferences: Codable {
     var addSpaceAfterMacro: Bool = false         // Add space after macro expansion
     
     // Smart switch settings
-    var smartSwitchEnabled: Bool = false         // Remember language per app
+    var smartSwitchEnabled: Bool = true         // Remember language per app
 
     
     // Debug settings
@@ -83,7 +94,7 @@ struct Preferences: Codable {
     var translationReplaceOriginal: Bool = true  // Replace selected text with translation (target direction)
     var translationCopyToClipboard: Bool = true  // Auto copy translation to clipboard (target direction)
     var translationShowPopup: Bool = false        // Show popup overlay (target direction)
-    var translationToolbarEnabled: Bool = true   // Show floating toolbar for quick language selection
+    var translationToolbarEnabled: Bool = false   // Show floating toolbar for quick language selection
     var translateToSourceHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
     var translateToSourceReplaceOriginal: Bool = false  // Replace text (source direction, default off)
     var translateToSourceCopyToClipboard: Bool = false  // Copy to clipboard (source direction, default off)

@@ -37,20 +37,20 @@ extension VNEngine {
             return true // Empty word is considered valid
         }
 
-        // When vAllowConsonantZFWJ is enabled, words containing Z, F, W, J consonants
+        // When custom consonants are enabled, words containing those consonants
         // should be considered valid without dictionary check
-        if vAllowConsonantZFWJ == 1 {
+        if !vCustomConsonants.isEmpty {
             let lowercaseWord = word.lowercased()
-            let specialConsonants: [Character] = ["z", "f", "w", "j"]
+            let customChars = vCustomConsonants.compactMap { VietnameseData.char(for: $0) }
 
-            if let firstChar = lowercaseWord.first, specialConsonants.contains(firstChar) {
-                logCallback?("📖 checkWordSpelling: SKIPPED (vAllowConsonantZFWJ=1, starts with '\(firstChar)')")
+            if let firstChar = lowercaseWord.first, customChars.contains(firstChar) {
+                logCallback?("📖 checkWordSpelling: SKIPPED (customConsonant, starts with '\(firstChar)')")
                 return true
             }
 
-            for consonant in specialConsonants {
+            for consonant in customChars {
                 if lowercaseWord.contains(consonant) {
-                    logCallback?("📖 checkWordSpelling: SKIPPED (vAllowConsonantZFWJ=1, contains '\(consonant)')")
+                    logCallback?("📖 checkWordSpelling: SKIPPED (customConsonant, contains '\(consonant)')")
                     return true
                 }
             }

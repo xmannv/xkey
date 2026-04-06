@@ -516,58 +516,17 @@ class MacroManager {
             }
         }
         
-        // Fallback: Build from shared letter map + digits + special chars
-        var keyCodeToChar = KeyCodeToCharacter.keyCodeToLetterMap
-        // Add digits
-        let digitMap: [UInt16: Character] = [
-            0x12: "1", 0x13: "2", 0x14: "3", 0x15: "4", 0x17: "5",
-            0x16: "6", 0x1A: "7", 0x1C: "8", 0x19: "9", 0x1D: "0"
-        ]
-        // Add special characters
-        let specialMap: [UInt16: Character] = [
-            0x32: "`",  // KEY_BACKQUOTE (tilde ~ with Shift)
-            0x1B: "-",  // KEY_MINUS
-            0x18: "=",  // KEY_EQUALS
-            0x21: "[",  // KEY_LEFT_BRACKET
-            0x1E: "]",  // KEY_RIGHT_BRACKET
-            0x2A: "\\", // KEY_BACK_SLASH
-            0x29: ";",  // KEY_SEMICOLON
-            0x27: "'",  // KEY_QUOTE
-            0x2B: ",",  // KEY_COMMA
-            0x2F: ".",  // KEY_DOT
-            0x2C: "/"   // KEY_SLASH
-        ]
-        keyCodeToChar.merge(digitMap) { _, new in new }
-        keyCodeToChar.merge(specialMap) { _, new in new }
+        // Fallback: Use canonical keyCode → character mapping from VietnameseData
+        let keyCodeToChar = VietnameseData.keyCodeToCharacterMap
         
         if let char = keyCodeToChar[keyCode] {
             // Handle special characters with Shift modifier
             let charStr: String
             if isCaps {
-                // Map shifted special characters
-                switch keyCode {
-                case 0x32: charStr = "~"  // Shift + ` → ~
-                case 0x12: charStr = "!"  // Shift + 1 → !
-                case 0x13: charStr = "@"  // Shift + 2 → @
-                case 0x14: charStr = "#"  // Shift + 3 → #
-                case 0x15: charStr = "$"  // Shift + 4 → $
-                case 0x17: charStr = "%"  // Shift + 5 → %
-                case 0x16: charStr = "^"  // Shift + 6 → ^
-                case 0x1A: charStr = "&"  // Shift + 7 → &
-                case 0x1C: charStr = "*"  // Shift + 8 → *
-                case 0x19: charStr = "("  // Shift + 9 → (
-                case 0x1D: charStr = ")"  // Shift + 0 → )
-                case 0x1B: charStr = "_"  // Shift + - → _
-                case 0x18: charStr = "+"  // Shift + = → +
-                case 0x21: charStr = "{"  // Shift + [ → {
-                case 0x1E: charStr = "}"  // Shift + ] → }
-                case 0x2A: charStr = "|"  // Shift + \ → |
-                case 0x29: charStr = ":"  // Shift + ; → :
-                case 0x27: charStr = "\"" // Shift + ' → "
-                case 0x2B: charStr = "<"  // Shift + , → <
-                case 0x2F: charStr = ">"  // Shift + . → >
-                case 0x2C: charStr = "?"  // Shift + / → ?
-                default:
+                // Use shared QWERTY shift mapping to get the shifted character
+                if let shiftedChar = KeyCodeToCharacter.qwertyCharacter(keyCode: keyCode, withShift: true) {
+                    charStr = String(shiftedChar)
+                } else {
                     charStr = String(char).uppercased()
                 }
             } else {

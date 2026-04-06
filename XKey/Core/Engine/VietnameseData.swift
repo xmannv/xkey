@@ -116,8 +116,13 @@ class VietnameseData {
     
     // MARK: - Vowel Tables (from Vietnamese.cpp)
     
-    // Standalone W bad characters
-    let standaloneWbad: [UInt16] = [KEY_W, KEY_E, KEY_Y, KEY_F, KEY_J, KEY_K, KEY_Z]
+    // Characters that are ALWAYS blocked before standalone ơ/ư
+    // These are vowels that can never precede a standalone bracket conversion
+    static let standaloneWbadAlways: [UInt16] = [KEY_E, KEY_Y]
+    
+    // Characters that are blocked before standalone ơ/ư UNLESS they are in customConsonants
+    // When user enables custom consonants and includes these keys, they become valid
+    static let standaloneWbadConditional: [UInt16] = [KEY_W, KEY_F, KEY_J, KEY_Z, KEY_K]
     
     // Double W allowed (consonant combinations)
     let doubleWAllowed: [[UInt16]] = [
@@ -153,7 +158,7 @@ class VietnameseData {
     
     // MARK: - Consonant Tables
     
-    // CONSONANT_ALLOW_MASK = 0x8000 - marks consonants that are only allowed when vAllowConsonantZFWJ is enabled
+    // CONSONANT_ALLOW_MASK = 0x8000 - marks consonants that are only allowed when they are in vCustomConsonants
     // END_CONSONANT_MASK = 0x4000 - marks consonants for quick consonant feature
     static let CONSONANT_ALLOW_MASK: UInt16 = 0x8000
     static let END_CONSONANT_MASK: UInt16 = 0x4000
@@ -185,7 +190,7 @@ class VietnameseData {
         [KEY_P],
         [KEY_S],
         [KEY_D],
-        // Consonants allowed only when vAllowConsonantZFWJ is enabled
+        // Consonants allowed only when they are in vCustomConsonants
         [KEY_F | CONSONANT_ALLOW_MASK],
         [KEY_W | CONSONANT_ALLOW_MASK],
         [KEY_Z | CONSONANT_ALLOW_MASK],
@@ -621,6 +626,74 @@ class VietnameseData {
     
     // MARK: - Helper Functions
     
+
+    // MARK: - Character ↔ KeyCode Mapping (Single Source of Truth)
+    
+    /// Canonical mapping: lowercase/unshifted Character → macOS keyCode
+    /// This is the SINGLE SOURCE OF TRUTH for all character↔keyCode conversions.
+    /// KeyCodeToCharacter and other modules should delegate to this.
+    static let characterToKeyCodeMap: [Character: UInt16] = [
+        // Letters (A-Z)
+        "a": KEY_A, "b": KEY_B, "c": KEY_C, "d": KEY_D, "e": KEY_E,
+        "f": KEY_F, "g": KEY_G, "h": KEY_H, "i": KEY_I, "j": KEY_J,
+        "k": KEY_K, "l": KEY_L, "m": KEY_M, "n": KEY_N, "o": KEY_O,
+        "p": KEY_P, "q": KEY_Q, "r": KEY_R, "s": KEY_S, "t": KEY_T,
+        "u": KEY_U, "v": KEY_V, "w": KEY_W, "x": KEY_X, "y": KEY_Y,
+        "z": KEY_Z,
+        // Numbers (0-9)
+        "1": KEY_1, "2": KEY_2, "3": KEY_3, "4": KEY_4, "5": KEY_5,
+        "6": KEY_6, "7": KEY_7, "8": KEY_8, "9": KEY_9, "0": KEY_0,
+        // Special characters (unshifted)
+        "`": KEY_BACKQUOTE, "-": KEY_MINUS, "=": KEY_EQUALS,
+        "[": KEY_LEFT_BRACKET, "]": KEY_RIGHT_BRACKET, "\\": KEY_BACK_SLASH,
+        ";": KEY_SEMICOLON, "'": KEY_QUOTE, ",": KEY_COMMA,
+        ".": KEY_DOT, "/": KEY_SLASH, " ": KEY_SPACE
+    ]
+    
+    /// Canonical reverse mapping: macOS keyCode → lowercase/unshifted Character
+    /// Auto-generated from characterToKeyCodeMap to guarantee consistency.
+    static let keyCodeToCharacterMap: [UInt16: Character] = {
+        var reversed: [UInt16: Character] = [:]
+        for (char, code) in characterToKeyCodeMap {
+            reversed[code] = char
+        }
+        return reversed
+    }()
+    
+    /// Letters-only subset: macOS keyCode → lowercase letter (A-Z only)
+    /// Useful for callers that only need letter keys (e.g., macro key building, status bar).
+    static let keyCodeToLetterMap: [UInt16: Character] = {
+        return keyCodeToCharacterMap.filter { $0.value.isLetter }
+    }()
+    
+    // MARK: - Character ↔ KeyCode Conversion Helpers
+    
+    /// Convert a Character to its corresponding macOS keyCode
+    /// Handles both lowercase and uppercase input (normalizes to lowercase).
+    static func keyCode(for char: Character) -> UInt16? {
+        let lowerChar = char.lowercased().first ?? char
+        return characterToKeyCodeMap[lowerChar]
+    }
+    
+    /// Convert a macOS keyCode to its corresponding lowercase Character
+    static func char(for keyCode: UInt16) -> Character? {
+        return keyCodeToCharacterMap[keyCode]
+    }
+    
+    /// Parse a comma-separated string of consonant characters into a Set of keyCodes
+    /// Example: "Z,F,W,J,K" → Set containing KEY_Z, KEY_F, KEY_W, KEY_J, KEY_K
+    static func parseCustomConsonants(_ str: String) -> Set<UInt16> {
+        guard !str.isEmpty else { return [] }
+        var result = Set<UInt16>()
+        for part in str.split(separator: ",") {
+            let trimmed = part.trimmingCharacters(in: .whitespaces)
+            if let char = trimmed.first, let code = keyCode(for: char) {
+                result.insert(code)
+            }
+        }
+        return result
+    }
+
     func isConsonant(_ keyCode: UInt16) -> Bool {
         return !(keyCode == VietnameseData.KEY_A || keyCode == VietnameseData.KEY_E ||
                  keyCode == VietnameseData.KEY_U || keyCode == VietnameseData.KEY_Y ||

@@ -344,10 +344,10 @@ extension String {
     /// Valid Vietnamese initials: b, c, ch, d, đ, g, gh, gi, h, k, kh, l, m, n,
     ///                           ng, ngh, nh, p, ph, qu, r, s, t, th, tr, v, x
     ///
-    /// - Parameter allowZFWJ: If true, allows words starting with z, f, w, j (for foreign words)
+    /// - Parameter customConsonants: Set of custom consonant characters to allow (e.g., z, f, w, j, k)
     /// Examples detected: "winner", "water", "food", "fast", "jazz", "zero",
     ///                    "street", "spring", "chrome", "psychology", "knight"
-    func startsWithImpossibleVietnameseCluster(allowZFWJ: Bool = false) -> Bool {
+    func startsWithImpossibleVietnameseCluster(customConsonants: Set<Character> = []) -> Bool {
         let word = self.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         
         guard !word.isEmpty else { return false }
@@ -359,11 +359,9 @@ extension String {
         // This catches: winner, water, food, fast, jazz, jungle, zero, zone, etc.
         // Vietnamese NEVER uses these letters at the start of words
         // This is the fastest check - O(1) Set lookup on a single character
-        // EXCEPTION: If allowZFWJ is true, skip this check (for "Allow consonant Z, F, W, J" setting)
-        if !allowZFWJ {
-            if let firstChar = word.first, Self.impossibleStartingChars.contains(firstChar) {
-                return true
-            }
+        // EXCEPTION: If the starting char is in customConsonants, skip this check
+        if let firstChar = word.first, Self.impossibleStartingChars.contains(firstChar) && !customConsonants.contains(firstChar) {
+            return true
         }
         
         // For single character words, we've already checked impossible chars above
@@ -371,9 +369,8 @@ extension String {
         
         // Check 2-letter prefixes (most common case - check first for efficiency)
         let prefix2 = String(word.prefix(2))
-        // When allowZFWJ is true, skip prefixes starting with z, f, w, j
-        let skipPrefix = allowZFWJ && (prefix2.hasPrefix("z") || prefix2.hasPrefix("f") || 
-                                        prefix2.hasPrefix("w") || prefix2.hasPrefix("j"))
+        // Skip prefix check if it starts with a custom consonant character
+        let skipPrefix = prefix2.first.map { customConsonants.contains($0) } ?? false
         if !skipPrefix && Self.impossible2LetterPrefixes.contains(prefix2) {
             return true
         }
@@ -381,9 +378,7 @@ extension String {
         // Check 3-letter prefixes
         if word.count >= 3 {
             let prefix3 = String(word.prefix(3))
-            // When allowZFWJ is true, skip prefixes starting with z, f, w, j
-            let skipPrefix3 = allowZFWJ && (prefix3.hasPrefix("z") || prefix3.hasPrefix("f") || 
-                                            prefix3.hasPrefix("w") || prefix3.hasPrefix("j"))
+            let skipPrefix3 = prefix3.first.map { customConsonants.contains($0) } ?? false
             if !skipPrefix3 && Self.impossible3LetterPrefixes.contains(prefix3) {
                 return true
             }
@@ -392,9 +387,7 @@ extension String {
         // Check 4-letter prefixes (most specific)
         if word.count >= 4 {
             let prefix4 = String(word.prefix(4))
-            // When allowZFWJ is true, skip prefixes starting with z, f, w, j
-            let skipPrefix4 = allowZFWJ && (prefix4.hasPrefix("z") || prefix4.hasPrefix("f") || 
-                                            prefix4.hasPrefix("w") || prefix4.hasPrefix("j"))
+            let skipPrefix4 = prefix4.first.map { customConsonants.contains($0) } ?? false
             if !skipPrefix4 && Self.impossible4LetterPrefixes.contains(prefix4) {
                 return true
             }
@@ -435,9 +428,9 @@ extension String {
     /// This considers valid input sequences like "dd" (Telex) or "d9" (VNI)
     ///
     /// - Parameter inputType: 0 = Telex, 1 = VNI, 2 = Simple Telex 1, 3 = Simple Telex 2
-    /// - Parameter allowZFWJ: If true, allows words starting with z, f, w, j (for foreign words)
+    /// - Parameter customConsonants: Set of custom consonant characters to allow
     /// - Returns: true if raw input starts with impossible pattern (excluding valid input sequences)
-    func startsWithImpossiblePatternForRawInput(inputType: Int = 0, allowZFWJ: Bool = false) -> Bool {
+    func startsWithImpossiblePatternForRawInput(inputType: Int = 0, customConsonants: Set<Character> = []) -> Bool {
         // First, check if this is a valid Vietnamese input sequence
         // If so, it's NOT impossible - return false early
         if isValidVietnameseInputSequence(inputType: inputType) {
@@ -482,7 +475,7 @@ extension String {
         }
         
         // Otherwise, check against impossible patterns
-        return startsWithImpossibleVietnameseCluster(allowZFWJ: allowZFWJ)
+        return startsWithImpossibleVietnameseCluster(customConsonants: customConsonants)
     }
     
     /// Check if RAW INPUT is definitely NOT Vietnamese based on START patterns only.
@@ -498,15 +491,15 @@ extension String {
     /// - Instant restore feature (if enabled)
     ///
     /// - Parameter inputType: 0 = Telex, 1 = VNI, 2 = Simple Telex, 3 = VIQR
-    /// - Parameter allowZFWJ: If true, allows words starting with z, f, w, j (for foreign words)
+    /// - Parameter customConsonants: Set of custom consonant characters to allow
     /// - Returns: true if raw input STARTS with impossible Vietnamese pattern
-    func isDefinitelyNotVietnameseForRawInput(inputType: Int = 0, allowZFWJ: Bool = false) -> Bool {
+    func isDefinitelyNotVietnameseForRawInput(inputType: Int = 0, customConsonants: Set<Character> = []) -> Bool {
         // Simply delegate to the start pattern check
         // This already handles:
         // 1. Valid Vietnamese input sequences (dd, cc, gg, etc.)
-        // 2. Impossible starting characters (f, j, w, z) - unless allowZFWJ is true
+        // 2. Impossible starting characters (f, j, w, z) - unless they are in customConsonants
         // 3. Impossible 2/3/4-letter prefixes (str, bl, gr, etc.)
-        return startsWithImpossiblePatternForRawInput(inputType: inputType, allowZFWJ: allowZFWJ)
+        return startsWithImpossiblePatternForRawInput(inputType: inputType, customConsonants: customConsonants)
     }
     
     /// Ultra-fast English detection for real-time typing
@@ -533,7 +526,7 @@ extension String {
         // ============================================
         // Almost certainly not pure Vietnamese
         // NOTE: 'w' is EXCLUDED because in Telex, it's a vowel modifier (a+w=ă, o+w=ơ, u+w=ư)
-        // Note: Some Vietnamese words use f, j, z with vAllowConsonantZFWJ,
+        // Note: Some Vietnamese words use f, j, z with custom consonants,
         // but they're rare and mostly loan words
         if word.rangeOfCharacter(from: CharacterSet(charactersIn: "fjz")) != nil {
             return true

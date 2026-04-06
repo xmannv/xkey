@@ -571,7 +571,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             quickEndConsonantEnabled: preferences.quickEndConsonantEnabled,
             upperCaseFirstChar: preferences.upperCaseFirstChar,
             restoreIfWrongSpelling: preferences.restoreIfWrongSpelling,
-            allowConsonantZFWJ: preferences.allowConsonantZFWJ,
+            customConsonants: preferences.customConsonantEnabled ? preferences.customConsonants : "",
             macroEnabled: preferences.macroEnabled,
             macroInEnglishMode: preferences.macroInEnglishMode,
             autoCapsMacro: preferences.autoCapsMacro,

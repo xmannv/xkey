@@ -67,8 +67,6 @@
 		10FA30B72EFA65B100C41BF8 /* SparkleUpdateDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FA30B62EFA65B100C41BF8 /* SparkleUpdateDelegate.swift */; };
 		10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
 		10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */; };
-		AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
-		AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
 		10FDCC1C2EF5942400B2D9AC /* InputSourceSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */; };
 		1A471CE86C0F7A587EF6B590 /* XKeyIMUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608CA8088C2F70FEC4ABA340 /* XKeyIMUpdateManager.swift */; };
 		210B156FF24D4357FC34F023 /* AboutSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A414AFDC35C8357A998491D /* AboutSection.swift */; };
@@ -96,6 +94,8 @@
 		A100000B /* KeyboardEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B /* KeyboardEventHandler.swift */; };
 		A100000C /* AdvancedInjectionMethods.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* AdvancedInjectionMethods.swift */; };
 		AA51E2E403268ACC6EF82BA4 /* TempOffToolbarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE2F92D3911EB5987686864 /* TempOffToolbarViewModel.swift */; };
+		AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
+		AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
 		APPVERSION001 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPVERSION002 /* AppVersion.swift */; };
 		BD23C4DFC4585965C86E2B51 /* BackupRestoreSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69901F64AACBE0FBAC7C0E0F /* BackupRestoreSection.swift */; };
 		C4EDC498282B5B6D76626F6D /* AdvancedSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F362794B762A19FE8D883F35 /* AdvancedSection.swift */; };
@@ -114,6 +114,7 @@
 		F3F2891E34784154B457BA39 /* AppearanceSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D22A491FA1C51411B4A156 /* AppearanceSection.swift */; };
 		F97414DA17E4F78264530EF0 /* KeyCodeToCharacter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */; };
 		F97414DB17E4F78264530EF1 /* KeyCodeToCharacter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */; };
+		FC31E5BF03BAE76EB0EF5881 /* CustomConsonantChipEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12D7FA2CC6EE444A4EB7B965 /* CustomConsonantChipEditor.swift */; };
 		FFFF798B22C18C084A0F7458 /* MacroSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F58879C0DDD2958AA9FF0D /* MacroSection.swift */; };
 		LAUNCHATLOGIN001 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = LAUNCHATLOGIN002 /* LaunchAtLogin.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
@@ -183,8 +184,8 @@
 		10F26F0D2ED6CAF900B9FA1F /* VietnameseData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VietnameseData.swift; sourceTree = "<group>"; };
 		10FA30B62EFA65B100C41BF8 /* SparkleUpdateDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdateDelegate.swift; sourceTree = "<group>"; };
 		10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBehaviorDetector.swift; sourceTree = "<group>"; };
-		AB12CD332F79A00100FACADE /* AXHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXHelper.swift; sourceTree = "<group>"; };
 		10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceSwitcher.swift; sourceTree = "<group>"; };
+		12D7FA2CC6EE444A4EB7B965 /* CustomConsonantChipEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomConsonantChipEditor.swift; sourceTree = "<group>"; };
 		1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogFileReader.swift; sourceTree = "<group>"; };
 		2FB7B1CC880090240CFD79B3 /* ExcludedAppsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExcludedAppsSection.swift; sourceTree = "<group>"; };
 		3A3D9B46E4A73E69A837ADAD /* ConvertToolSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConvertToolSection.swift; sourceTree = "<group>"; };
@@ -218,6 +219,7 @@
 		A3000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A3000002 /* XKey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XKey.entitlements; sourceTree = "<group>"; };
 		A7801294053CCB45DE7232D2 /* VNEngineSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VNEngineSettings.swift; sourceTree = "<group>"; };
+		AB12CD332F79A00100FACADE /* AXHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXHelper.swift; sourceTree = "<group>"; };
 		APPVERSION002 /* AppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		B65F5E57423E05ADF4033DCD /* TempOffToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarView.swift; sourceTree = "<group>"; };
 		C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatusBarPopoverView.swift; sourceTree = "<group>"; };
@@ -372,6 +374,15 @@
 			path = TempOffToolbar;
 			sourceTree = "<group>";
 		};
+		66372C6A89C941917C844E21 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				12D7FA2CC6EE444A4EB7B965 /* CustomConsonantChipEditor.swift */,
+			);
+			name = Components;
+			path = Components;
+			sourceTree = "<group>";
+		};
 		A5000001 = {
 			isa = PBXGroup;
 			children = (
@@ -470,6 +481,7 @@
 				53FD9B0D641FE6019C3870E0 /* TempOffToolbar */,
 				TRANSLATTB007 /* TranslationToolbar */,
 				C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */,
+				66372C6A89C941917C844E21 /* Components */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -787,6 +799,7 @@
 				TRANSLATTB005 /* TranslationToolbarViewModel.swift in Sources */,
 				504A8EDB4750AC97ED723345 /* AudioManager.swift in Sources */,
 				96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */,
+				FC31E5BF03BAE76EB0EF5881 /* CustomConsonantChipEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -67,7 +67,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
-    @Published var allowConsonantZFWJ: Bool = false {
+    @Published var customConsonants: String = "" {
         didSet { updateEngineSettings() }
     }
     
@@ -89,7 +89,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     // Smart switch
-    @Published var smartSwitchEnabled: Bool = false {
+    @Published var smartSwitchEnabled: Bool = true {
         didSet { updateEngineSettings() }
     }
     
@@ -457,9 +457,16 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Determine if uppercase:
         // - For letters: Shift XOR Caps Lock (standard behavior)
-        // - For non-letters: use the character as-is
+        // - For bracket keys [/]: respect Caps Lock since engine converts them to Vietnamese vowels ơ/ư
+        // - For other non-letters: use the character as-is
         let isLetter = character.isLetter
-        let isUppercase = isLetter ? (hasShiftModifier != hasCapsLock) : character.isUppercase
+        let isBracketForVietnamese = (character == "[" || character == "]")
+        let isUppercase: Bool
+        if isLetter || isBracketForVietnamese {
+            isUppercase = hasShiftModifier != hasCapsLock
+        } else {
+            isUppercase = character.isUppercase
+        }
 
         // Convert character to QWERTY keyCode for engine processing
         // Engine expects keyCode based on QWERTY layout (e.g., 'z' → 0x06)
@@ -677,7 +684,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.upperCaseFirstChar = upperCaseFirstChar
         settings.restoreIfWrongSpelling = restoreIfWrongSpelling
 
-        settings.allowConsonantZFWJ = allowConsonantZFWJ
+        settings.customConsonants = VietnameseData.parseCustomConsonants(customConsonants)
         
         // Macro settings
         settings.macroEnabled = macroEnabled
@@ -710,7 +717,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         quickEndConsonantEnabled: Bool,
         upperCaseFirstChar: Bool,
         restoreIfWrongSpelling: Bool,
-        allowConsonantZFWJ: Bool,
+        customConsonants: String,
         macroEnabled: Bool,
         macroInEnglishMode: Bool,
         autoCapsMacro: Bool,
@@ -732,7 +739,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         self.quickEndConsonantEnabled = quickEndConsonantEnabled
         self.upperCaseFirstChar = upperCaseFirstChar
         self.restoreIfWrongSpelling = restoreIfWrongSpelling
-        self.allowConsonantZFWJ = allowConsonantZFWJ
+        self.customConsonants = customConsonants
         self.macroEnabled = macroEnabled
         self.macroInEnglishMode = macroInEnglishMode
         self.autoCapsMacro = autoCapsMacro

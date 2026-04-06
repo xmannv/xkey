@@ -69,7 +69,7 @@ class VNEngine {
     var vUpperCaseFirstChar = 0    // 0: No, 1: Yes
     var vTempOffSpelling = 0       // 0: No, 1: Yes (temp off spell check via toolbar)
     var vTempOffEngine = 0         // 0: No, 1: Yes (temp off engine via toolbar)
-    var vAllowConsonantZFWJ = 0    // 0: No, 1: Yes
+    var vCustomConsonants: Set<UInt16> = [] // Custom consonants allowed (e.g., Z, F, W, J, K)
     var vQuickStartConsonant = 0   // 0: No, 1: Yes (f->ph, j->gi, w->qu)
     var vQuickEndConsonant = 0     // 0: No, 1: Yes (g->ng, h->nh, k->ch)
     var vTempOffOpenKey = 0        // 0: No, 1: Yes (temp off engine with Option key)
@@ -534,7 +534,14 @@ class VNEngine {
         
         let isSpecial = isSpecialKey(keyCode: keyCode)
         
-        if !isSpecial || tempDisableKey {
+        // Bracket keys [/] are EXPLICIT Vietnamese standalone input (ơ/ư).
+        // They should bypass tempDisableKey because:
+        // 1. They are different from the key that triggered the undo
+        // 2. The user intentionally pressed them for Vietnamese input
+        // 3. checkForStandaloneChar already validates the context
+        let isBracketStandaloneKey = (keyCode == VietnameseData.KEY_LEFT_BRACKET || keyCode == VietnameseData.KEY_RIGHT_BRACKET)
+        
+        if !isSpecial || (tempDisableKey && !isBracketStandaloneKey) {
             if vQuickTelex == 1 && isQuickTelexKey(keyCode: keyCode) {
                 handleQuickTelex(keyCode: keyCode, isCaps: isCaps)
                 return
@@ -546,6 +553,12 @@ class VNEngine {
                 insertKey(keyCode: keyCode, isCaps: isCaps)
             }
         } else {
+            // Reset tempDisableKey when bracket key passes through
+            // This allows subsequent Vietnamese processing to continue
+            if tempDisableKey && isBracketStandaloneKey {
+                tempDisableKey = false
+                logCallback?("tempDisableKey reset by bracket key '\(keyCode == VietnameseData.KEY_LEFT_BRACKET ? "[" : "]")'")
+            }
             hookState.code = UInt8(vDoNothing)
             hookState.extCode = 3
             handleMainKey(keyCode: keyCode, isCaps: isCaps)
@@ -743,8 +756,8 @@ class VNEngine {
         // NOTE: Use getRawInputStringForEnglishDetection() which EXCLUDES overflow entries
         // to avoid false positives after restoreLastTypingState()
         let rawInput = getRawInputStringForEnglishDetection()
-        let allowZFWJ = vAllowConsonantZFWJ == 1
-        if rawInput.isDefinitelyNotVietnameseForRawInput(inputType: vInputType, allowZFWJ: allowZFWJ) {
+        let customConsonantChars = Set(vCustomConsonants.compactMap { VietnameseData.char(for: $0) })
+        if rawInput.isDefinitelyNotVietnameseForRawInput(inputType: vInputType, customConsonants: customConsonantChars) {
             // ENHANCED LOGGING: Log full context when English pattern is detected
             // This helps debug buffer desync issues
             logCallback?("⚠️ ENGLISH PATTERN DETECTED:")
@@ -1905,10 +1918,12 @@ class VNEngine {
                 for (idx, patternKey) in consonantPattern.enumerated() {
                     let actualKey = chr(idx)
                     // Handle CONSONANT_ALLOW_MASK and END_CONSONANT_MASK
-                    // When vAllowConsonantZFWJ == 1, REMOVE the mask to allow matching z, f, w, j
-                    // When vQuickStartConsonant == 1, REMOVE the END_CONSONANT_MASK to allow quick consonant
+                    // For CONSONANT_ALLOW_MASK: only unmask if this specific consonant is in customConsonants
+                    // For END_CONSONANT_MASK: unmask when quick start consonant is enabled
+                    let baseKeyForAllowCheck = patternKey & ~(VietnameseData.CONSONANT_ALLOW_MASK | VietnameseData.END_CONSONANT_MASK)
+                    let shouldUnmaskAllow = (patternKey & VietnameseData.CONSONANT_ALLOW_MASK) != 0 && vCustomConsonants.contains(baseKeyForAllowCheck)
                     let patternKeyMasked = patternKey & ~(
-                        (vAllowConsonantZFWJ == 1 ? VietnameseData.CONSONANT_ALLOW_MASK : 0) |
+                        (shouldUnmaskAllow ? VietnameseData.CONSONANT_ALLOW_MASK : 0) |
                         (vQuickStartConsonant == 1 ? VietnameseData.END_CONSONANT_MASK : 0)
                     )
                     
@@ -2757,20 +2772,31 @@ class VNEngine {
         }
         
         if index == 0 {
+            // Standalone ơ/ư at word start → always allow
             insertKey(keyCode: data, isCaps: isCaps, isCheckSpelling: false)
             reverseLastStandaloneChar(keyCode: keyWillReverse, isCaps: isCaps)
             return
         } else if index == 1 {
-            for badKey in vietnameseData.standaloneWbad {
-                if chr(0) == badKey {
-                    insertKey(keyCode: data, isCaps: isCaps)
-                    return
-                }
+            let prevKey = chr(0)
+            
+            // Always block: vowels that can never precede standalone ơ/ư
+            if VietnameseData.standaloneWbadAlways.contains(prevKey) {
+                insertKey(keyCode: data, isCaps: isCaps)
+                return
             }
+            
+            // Conditionally block: only block if key is NOT in customConsonants
+            if VietnameseData.standaloneWbadConditional.contains(prevKey) && !vCustomConsonants.contains(prevKey) {
+                insertKey(keyCode: data, isCaps: isCaps)
+                return
+            }
+            
+            // Valid consonant before ơ/ư → allow conversion
             insertKey(keyCode: data, isCaps: isCaps, isCheckSpelling: false)
             reverseLastStandaloneChar(keyCode: keyWillReverse, isCaps: isCaps)
             return
         } else if index == 2 {
+            // Check double consonant combinations (kh, th, tr, ch, nh, ng, gh, gi, ph)
             for allowed in vietnameseData.doubleWAllowed {
                 if chr(0) == allowed[0] && chr(1) == allowed[1] {
                     insertKey(keyCode: data, isCaps: isCaps, isCheckSpelling: false)
@@ -2782,6 +2808,8 @@ class VNEngine {
             return
         }
         
+        // index > 2: no valid Vietnamese word has ơ/ư after 3+ consonant chars
+        // Examples: "nghư", "nghơ" don't exist → always insert raw
         insertKey(keyCode: data, isCaps: isCaps)
     }
     

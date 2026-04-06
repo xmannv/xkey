@@ -132,6 +132,11 @@ class XKeyIMController: IMKInputController {
         engineSettings.quickTelexEnabled = settings.quickTelexEnabled
 
         engineSettings.restoreIfWrongSpelling = settings.restoreIfWrongSpelling
+        
+        // Parse custom consonants string into Set<UInt16> for engine
+        let customConsonantsStr = SharedSettings.shared.customConsonants
+        engineSettings.customConsonants = VietnameseData.parseCustomConsonants(customConsonantsStr)
+        
         engine.updateSettings(engineSettings)
     }
     
