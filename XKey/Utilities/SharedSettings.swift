@@ -39,7 +39,6 @@ enum SharedSettingsKey: String {
     case instantRestoreOnWrongSpelling = "XKey.instantRestoreOnWrongSpelling"
 
     case allowConsonantZFWJ = "XKey.allowConsonantZFWJ"
-    case freeMarkEnabled = "XKey.freeMarkEnabled"
     case tempOffToolbarEnabled = "XKey.tempOffToolbarEnabled"
     case tempOffToolbarHotkeyCode = "XKey.tempOffToolbarHotkeyCode"
     case tempOffToolbarHotkeyModifiers = "XKey.tempOffToolbarHotkeyModifiers"
@@ -135,7 +134,6 @@ class SharedSettings {
         SharedSettingsKey.spellCheckEnabled.rawValue: false,
         SharedSettingsKey.quickTelexEnabled.rawValue: false,
         SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
-        SharedSettingsKey.freeMarkEnabled.rawValue: true,
         SharedSettingsKey.imkitUseMarkedText.rawValue: true,
         SharedSettingsKey.translationCopyToClipboard.rawValue: true,
         SharedSettingsKey.translateToSourceShowPopup.rawValue: true,
@@ -380,15 +378,7 @@ class SharedSettings {
         get { readBool(forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
         set { writeBool(newValue, forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
     }
-
-    var freeMarkEnabled: Bool {
-        get { readBool(forKey: SharedSettingsKey.freeMarkEnabled.rawValue) }
-        set {
-            writeBool(newValue, forKey: SharedSettingsKey.freeMarkEnabled.rawValue)
-            notifySettingsChanged()
-        }
-    }
-
+    
     var tempOffToolbarEnabled: Bool {
         get { readBool(forKey: SharedSettingsKey.tempOffToolbarEnabled.rawValue) }
         set {
@@ -1041,7 +1031,6 @@ class SharedSettings {
         prefs.instantRestoreOnWrongSpelling = instantRestoreOnWrongSpelling
 
         prefs.allowConsonantZFWJ = allowConsonantZFWJ
-        prefs.freeMarkEnabled = freeMarkEnabled
         prefs.tempOffToolbarEnabled = tempOffToolbarEnabled
 
         // Temp off toolbar hotkey
@@ -1192,7 +1181,6 @@ class SharedSettings {
         instantRestoreOnWrongSpelling = prefs.instantRestoreOnWrongSpelling
 
         allowConsonantZFWJ = prefs.allowConsonantZFWJ
-        freeMarkEnabled = prefs.freeMarkEnabled
         tempOffToolbarEnabled = prefs.tempOffToolbarEnabled
         tempOffToolbarHotkeyCode = prefs.tempOffToolbarHotkey.keyCode
         tempOffToolbarHotkeyModifiers = prefs.tempOffToolbarHotkey.modifiers.rawValue

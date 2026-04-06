@@ -121,8 +121,6 @@ class VNEngineTests: XCTestCase {
     
     func testTelex_HW_ToStandaloneUHorn() {
         engine.reset()
-        // Enable Free Mark (important for this to work)
-        engine.vFreeMark = 1
         
         // Type 'h'
         _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
@@ -805,7 +803,6 @@ class VNEngineTests: XCTestCase {
     /// Then "i" → "ngoài" (correct mark on 'a')
     func testTonePlacement_NGOAI_MarkBeforeVowel() {
         engine.reset()
-        engine.vFreeMark = 1  // Free Mark ON (as in user's config)
         
         // n-g-o-f-a-i → ngoài (Telex)
         _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
@@ -821,7 +818,6 @@ class VNEngineTests: XCTestCase {
     /// Test similar case with "hoà" → mark on 'a' not 'o'
     func testTonePlacement_HOA_MarkBeforeVowel() {
         engine.reset()
-        engine.vFreeMark = 1  // Free Mark ON
         
         // h-o-f-a → hoà (not hòa)
         _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
@@ -839,7 +835,6 @@ class VNEngineTests: XCTestCase {
     /// unconditional insertState() call adding duplicate modifiers
     func testTelex_LYS_ToLy_NotEnglishPattern() {
         engine.reset()
-        engine.vFreeMark = 1  // Free Mark ON (as in user's config)
         
         // l-y-s → lý (Telex)
         _ = engine.processKey(character: "l", keyCode: VietnameseData.KEY_L, isUppercase: false)
@@ -1005,7 +1000,6 @@ class VNEngineTests: XCTestCase {
     /// Scenario: "nhầm" → "f" (undo) → "nhâmf" → BACKSPACE → "nhâm" → "f" → should be "nhầm"
     func testTelex_UndoBackspaceRetype_ToneMark() {
         engine.reset()
-        engine.vFreeMark = 1  // Free Mark ON
         
         // Step 1: Type "nhâm" (n-h-a-a-m)
         _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
@@ -1084,7 +1078,6 @@ class VNEngineTests: XCTestCase {
     /// and preventing 's' from being applied as sắc tone mark
     func testTelex_WNGS_ToUng() {
         engine.reset()
-        engine.vFreeMark = 1
         // Ensure allowConsonantZFWJ is OFF (default)
         engine.vAllowConsonantZFWJ = 0
         
@@ -1251,7 +1244,6 @@ class VNEngineTests: XCTestCase {
     /// insertMarkInternal skips mark placement and returns vDoNothing.
     func testTelex_NGINX_ShouldNotApplyMark() {
         engine.reset()
-        engine.vFreeMark = 1
         
         // n-g-i-n-x → "nginx" (vowelCount=0, vowelEndIndex=2 > 1 → mark skipped)
         _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
@@ -1267,7 +1259,6 @@ class VNEngineTests: XCTestCase {
     /// Same as above but without ending consonant: "ngi" + x → "ngix"
     func testTelex_NGIX_ShouldNotApplyMark() {
         engine.reset()
-        engine.vFreeMark = 1
         
         // n-g-i-x → "ngix" (vowelCount=0, vowelEndIndex=2 > 1 → mark skipped)
         _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
@@ -1283,7 +1274,6 @@ class VNEngineTests: XCTestCase {
     /// vowel (vowelCount=1), so mark placement proceeds normally.
     func testTelex_NGHIX_ShouldApplyMark() {
         engine.reset()
-        engine.vFreeMark = 1
         
         // n-g-h-i-x → "nghĩ" (vowelCount=1, 'i' is the vowel)
         _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
@@ -1300,7 +1290,6 @@ class VNEngineTests: XCTestCase {
     /// (vowelEndIndex=1 ≤ 1), so handleOldMark's special case places mark on 'i'.
     func testTelex_GIF_ShouldApplyMark() {
         engine.reset()
-        engine.vFreeMark = 1
         
         // g-i-f → "gì" (vowelCount=0, but vowelEndIndex=1 ≤ 1 → mark allowed)
         _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
@@ -1315,7 +1304,6 @@ class VNEngineTests: XCTestCase {
     /// ending consonant 'n' and free mark placement.
     func testTelex_GINF_ShouldApplyMark() {
         engine.reset()
-        engine.vFreeMark = 1
         
         // g-i-n-f → "gìn" (vowelCount=0, but vowelEndIndex=1 ≤ 1 → mark allowed)
         _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)

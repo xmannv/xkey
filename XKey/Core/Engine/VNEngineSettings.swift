@@ -16,7 +16,6 @@ extension VNEngine {
         var codeTable: CodeTable = .unicode
         var modernStyle: Bool = true
         var spellCheckEnabled: Bool = true
-        var freeMarking: Bool = true
         
         // Advanced features
         var quickTelexEnabled: Bool = true
@@ -67,7 +66,6 @@ extension VNEngine {
         vRestoreIfWrongSpelling = settings.restoreIfWrongSpelling ? 1 : 0
 
         vAllowConsonantZFWJ = settings.allowConsonantZFWJ ? 1 : 0
-        vFreeMark = settings.freeMarking ? 1 : 0
         
         // Macro settings
         vUseMacro = settings.macroEnabled ? 1 : 0
@@ -110,9 +108,7 @@ extension VNEngine {
         settings.quickEndConsonantEnabled = vQuickEndConsonant == 1
         settings.upperCaseFirstChar = vUpperCaseFirstChar == 1
         settings.restoreIfWrongSpelling = vRestoreIfWrongSpelling == 1
-
         settings.allowConsonantZFWJ = vAllowConsonantZFWJ == 1
-        settings.freeMarking = vFreeMark == 1
         
         // Macro settings
         settings.macroEnabled = vUseMacro == 1

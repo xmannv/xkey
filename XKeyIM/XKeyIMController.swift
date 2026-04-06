@@ -130,7 +130,7 @@ class XKeyIMController: IMKInputController {
         engineSettings.spellCheckEnabled = settings.spellCheckEnabled
 
         engineSettings.quickTelexEnabled = settings.quickTelexEnabled
-        engineSettings.freeMarking = settings.freeMarkEnabled
+
         engineSettings.restoreIfWrongSpelling = settings.restoreIfWrongSpelling
         engine.updateSettings(engineSettings)
     }
@@ -1281,7 +1281,6 @@ class XKeyIMSettings {
     var spellCheckEnabled: Bool = true
 
     var quickTelexEnabled: Bool = true
-    var freeMarkEnabled: Bool = false
     var restoreIfWrongSpelling: Bool = true
     var useMarkedText: Bool = true  // Default to true - standard IMKit behavior
     var debugModeEnabled: Bool = false  // Controls whether XKeyIM writes to ~/XKey_Debug.log
@@ -1312,7 +1311,6 @@ class XKeyIMSettings {
         spellCheckEnabled = readBool(forKey: "XKey.spellCheckEnabled")
 
         quickTelexEnabled = readBool(forKey: "XKey.quickTelexEnabled", defaultValue: true)
-        freeMarkEnabled = readBool(forKey: "XKey.freeMarkEnabled")
         restoreIfWrongSpelling = readBool(forKey: "XKey.restoreIfWrongSpelling", defaultValue: true)
         
         // Use Marked Text

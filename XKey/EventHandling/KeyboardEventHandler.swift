@@ -67,13 +67,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
-
-    
     @Published var allowConsonantZFWJ: Bool = false {
-        didSet { updateEngineSettings() }
-    }
-    
-    @Published var freeMarkEnabled: Bool = false {
         didSet { updateEngineSettings() }
     }
     
@@ -684,7 +678,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.restoreIfWrongSpelling = restoreIfWrongSpelling
 
         settings.allowConsonantZFWJ = allowConsonantZFWJ
-        settings.freeMarking = freeMarkEnabled
         
         // Macro settings
         settings.macroEnabled = macroEnabled
@@ -718,7 +711,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         upperCaseFirstChar: Bool,
         restoreIfWrongSpelling: Bool,
         allowConsonantZFWJ: Bool,
-        freeMarkEnabled: Bool,
         macroEnabled: Bool,
         macroInEnglishMode: Bool,
         autoCapsMacro: Bool,
@@ -741,7 +733,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         self.upperCaseFirstChar = upperCaseFirstChar
         self.restoreIfWrongSpelling = restoreIfWrongSpelling
         self.allowConsonantZFWJ = allowConsonantZFWJ
-        self.freeMarkEnabled = freeMarkEnabled
         self.macroEnabled = macroEnabled
         self.macroInEnglishMode = macroInEnglishMode
         self.autoCapsMacro = autoCapsMacro

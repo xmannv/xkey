@@ -55,7 +55,6 @@ class VNEngine {
     
     var vLanguage = 1              // 0: English, 1: Vietnamese
     var vInputType = 0             // 0: Telex, 1: VNI
-    var vFreeMark = 0              // 0: No, 1: Yes
     var vCodeTable = 0             // 0: Unicode, 1: TCVN3, 2: VNI-Windows
     var vCheckSpelling = 1         // 0: No, 1: Yes
     var vUseModernOrthography = 1  // 0: òa/úy, 1: oà/uý
@@ -552,7 +551,7 @@ class VNEngine {
             handleMainKey(keyCode: keyCode, isCaps: isCaps)
         }
         
-        // Always check for vowel auto-fix (ưo → ươ) regardless of vFreeMark
+        // Always check for vowel auto-fix (ưo → ươ)
         // This is important for correct Vietnamese typing
         // Skip if instant restore has occurred (extCode == 5) - word is being discarded
         if !isKeyD(keyCode: keyCode, inputType: vInputType) && hookState.extCode != 5 {
@@ -565,7 +564,6 @@ class VNEngine {
         // Example: "hoạt" - tone on 'a', not 'o'; "hiện" - tone on 'ê', not 'i'
         // Additional rule: when adding vowels after a mark, position may need adjustment
         // Example: "ngò" + "a" → "ngoà" (mark moves from 'o' to 'a')
-        // This rule applies regardless of vFreeMark setting
         // Skip if instant restore has occurred (extCode == 5) - word is being discarded
         if !isKeyD(keyCode: keyCode, inputType: vInputType) && hookState.extCode != 5 {
             // Check if this key is an end consonant
@@ -583,11 +581,10 @@ class VNEngine {
                 }
             }
             
-            // Always check mark position if:
-            // 1. vFreeMark is disabled, OR
-            // 2. This is an end consonant (Vietnamese spelling rule), OR
-            // 3. This is a vowel added to a word with existing mark (mark position may need adjustment)
-            if vFreeMark == 0 || isEndConsonant || isVowelWithExistingMark {
+            // Always check mark position when:
+            // 1. This is an end consonant (Vietnamese spelling rule), OR
+            // 2. This is a vowel added to a word with existing mark (mark position may need adjustment)
+            if isEndConsonant || isVowelWithExistingMark {
                 // IMPORTANT: Determine deltaBackSpace correctly
                 // If checkVowelAutoFix has run (extCode=4), the last character hasn't been
                 // sent to screen yet, so we need deltaBackSpace=-1 even if hookState.code != vDoNothing
@@ -683,17 +680,6 @@ class VNEngine {
         
         // Handle D key
         if isKeyD(keyCode: keyCode, inputType: vInputType) {
-            // FREE MARK CHECK: When vFreeMark is OFF, only allow đ if last char is 'd'
-            // Example: "d + d" → "đ" OK, "d + i + d" → NOT OK (must type "d + d + i")
-            if vFreeMark == 0 && index > 0 {
-                let lastChar = chr(Int(index) - 1)
-                if lastChar != VietnameseData.KEY_D {
-                    logCallback?("handleMainKey: Free Mark OFF - D key rejected, last char is not 'd'")
-                    insertKey(keyCode: keyCode, isCaps: isCaps)
-                    return
-                }
-            }
-            
             var isCorrect = false
             var isChanged = false
             var k = Int(index)
@@ -790,29 +776,13 @@ class VNEngine {
         var isChanged = false
         
         let charDisplay = Self.keyCodeToChar(keyCode).map { " '\($0)'" } ?? ""
-        logCallback?("handleMarkKey: keyCode=\(keyCode)\(charDisplay), index=\(index), buffer=\(getCurrentWord()), vFreeMark=\(vFreeMark)")
+        logCallback?("handleMarkKey: keyCode=\(keyCode)\(charDisplay), index=\(index), buffer=\(getCurrentWord())")
         
         // Ignore "qu" case - OpenKey: checkCorrectVowel
         if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q {
             logCallback?("  → Skipping: qu case")
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
-        }
-        
-        // FREE MARK CHECK: When vFreeMark is OFF (0), only allow placing tone marks
-        // if the last character is a vowel (mark must be typed immediately after vowel)
-        // Example: "a + s" → OK, "a + n + h + s" → NOT OK (must type "a + s + n + h")
-        if vFreeMark == 0 && index > 0 {
-            let lastChar = chr(Int(index) - 1)
-            let isLastCharVowel = vietnameseData.isVowelKey(lastChar)
-            logCallback?("  → Free Mark OFF: lastChar=\(lastChar), isVowel=\(isLastCharVowel)")
-            
-            if !isLastCharVowel {
-                // Last character is not a vowel, cannot place mark here in non-free-mark mode
-                logCallback?("  → Rejected: Free Mark is OFF and last char is not a vowel")
-                insertKey(keyCode: keyCode, isCaps: isCaps)
-                return
-            }
         }
         
         for (vowelKey, charsets) in vietnameseData.vowelForMarkTable {
@@ -957,8 +927,7 @@ class VNEngine {
             logCallback?("  → No pattern matched, checking for VNI fallback...")
             
             // VNI fallback: For keys 1-5, if pattern didn't match but we have vowels,
-            // try to apply tone anyway. Note: This only runs when Free Mark is ON
-            // or when last char is a vowel (we return early above otherwise).
+            // try to apply tone anyway.
             if vInputType == 1 && (keyCode == VietnameseData.KEY_1 || keyCode == VietnameseData.KEY_2 ||
                                    keyCode == VietnameseData.KEY_3 || keyCode == VietnameseData.KEY_4 ||
                                    keyCode == VietnameseData.KEY_5) {
@@ -998,7 +967,7 @@ class VNEngine {
     
     private func handleVowelKey(keyCode: UInt16, isCaps: Bool) {
         let charDisplay = Self.keyCodeToChar(keyCode).map { " '\($0)'" } ?? ""
-        logCallback?("handleVowelKey: keyCode=\(keyCode)\(charDisplay), index=\(index), tempDisableKey=\(tempDisableKey), buffer=\(getCurrentWord()), vFreeMark=\(vFreeMark)")
+        logCallback?("handleVowelKey: keyCode=\(keyCode)\(charDisplay), index=\(index), tempDisableKey=\(tempDisableKey), buffer=\(getCurrentWord())")
         
         // Ignore "qu" case - OpenKey: checkCorrectVowel
         if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q {
@@ -1006,102 +975,7 @@ class VNEngine {
             return
         }
         
-        // FREE MARK CHECK: When vFreeMark is OFF, only allow vowel modifiers
-        // if the last character is the corresponding vowel
-        // Example for Telex: "a + a" → "â" OK, "a + n + a" → NOT OK (must type "a + a + n")
-        // Example for VNI: "a + 6" → "â" OK, "a + n + 6" → NOT OK
-        if vFreeMark == 0 && index > 0 {
-            let lastChar = chr(Int(index) - 1)
-            var expectedVowels: [UInt16] = []
-            var needsExtraVowelCheck = false  // For W key, need additional check
-            
-            if vInputType != 1 { // Telex
-                switch keyCode {
-                case VietnameseData.KEY_A:
-                    expectedVowels = [VietnameseData.KEY_A]  // aa → â
-                case VietnameseData.KEY_O:
-                    expectedVowels = [VietnameseData.KEY_O]  // oo → ô
-                case VietnameseData.KEY_E:
-                    expectedVowels = [VietnameseData.KEY_E]  // ee → ê
-                case VietnameseData.KEY_W:
-                    expectedVowels = [VietnameseData.KEY_U, VietnameseData.KEY_O, VietnameseData.KEY_A]  // w → ư, ơ, ă
-                    needsExtraVowelCheck = true
-                default:
-                    break
-                }
-            } else { // VNI
-                switch keyCode {
-                case VietnameseData.KEY_6:
-                    expectedVowels = [VietnameseData.KEY_A, VietnameseData.KEY_E, VietnameseData.KEY_O]  // 6 → ^
-                    needsExtraVowelCheck = true
-                case VietnameseData.KEY_7:
-                    expectedVowels = [VietnameseData.KEY_U, VietnameseData.KEY_O]  // 7 → móc (ư, ơ)
-                    needsExtraVowelCheck = true
-                case VietnameseData.KEY_8:
-                    expectedVowels = [VietnameseData.KEY_A]  // 8 → trăng (ă)
-                    needsExtraVowelCheck = true
-                default:
-                    break
-                }
-            }
-            
-            // If this key adds a vowel modifier, check if last char is expected
-            if !expectedVowels.isEmpty && !expectedVowels.contains(lastChar) {
-                logCallback?("  → Free Mark OFF: lastChar=\(lastChar), expectedVowels=\(expectedVowels) - REJECTED")
-                insertKey(keyCode: keyCode, isCaps: isCaps)
-                return
-            }
-            
-            // Additional check for W key (and VNI 6/7/8): reject only if insertW() would modify
-            // an earlier vowel that is NOT the lastChar (true "free mark" behavior)
-            //
-            // insertW() logic for 2 vowels (from insertW function):
-            // - U + O → both get TONEW_MASK (ươ) - OK, standard pattern
-            // - U + A, U + I, U + U, O + I → only first vowel (v1) gets modified - REJECT (free mark)
-            // - I + O, O + A → only second vowel (v2) gets modified - OK, modifies lastChar
-            // - Other combinations → do nothing
-            //
-            // So we only reject when: there are 2 unmodified vowels AND insertW would modify v1 only
-            // Patterns that modify v1 only: U+A, U+I, U+U, O+I
-            if needsExtraVowelCheck && expectedVowels.contains(lastChar) {
-                // Find unmodified vowels and their keys
-                var unmodifiedVowels: [(index: Int, key: UInt16)] = []
-                for i in 0..<Int(index) {
-                    if vietnameseData.isVowelKey(chr(i)) {
-                        let isAlreadyModified = (typingWord[i] & VNEngine.TONEW_MASK) != 0 ||
-                                                (typingWord[i] & VNEngine.TONE_MASK) != 0
-                        if !isAlreadyModified {
-                            unmodifiedVowels.append((index: i, key: chr(i)))
-                        }
-                    }
-                }
-
-                // insertW() uses vowelStartIndex and vowelStartIndex+1 (first 2 vowels)
-                // So we check if the first 2 unmodified vowels would trigger "free mark" behavior
-                if unmodifiedVowels.count >= 2 {
-                    let v1Key = unmodifiedVowels[0].key
-                    let v2Key = unmodifiedVowels[1].key
-
-                    // These patterns would modify v1 only (the earlier vowel) - this is "free mark" behavior
-                    // U+A → ư+a, U+I → ư+i, U+U → ư+u, O+I → ơ+i
-                    let wouldModifyV1Only =
-                        (v1Key == VietnameseData.KEY_U && v2Key == VietnameseData.KEY_A) ||
-                        (v1Key == VietnameseData.KEY_U && v2Key == VietnameseData.KEY_I) ||
-                        (v1Key == VietnameseData.KEY_U && v2Key == VietnameseData.KEY_U) ||
-                        (v1Key == VietnameseData.KEY_O && v2Key == VietnameseData.KEY_I)
-
-                    if wouldModifyV1Only {
-                        logCallback?("  → Free Mark OFF: W key would modify earlier vowel (v1=\(v1Key), v2=\(v2Key)) - REJECTED")
-                        insertKey(keyCode: keyCode, isCaps: isCaps)
-                        return
-                    }
-
-                    logCallback?("  → Free Mark OFF: W key with \(unmodifiedVowels.count) vowels (v1=\(v1Key), v2=\(v2Key)) - ALLOWED (modifies lastChar or both)")
-                }
-            }
-        }
-        
-        // Check VNI special case - find the vowel to apply circumflex/horn
+        // Handle VNI: for keys 6, 7, 8 find the correct vowel to modify circumflex/horn
         // VEI = -1 means no valid vowel (a, e, o) was found
         var VEI = -1
         if vInputType == 1 { // VNI
@@ -2211,7 +2085,7 @@ class VNEngine {
     // MARK: - Grammar Check
 
     /// Check and auto-fix vowel combinations like "ưo" → "ươ"
-    /// This should always run regardless of vFreeMark setting
+    /// This always runs to ensure correct vowel patterns
     private func checkVowelAutoFix(deltaBackSpace: Int) {
         logCallback?("checkVowelAutoFix: index=\(index), deltaBackSpace=\(deltaBackSpace)")
 
@@ -2298,7 +2172,7 @@ class VNEngine {
     }
     
     /// Check and auto-adjust mark position
-    /// This only runs when vFreeMark is disabled
+    /// Ensures tone marks are on the correct vowel according to Vietnamese spelling rules
     private func checkMarkPosition(deltaBackSpace: Int) {
         logCallback?("checkMarkPosition: index=\(index), deltaBackSpace=\(deltaBackSpace)")
         
@@ -2394,13 +2268,11 @@ class VNEngine {
     /// Legacy function - calls both checkVowelAutoFix and checkMarkPosition
     private func checkGrammar(deltaBackSpace: Int) {
         checkVowelAutoFix(deltaBackSpace: deltaBackSpace)
-        // When deleting a character (deltaBackSpace > 0), ALWAYS check mark position
-        // regardless of vFreeMark setting. This is because deleting an ending consonant
-        // changes the "terminated" status of the vowel sequence, which affects where
-        // the tone mark should be placed according to Vietnamese spelling rules.
+        // When deleting a character (deltaBackSpace > 0), check mark position
+        // because deleting an ending consonant changes the "terminated" status
+        // of the vowel sequence, which affects where the tone mark should be placed.
         // Example: "bưãn" (mark on 'a') -> delete 'n' -> "bữa" (mark should move to 'ư')
-        // This is NOT a free marking choice - it's a spelling rule.
-        if vFreeMark == 0 || deltaBackSpace > 0 {
+        if deltaBackSpace > 0 {
             checkMarkPosition(deltaBackSpace: deltaBackSpace)
         }
     }

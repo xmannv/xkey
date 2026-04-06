@@ -345,7 +345,6 @@ class DebugViewModel: ObservableObject {
         lines.append("[Input Settings]")
         lines.append("  Modern Style: \(settings.modernStyle ? "ON" : "OFF")")
         lines.append("  Spell Check: \(settings.spellCheckEnabled ? "ON" : "OFF")")
-        lines.append("  Free Mark: \(settings.freeMarkEnabled ? "ON" : "OFF")")
         lines.append("  Allow Consonant ZFWJ: \(settings.allowConsonantZFWJ ? "ON" : "OFF")")
         lines.append("  Upper Case First Char: \(settings.upperCaseFirstChar ? "ON" : "OFF")")
         lines.append("  Undo Typing: \(settings.undoTypingEnabled ? "ON" : "OFF")")

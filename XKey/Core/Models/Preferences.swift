@@ -43,7 +43,6 @@ struct Preferences: Codable {
     var restoreIfWrongSpelling: Bool = true      // Restore if wrong spelling
     var instantRestoreOnWrongSpelling: Bool = false // Restore immediately when wrong spelling detected
     var allowConsonantZFWJ: Bool = false         // Allow Z, F, W, J consonants
-    var freeMarkEnabled: Bool = true             // Free mark placement (đặt dấu tự do)
     var tempOffToolbarEnabled: Bool = false      // Show floating toolbar for temp off controls
     var tempOffToolbarHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .option])  // Default: Cmd+Option+T
     var convertToolHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)

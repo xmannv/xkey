@@ -126,6 +126,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // SINGLE INSTANCE GUARD: Terminate if another instance is already running
+        // This prevents duplicate status bar icons when opening from both
+        // /Applications and build directory simultaneously
+        if !isRunningTests {
+            if let bundleId = Bundle.main.bundleIdentifier {
+                let runningApps = NSRunningApplication.runningApplications(
+                    withBundleIdentifier: bundleId
+                )
+                // Filter to only OTHER instances (exclude self)
+                let otherInstances = runningApps.filter { $0 != NSRunningApplication.current }
+                if !otherInstances.isEmpty {
+                    // Other instance(s) running — terminate them, new instance takes over
+                    for oldInstance in otherInstances {
+                        NSLog("[XKey] Terminating old instance (PID: %d)", oldInstance.processIdentifier)
+                        oldInstance.terminate()
+                    }
+                    // Brief delay to allow old instance(s) to fully clean up
+                    // (release status bar icon, event tap, etc.)
+                    Thread.sleep(forTimeInterval: 0.5)
+                }
+            }
+        }
+        
         // Set shared instance for access from SwiftUI views
         AppDelegate.shared = self
         
@@ -549,7 +572,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             upperCaseFirstChar: preferences.upperCaseFirstChar,
             restoreIfWrongSpelling: preferences.restoreIfWrongSpelling,
             allowConsonantZFWJ: preferences.allowConsonantZFWJ,
-            freeMarkEnabled: preferences.freeMarkEnabled,
             macroEnabled: preferences.macroEnabled,
             macroInEnglishMode: preferences.macroInEnglishMode,
             autoCapsMacro: preferences.autoCapsMacro,
