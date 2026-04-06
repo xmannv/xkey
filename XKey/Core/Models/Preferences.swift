@@ -42,7 +42,18 @@ struct Preferences: Codable {
     var upperCaseFirstChar: Bool = false         // Auto capitalize first letter
     var restoreIfWrongSpelling: Bool = true      // Restore if wrong spelling
     var instantRestoreOnWrongSpelling: Bool = false // Restore immediately when wrong spelling detected
-    var allowConsonantZFWJ: Bool = false         // Allow Z, F, W, J consonants
+    var customConsonantEnabled: Bool = false         // Whether custom consonants feature is enabled
+    var customConsonants: String = "Z,F,W,J"         // Custom consonants list (always stored, even when disabled)
+    
+    /// Default custom consonants when feature is reset
+    static let defaultCustomConsonants = "Z,F,W,J"
+    
+    /// Computed: get individual consonant list from the comma-separated string
+    var customConsonantList: [String] {
+        guard !customConsonants.isEmpty else { return [] }
+        return customConsonants.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces).uppercased() }
+    }
+
     var tempOffToolbarEnabled: Bool = false      // Show floating toolbar for temp off controls
     var tempOffToolbarHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .option])  // Default: Cmd+Option+T
     var convertToolHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)

@@ -34,7 +34,9 @@ struct AdvancedSection: View {
                 SettingsGroup(title: "Chính tả & Viết hoa") {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle("Tự động viết hoa chữ đầu câu", isOn: $viewModel.preferences.upperCaseFirstChar)
-                        Toggle("Cho phép phụ âm Z, F, W, J", isOn: $viewModel.preferences.allowConsonantZFWJ)
+                        
+                        // Custom consonants toggle + chip editor
+                        CustomConsonantChipEditor(isEnabled: $viewModel.preferences.customConsonantEnabled, customConsonants: $viewModel.preferences.customConsonants)
 
                         Toggle("Kiểm tra chính tả và tự động khôi phục (Thử nghiệm)", isOn: $viewModel.preferences.spellCheckEnabled)
                             .onChange(of: viewModel.preferences.spellCheckEnabled) { newValue in

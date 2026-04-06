@@ -38,7 +38,8 @@ enum SharedSettingsKey: String {
     case restoreIfWrongSpelling = "XKey.restoreIfWrongSpelling"
     case instantRestoreOnWrongSpelling = "XKey.instantRestoreOnWrongSpelling"
 
-    case allowConsonantZFWJ = "XKey.allowConsonantZFWJ"
+    case customConsonantEnabled = "XKey.customConsonantEnabled"
+    case customConsonants = "XKey.customConsonants"
     case tempOffToolbarEnabled = "XKey.tempOffToolbarEnabled"
     case tempOffToolbarHotkeyCode = "XKey.tempOffToolbarHotkeyCode"
     case tempOffToolbarHotkeyModifiers = "XKey.tempOffToolbarHotkeyModifiers"
@@ -373,10 +374,20 @@ class SharedSettings {
     }
 
 
+    var customConsonantEnabled: Bool {
+        get { readBool(forKey: SharedSettingsKey.customConsonantEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.customConsonantEnabled.rawValue)
+            notifySettingsChanged()
+        }
+    }
 
-    var allowConsonantZFWJ: Bool {
-        get { readBool(forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
-        set { writeBool(newValue, forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
+    var customConsonants: String {
+        get { readString(forKey: SharedSettingsKey.customConsonants.rawValue) ?? Preferences.defaultCustomConsonants }
+        set {
+            writeString(newValue, forKey: SharedSettingsKey.customConsonants.rawValue)
+            notifySettingsChanged()
+        }
     }
     
     var tempOffToolbarEnabled: Bool {
@@ -1030,7 +1041,9 @@ class SharedSettings {
         prefs.restoreIfWrongSpelling = restoreIfWrongSpelling
         prefs.instantRestoreOnWrongSpelling = instantRestoreOnWrongSpelling
 
-        prefs.allowConsonantZFWJ = allowConsonantZFWJ
+        // Custom consonants (2-prop: enabled + list)
+        prefs.customConsonantEnabled = customConsonantEnabled
+        prefs.customConsonants = customConsonants
         prefs.tempOffToolbarEnabled = tempOffToolbarEnabled
 
         // Temp off toolbar hotkey
@@ -1180,7 +1193,8 @@ class SharedSettings {
         restoreIfWrongSpelling = prefs.restoreIfWrongSpelling
         instantRestoreOnWrongSpelling = prefs.instantRestoreOnWrongSpelling
 
-        allowConsonantZFWJ = prefs.allowConsonantZFWJ
+        customConsonantEnabled = prefs.customConsonantEnabled
+        customConsonants = prefs.customConsonants
         tempOffToolbarEnabled = prefs.tempOffToolbarEnabled
         tempOffToolbarHotkeyCode = prefs.tempOffToolbarHotkey.keyCode
         tempOffToolbarHotkeyModifiers = prefs.tempOffToolbarHotkey.modifiers.rawValue

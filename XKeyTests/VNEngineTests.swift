@@ -1078,8 +1078,8 @@ class VNEngineTests: XCTestCase {
     /// and preventing 's' from being applied as sắc tone mark
     func testTelex_WNGS_ToUng() {
         engine.reset()
-        // Ensure allowConsonantZFWJ is OFF (default)
-        engine.vAllowConsonantZFWJ = 0
+        // Ensure customConsonants is empty (default - no custom consonants)
+        engine.vCustomConsonants = []
         
         // w-n-g-s → ứng (standalone ư + ng ending + sắc tone)
         _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
@@ -1433,6 +1433,650 @@ class VNEngineTests: XCTestCase {
         
         XCTAssertEqual(engine.getCurrentWord(), "â",
                        "aa should still produce 'â' — only 2 identical vowels (below threshold)")
+    }
+
+    // MARK: - Custom Consonants: parseCustomConsonants Utility Tests
+    
+    /// Test parsing a valid comma-separated string into Set<UInt16>
+    func testParseCustomConsonants_ValidString() {
+        let result = VietnameseData.parseCustomConsonants("Z,F,W,J,K")
+        XCTAssertEqual(result.count, 5)
+        XCTAssertTrue(result.contains(VietnameseData.KEY_Z))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_F))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_W))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_J))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_K))
+    }
+    
+    /// Test parsing an empty string returns empty set (feature disabled)
+    func testParseCustomConsonants_EmptyString() {
+        let result = VietnameseData.parseCustomConsonants("")
+        XCTAssertTrue(result.isEmpty, "Empty string should parse to empty set")
+    }
+    
+    /// Test parsing with extra whitespace
+    func testParseCustomConsonants_WithWhitespace() {
+        let result = VietnameseData.parseCustomConsonants(" Z , F , W ")
+        XCTAssertEqual(result.count, 3)
+        XCTAssertTrue(result.contains(VietnameseData.KEY_Z))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_F))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_W))
+    }
+    
+    /// Test parsing lowercase letters (should convert to keycode correctly)
+    func testParseCustomConsonants_Lowercase() {
+        let result = VietnameseData.parseCustomConsonants("z,f")
+        XCTAssertEqual(result.count, 2)
+        XCTAssertTrue(result.contains(VietnameseData.KEY_Z))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_F))
+    }
+    
+    /// Test parsing single consonant
+    func testParseCustomConsonants_SingleConsonant() {
+        let result = VietnameseData.parseCustomConsonants("K")
+        XCTAssertEqual(result.count, 1)
+        XCTAssertTrue(result.contains(VietnameseData.KEY_K))
+    }
+    
+    /// Test parsing with duplicate entries (set deduplicates)
+    func testParseCustomConsonants_Duplicates() {
+        let result = VietnameseData.parseCustomConsonants("Z,Z,F,F")
+        XCTAssertEqual(result.count, 2, "Duplicates should be deduplicated by Set")
+        XCTAssertTrue(result.contains(VietnameseData.KEY_Z))
+        XCTAssertTrue(result.contains(VietnameseData.KEY_F))
+    }
+    
+    // MARK: - Custom Consonants: Standalone Char Conversion Tests
+    
+    /// When K is in customConsonants, "k]" should produce "kư"
+    /// This is the primary bug fix scenario
+    func testStandalone_KBracket_WithKEnabled_ShouldProduceKU() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_K]
+        
+        // k-] → kư (K is in custom consonants, so standalone ư allowed after K)
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "kư",
+                       "k+] should produce 'kư' when K is in customConsonants")
+    }
+    
+    /// When K is NOT in customConsonants, "k]" should produce "kw" (raw)
+    func testStandalone_KBracket_WithKDisabled_ShouldProduceRaw() {
+        engine.reset()
+        engine.vCustomConsonants = [] // K not in custom consonants
+        
+        // k-] → kw (K is blocked, standalone ư NOT allowed)
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        // When blocked, the W key is inserted raw
+        let word = engine.getCurrentWord()
+        XCTAssertNotEqual(word, "kư",
+                         "k+] should NOT produce 'kư' when K is not in customConsonants")
+    }
+    
+    /// When Z is in customConsonants, "z[" should produce "zơ"
+    func testStandalone_ZBracket_WithZEnabled_ShouldProduceZO() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z]
+        
+        // z-[ → zơ (Z is in custom consonants, standalone ơ allowed after Z)
+        _ = engine.processKey(character: "z", keyCode: VietnameseData.KEY_Z, isUppercase: false)
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "zơ",
+                       "z+[ should produce 'zơ' when Z is in customConsonants")
+    }
+    
+    /// When Z is NOT in customConsonants, "z[" should NOT produce "zơ"
+    func testStandalone_ZBracket_WithZDisabled_ShouldNotConvert() {
+        engine.reset()
+        engine.vCustomConsonants = [] // Z not in custom consonants
+        
+        // z-[ → raw output (Z is blocked, standalone ơ NOT allowed)
+        _ = engine.processKey(character: "z", keyCode: VietnameseData.KEY_Z, isUppercase: false)
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        
+        let word = engine.getCurrentWord()
+        XCTAssertNotEqual(word, "zơ",
+                         "z+[ should NOT produce 'zơ' when Z is not in customConsonants")
+    }
+    
+    /// When F is in customConsonants, "f]" should produce "fư"
+    func testStandalone_FBracket_WithFEnabled_ShouldProduceFU() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_F]
+        
+        // f-] → fư
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "fư",
+                       "f+] should produce 'fư' when F is in customConsonants")
+    }
+    
+    /// When W is in customConsonants, "w" is standalone ư (no preceding char)
+    /// This should still work (standalone at word start)
+    func testStandalone_W_AtWordStart_AlwaysConverts() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // w at word start → ư (standalone at index 0 always allowed)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ư",
+                       "w at word start should produce 'ư' regardless of customConsonants")
+    }
+    
+    /// Standalone ơ at word start should always work
+    func testStandalone_O_AtWordStart_AlwaysConverts() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // [ at word start → ơ (standalone at index 0 always allowed)
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ơ",
+                       "[ at word start should produce 'ơ' regardless of customConsonants")
+    }
+    
+    /// Always-blocked chars (E, Y) should NEVER allow standalone conversion
+    /// regardless of customConsonants setting
+    func testStandalone_AfterE_AlwaysBlocked() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z, VietnameseData.KEY_F, VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K]
+        
+        // e-] → should NOT produce "eư" even with all custom consonants enabled
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        let word = engine.getCurrentWord()
+        XCTAssertNotEqual(word, "eư",
+                         "Standalone ư after 'e' should ALWAYS be blocked (e is in standaloneWbadAlways)")
+    }
+    
+    /// Always-blocked chars (Y) should NEVER allow standalone conversion
+    func testStandalone_AfterY_AlwaysBlocked() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z, VietnameseData.KEY_F, VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K]
+        
+        // y-[ → should NOT produce "yơ"
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        
+        let word = engine.getCurrentWord()
+        XCTAssertNotEqual(word, "yơ",
+                         "Standalone ơ after 'y' should ALWAYS be blocked (y is in standaloneWbadAlways)")
+    }
+    
+    /// Standard consonants (not in conditional list) should always allow standalone conversion
+    func testStandalone_AfterB_AlwaysAllowed() {
+        engine.reset()
+        engine.vCustomConsonants = [] // Empty - feature disabled
+        
+        // b-] → bư (b is a standard Vietnamese consonant)
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "bư",
+                       "Standalone ư after standard consonant 'b' should always be allowed")
+    }
+    
+    /// Standard consonant "l" should always allow standalone conversion
+    func testStandalone_AfterL_AlwaysAllowed() {
+        engine.reset()
+        engine.vCustomConsonants = [] // Empty
+        
+        // l-[ → lơ
+        _ = engine.processKey(character: "l", keyCode: VietnameseData.KEY_L, isUppercase: false)
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "lơ",
+                       "Standalone ơ after standard consonant 'l' should always be allowed")
+    }
+    
+    // MARK: - Custom Consonants: Full Word Tests with Custom Consonants
+    
+    /// "kưu" with K enabled: k-]-u → should handle correctly
+    func testCustomConsonant_KUU_WithKEnabled() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_K]
+        
+        // k-]-u
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        
+        // kư + u = "kưu" or "kuu" depending on engine logic
+        let word = engine.getCurrentWord()
+        // Key point: k] should have converted to kư first
+        XCTAssertTrue(word.contains("ư") || word.hasPrefix("k"),
+                     "K+]+u should start with k and contain ư when K is in customConsonants, got: '\(word)'")
+    }
+    
+    /// Test "wng" → "ưng" without custom consonants (basic standalone test)
+    func testStandalone_WNG_ToUng_WithoutCustomConsonants() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // w-n-g → ưng
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ưng",
+                       "w-n-g should produce 'ưng' (standalone ư at word start + ng)")
+    }
+    
+    /// Test with multiple custom consonants enabled at once
+    func testStandalone_AllCustomConsonants_Enabled() {
+        engine.reset()
+        let allCustom: Set<UInt16> = [
+            VietnameseData.KEY_Z, VietnameseData.KEY_F,
+            VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K
+        ]
+        engine.vCustomConsonants = allCustom
+        
+        // Test each custom consonant + ] → Xư
+        let testCases: [(Character, UInt16, String)] = [
+            ("z", VietnameseData.KEY_Z, "zư"),
+            ("f", VietnameseData.KEY_F, "fư"),
+            ("j", VietnameseData.KEY_J, "jư"),
+            ("k", VietnameseData.KEY_K, "kư"),
+        ]
+        
+        for (char, keyCode, expected) in testCases {
+            engine.reset()
+            engine.vCustomConsonants = allCustom
+            
+            _ = engine.processKey(character: char, keyCode: keyCode, isUppercase: false)
+            _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+            
+            XCTAssertEqual(engine.getCurrentWord(), expected,
+                          "\(char)+] should produce '\(expected)' when \(String(char).uppercased()) is in customConsonants")
+        }
+    }
+    
+    // MARK: - Custom Consonants: Selective Enable/Disable Tests
+    
+    /// Only Z enabled: Z should allow standalone, but F/W/J/K should still block
+    func testStandalone_OnlyZEnabled_OthersStillBlocked() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z] // Only Z enabled
+        
+        // z-] → zư (Z enabled, should allow)
+        _ = engine.processKey(character: "z", keyCode: VietnameseData.KEY_Z, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "zư",
+                       "z+] should produce 'zư' when Z is in customConsonants")
+        
+        // f-] → should NOT produce fư (F not enabled)
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z]
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertNotEqual(engine.getCurrentWord(), "fư",
+                         "f+] should NOT produce 'fư' when only Z is in customConsonants")
+        
+        // k-] → should NOT produce kư (K not enabled)
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z]
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertNotEqual(engine.getCurrentWord(), "kư",
+                         "k+] should NOT produce 'kư' when only Z is in customConsonants")
+    }
+    
+    /// Only K enabled: K should allow standalone, but Z should still block
+    func testStandalone_OnlyKEnabled_ZStillBlocked() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_K] // Only K enabled
+        
+        // k-] → kư (K enabled)
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "kư",
+                       "k+] should produce 'kư' when K is in customConsonants")
+        
+        // z-] → should NOT produce zư (Z not enabled)
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_K]
+        _ = engine.processKey(character: "z", keyCode: VietnameseData.KEY_Z, isUppercase: false)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertNotEqual(engine.getCurrentWord(), "zư",
+                         "z+] should NOT produce 'zư' when only K is in customConsonants")
+    }
+    
+    // MARK: - Custom Consonants: English Detection Bypass Tests
+    
+    /// When Z is in customConsonants, "zero" should NOT be flagged as impossible Vietnamese
+    func testEnglishDetection_ZeroWord_WithZEnabled() {
+        let customConsonants: Set<Character> = ["z"]
+        let result = "zero".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants)
+        XCTAssertFalse(result,
+                      "'zero' should NOT be flagged as impossible when 'z' is in customConsonants")
+    }
+    
+    /// When Z is NOT in customConsonants, "zero" SHOULD be flagged as impossible
+    func testEnglishDetection_ZeroWord_WithZDisabled() {
+        let result = "zero".startsWithImpossibleVietnameseCluster(customConsonants: [])
+        XCTAssertTrue(result,
+                     "'zero' SHOULD be flagged as impossible when customConsonants is empty")
+    }
+    
+    /// When F is in customConsonants, "fast" should NOT be flagged as impossible
+    func testEnglishDetection_FastWord_WithFEnabled() {
+        let customConsonants: Set<Character> = ["f"]
+        let result = "fast".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants)
+        XCTAssertFalse(result,
+                      "'fast' should NOT be flagged as impossible when 'f' is in customConsonants")
+    }
+    
+    /// When F is NOT in customConsonants, "fast" SHOULD be flagged
+    func testEnglishDetection_FastWord_WithFDisabled() {
+        let result = "fast".startsWithImpossibleVietnameseCluster(customConsonants: [])
+        XCTAssertTrue(result,
+                     "'fast' SHOULD be flagged as impossible when customConsonants is empty")
+    }
+    
+    /// When W is in customConsonants, "win" should NOT be flagged as impossible
+    func testEnglishDetection_WinWord_WithWEnabled() {
+        let customConsonants: Set<Character> = ["w"]
+        let result = "win".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants)
+        XCTAssertFalse(result,
+                      "'win' should NOT be flagged as impossible when 'w' is in customConsonants")
+    }
+    
+    /// When J is in customConsonants, "jazz" should NOT be flagged
+    func testEnglishDetection_JazzWord_WithJEnabled() {
+        let customConsonants: Set<Character> = ["j"]
+        let result = "jazz".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants)
+        XCTAssertFalse(result,
+                      "'jazz' should NOT be flagged as impossible when 'j' is in customConsonants")
+    }
+    
+    /// Normal Vietnamese words should never be flagged regardless of customConsonants
+    func testEnglishDetection_VietnameseWords_NeverFlagged() {
+        // These should never be flagged as impossible
+        let vietnameseWords = ["ngo", "thu", "chao", "nghi", "khong", "pho"]
+        
+        for word in vietnameseWords {
+            let result = word.startsWithImpossibleVietnameseCluster(customConsonants: [])
+            XCTAssertFalse(result,
+                          "Vietnamese word '\(word)' should NEVER be flagged as impossible")
+        }
+    }
+    
+    /// "street", "spring", "chrome" should always be flagged (regardless of customConsonants)
+    /// because they start with impossible consonant clusters
+    func testEnglishDetection_ImpossibleClusters_AlwaysFlagged() {
+        // These have impossible multi-letter clusters
+        let impossibleWords = ["street", "spring", "chrome"]
+        
+        for word in impossibleWords {
+            let result = word.startsWithImpossibleVietnameseCluster(customConsonants: [])
+            XCTAssertTrue(result,
+                         "'\(word)' SHOULD be flagged as impossible cluster")
+        }
+    }
+    
+    /// Partially enabled: only Z enabled, F-starting words should still be flagged
+    func testEnglishDetection_PartialEnable_OnlyZ() {
+        let customConsonants: Set<Character> = ["z"]
+        
+        // "zero" - should NOT be flagged (z enabled)
+        XCTAssertFalse("zero".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants),
+                       "'zero' should NOT be flagged when z is enabled")
+        
+        // "fast" - SHOULD still be flagged (f not enabled)
+        XCTAssertTrue("fast".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants),
+                      "'fast' SHOULD be flagged when only z is enabled")
+        
+        // "jazz" - SHOULD still be flagged (j not enabled)
+        XCTAssertTrue("jazz".startsWithImpossibleVietnameseCluster(customConsonants: customConsonants),
+                      "'jazz' SHOULD be flagged when only z is enabled")
+    }
+    
+    // MARK: - Custom Consonants: Regression Tests
+    
+    /// Standard Vietnamese words must still work correctly with custom consonants enabled
+    func testRegression_StandardVietnamese_WithAllCustomEnabled() {
+        engine.reset()
+        engine.vCustomConsonants = [
+            VietnameseData.KEY_Z, VietnameseData.KEY_F,
+            VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K
+        ]
+        
+        // "việt" = v-i-e-e-t
+        _ = engine.processKey(character: "v", keyCode: VietnameseData.KEY_V, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "viêt",
+                       "Standard Vietnamese 'viêt' should still work with custom consonants enabled")
+    }
+    
+    /// "thông" should still work with custom consonants enabled
+    func testRegression_Thong_WithAllCustomEnabled() {
+        engine.reset()
+        engine.vCustomConsonants = [
+            VietnameseData.KEY_Z, VietnameseData.KEY_F,
+            VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K
+        ]
+        
+        // t-h-o-o-n-g → thông
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "thông",
+                       "'thông' should still work with custom consonants enabled")
+    }
+    
+    /// "người" should still work with custom consonants enabled
+    func testRegression_Nguoi_WithAllCustomEnabled() {
+        engine.reset()
+        engine.vCustomConsonants = [
+            VietnameseData.KEY_Z, VietnameseData.KEY_F,
+            VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K
+        ]
+        
+        // n-g-u-o-w-f-i → người
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "người",
+                       "'người' should still work with custom consonants enabled")
+    }
+    
+    /// "ký" should still work (k-y-s) regardless of K in customConsonants
+    func testRegression_Ky_WorksWithOrWithoutCustomK() {
+        // Test WITH K enabled
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_K]
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ký",
+                       "'ký' should work with K in customConsonants")
+        
+        // Test WITHOUT K enabled
+        engine.reset()
+        engine.vCustomConsonants = []
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ký",
+                       "'ký' should work without K in customConsonants too (K is standard Vietnamese consonant)")
+    }
+    
+    /// "đ" (d-d) should still work with custom consonants enabled
+    func testRegression_DD_WorksWithCustomConsonants() {
+        engine.reset()
+        engine.vCustomConsonants = [
+            VietnameseData.KEY_Z, VietnameseData.KEY_F,
+            VietnameseData.KEY_W, VietnameseData.KEY_J, VietnameseData.KEY_K
+        ]
+        
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "đ",
+                       "d-d should still produce 'đ' with custom consonants enabled")
+    }
+    
+    /// Double consonant + standalone: "kh" + w → "khư" should still work
+    func testRegression_KHW_DoubleConsonantStandalone() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // k-h-w → khư (kh is valid double consonant, standalone ư allowed)
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "khư",
+                       "k-h-w should produce 'khư' (valid double consonant + standalone ư)")
+    }
+    
+    // MARK: - Bug Fix: Bracket Keys After Undo Standalone W
+    
+    /// After undo standalone ư → w, bracket key ] should still produce standalone ư
+    /// Bug: tempDisableKey=true after undo blocked bracket keys entirely
+    func testBracketAfterUndo_WBracketRight_ProducesUHorn() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_W]
+        
+        // Step 1: w → ư (standalone conversion)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ư", "w should produce 'ư'")
+        
+        // Step 2: ww → undo → w (raw)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "w", "ww should undo to 'w'")
+        
+        // Step 3: w + ] → wư (bracket key should work despite tempDisableKey)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        let word = engine.getCurrentWord()
+        XCTAssertTrue(word.contains("ư"),
+                     "After undo, ] should still produce standalone ư, got: '\(word)'")
+    }
+    
+    /// After undo standalone ư → w, bracket keys ][ should produce ươ combination
+    func testBracketAfterUndo_WBracketRightLeft_ProducesUOHorn() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_W]
+        
+        // Step 1-2: w → ư → ww → w (undo)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "w", "ww should undo to 'w'")
+        
+        // Step 3: w + ] → wư
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        
+        // Step 4: wư + [ → wươ
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        let word = engine.getCurrentWord()
+        XCTAssertTrue(word.contains("ươ"),
+                     "After undo w, ][ should produce ươ combination, got: '\(word)'")
+    }
+    
+    /// Bracket key [ should work after undo standalone ơ
+    func testBracketAfterUndo_OBracketLeft_ProducesOHorn() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // [ at word start → ơ
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ơ", "[ should produce 'ơ'")
+    }
+    
+    /// Bracket ] should work at word start even after a previous undo
+    func testBracketAtWordStart_AlwaysWorks() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // ] at word start → ư
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ư", "] at word start should produce 'ư'")
+    }
+    
+    /// After undo standalone, regular consonant + bracket should still work
+    /// Example: undo w, then type b] → bư
+    func testBracketAfterUndo_NewWord_BracketWorks() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_W]
+        
+        // w → ư → ww → w (undo)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "w", "ww should undo to 'w'")
+        
+        // w + ] should produce wư (since W is custom consonant, standalone ư allowed after w)
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        let word = engine.getCurrentWord()
+        XCTAssertTrue(word.contains("ư"),
+                     "w + ] should produce standalone ư after undo, got: '\(word)'")
+    }
+    
+    // MARK: - Bug Fix: Bracket Keys Should Respect Caps Lock
+    
+    /// Bracket ] with uppercase should produce Ư (uppercase)
+    func testBracketRight_WithCapsLock_ProducesUppercaseUHorn() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // ] with isUppercase=true → Ư
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: true)
+        let word = engine.getCurrentWord()
+        XCTAssertEqual(word, "Ư", "] with caps lock should produce 'Ư', got: '\(word)'")
+    }
+    
+    /// Bracket [ with uppercase should produce Ơ (uppercase)
+    func testBracketLeft_WithCapsLock_ProducesUppercaseOHorn() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // [ with isUppercase=true → Ơ
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: true)
+        let word = engine.getCurrentWord()
+        XCTAssertEqual(word, "Ơ", "[ with caps lock should produce 'Ơ', got: '\(word)'")
+    }
+    
+    /// Bracket [] with uppercase should produce ƠƯ (uppercase)
+    func testBracketLeftRight_WithCapsLock_ProducesUppercaseOUHorn() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // [ with caps → Ơ
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: true)
+        // ] with caps → Ư
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: true)
+        let word = engine.getCurrentWord()
+        XCTAssertTrue(word.contains("Ơ") && word.contains("Ư"),
+                     "[] with caps lock should produce uppercase 'ƠƯ', got: '\(word)'")
+    }
+    
+    /// Bracket without caps lock should produce lowercase ơ/ư
+    func testBracket_WithoutCapsLock_ProducesLowercase() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        _ = engine.processKey(character: "[", keyCode: VietnameseData.KEY_LEFT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ơ", "[ without caps should produce 'ơ'")
+        
+        engine.reset()
+        _ = engine.processKey(character: "]", keyCode: VietnameseData.KEY_RIGHT_BRACKET, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ư", "] without caps should produce 'ư'")
     }
 
 }

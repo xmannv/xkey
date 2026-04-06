@@ -116,8 +116,13 @@ class VietnameseData {
     
     // MARK: - Vowel Tables (from Vietnamese.cpp)
     
-    // Standalone W bad characters
-    let standaloneWbad: [UInt16] = [KEY_W, KEY_E, KEY_Y, KEY_F, KEY_J, KEY_K, KEY_Z]
+    // Characters that are ALWAYS blocked before standalone ơ/ư
+    // These are vowels that can never precede a standalone bracket conversion
+    static let standaloneWbadAlways: [UInt16] = [KEY_E, KEY_Y]
+    
+    // Characters that are blocked before standalone ơ/ư UNLESS they are in customConsonants
+    // When user enables custom consonants and includes these keys, they become valid
+    static let standaloneWbadConditional: [UInt16] = [KEY_W, KEY_F, KEY_J, KEY_Z, KEY_K]
     
     // Double W allowed (consonant combinations)
     let doubleWAllowed: [[UInt16]] = [
@@ -153,7 +158,7 @@ class VietnameseData {
     
     // MARK: - Consonant Tables
     
-    // CONSONANT_ALLOW_MASK = 0x8000 - marks consonants that are only allowed when vAllowConsonantZFWJ is enabled
+    // CONSONANT_ALLOW_MASK = 0x8000 - marks consonants that are only allowed when they are in vCustomConsonants
     // END_CONSONANT_MASK = 0x4000 - marks consonants for quick consonant feature
     static let CONSONANT_ALLOW_MASK: UInt16 = 0x8000
     static let END_CONSONANT_MASK: UInt16 = 0x4000
@@ -185,7 +190,7 @@ class VietnameseData {
         [KEY_P],
         [KEY_S],
         [KEY_D],
-        // Consonants allowed only when vAllowConsonantZFWJ is enabled
+        // Consonants allowed only when they are in vCustomConsonants
         [KEY_F | CONSONANT_ALLOW_MASK],
         [KEY_W | CONSONANT_ALLOW_MASK],
         [KEY_Z | CONSONANT_ALLOW_MASK],
@@ -621,6 +626,73 @@ class VietnameseData {
     
     // MARK: - Helper Functions
     
+
+    // MARK: - Character ↔ KeyCode Conversion Helpers
+    
+    /// Convert a Character to its corresponding macOS keyCode
+    /// Used by custom consonants feature to map user-readable chars to engine key codes
+    static func keyCode(for char: Character) -> UInt16? {
+        switch char.lowercased().first {
+        case "a": return KEY_A
+        case "b": return KEY_B
+        case "c": return KEY_C
+        case "d": return KEY_D
+        case "e": return KEY_E
+        case "f": return KEY_F
+        case "g": return KEY_G
+        case "h": return KEY_H
+        case "i": return KEY_I
+        case "j": return KEY_J
+        case "k": return KEY_K
+        case "l": return KEY_L
+        case "m": return KEY_M
+        case "n": return KEY_N
+        case "o": return KEY_O
+        case "p": return KEY_P
+        case "q": return KEY_Q
+        case "r": return KEY_R
+        case "s": return KEY_S
+        case "t": return KEY_T
+        case "u": return KEY_U
+        case "v": return KEY_V
+        case "w": return KEY_W
+        case "x": return KEY_X
+        case "y": return KEY_Y
+        case "z": return KEY_Z
+        default: return nil
+        }
+    }
+    
+    /// Convert a macOS keyCode to its corresponding lowercase Character
+    /// Reverse mapping of keyCode(for:)
+    static func char(for keyCode: UInt16) -> Character? {
+        // Build reverse lookup from keyCode(for:)
+        let mapping: [UInt16: Character] = [
+            KEY_A: "a", KEY_B: "b", KEY_C: "c", KEY_D: "d",
+            KEY_E: "e", KEY_F: "f", KEY_G: "g", KEY_H: "h",
+            KEY_I: "i", KEY_J: "j", KEY_K: "k", KEY_L: "l",
+            KEY_M: "m", KEY_N: "n", KEY_O: "o", KEY_P: "p",
+            KEY_Q: "q", KEY_R: "r", KEY_S: "s", KEY_T: "t",
+            KEY_U: "u", KEY_V: "v", KEY_W: "w", KEY_X: "x",
+            KEY_Y: "y", KEY_Z: "z"
+        ]
+        return mapping[keyCode]
+    }
+    
+    /// Parse a comma-separated string of consonant characters into a Set of keyCodes
+    /// Example: "Z,F,W,J,K" → Set containing KEY_Z, KEY_F, KEY_W, KEY_J, KEY_K
+    static func parseCustomConsonants(_ str: String) -> Set<UInt16> {
+        guard !str.isEmpty else { return [] }
+        var result = Set<UInt16>()
+        for part in str.split(separator: ",") {
+            let trimmed = part.trimmingCharacters(in: .whitespaces)
+            if let char = trimmed.first, let code = keyCode(for: char) {
+                result.insert(code)
+            }
+        }
+        return result
+    }
+
     func isConsonant(_ keyCode: UInt16) -> Bool {
         return !(keyCode == VietnameseData.KEY_A || keyCode == VietnameseData.KEY_E ||
                  keyCode == VietnameseData.KEY_U || keyCode == VietnameseData.KEY_Y ||
