@@ -6,27 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260402)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260402</link>
-      <sparkle:version>20260402</sparkle:version>
+      <title>Version 1.2.21 (Build 20260406)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406</link>
+      <sparkle:version>20260406</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: passthrough rules now override browser address bar detection</p>
-<p>Passthrough injection method (disable Vietnamese) was being ignored when</p>
-<p>browser address bar was focused because hardcoded address bar detection</p>
-<p>(Priority 0.5) returned before Window Title Rules (Priority 1.0).</p>
-<p>Solution: Add Priority 0.45 check — pre-compute getMergedRuleResult()</p>
-<p>and if the merged result is passthrough, return immediately before</p>
-<p>address bar detection. The pre-computed result is reused at Priority 1.0</p>
-<p>for zero performance overhead.</p>
-<p>This preserves existing behavior for all other injection methods (.fast,</p>
-<p>.slow, .selection) which correctly defer to address bar detection.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260402">Xem chi tiết trên GitHub</a></p>
+<p>feat: make free mark always-on and add single-instance guard</p>
+<ul>
+<li>Remove vFreeMark config variable and UI toggle (free mark is now always enabled)</li>
+<li>Clean up related code in VNEngine, SharedSettings, Preferences, GeneralSection</li>
+<li>Add single-instance guard in AppDelegate to prevent duplicate instances</li>
+<li>New instance terminates old instance(s) and takes over, ensuring only one XKey runs</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 02 Apr 2026 05:21:02 +0000</pubDate>
+      <pubDate>Mon, 06 Apr 2026 01:21:24 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260402/XKey.dmg" sparkle:version="20260402" sparkle:shortVersionString="1.2.21" length="10497357" type="application/octet-stream" sparkle:edSignature="NAnRDeSQlhrs18PS4HI0Au36dd6qEBuxF8etxkJ3h2LJfQrPphkLFWu3r8J9xaGdtfdiGwHNzLVjyqcxkKkPAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260406/XKey.dmg" sparkle:version="20260406" sparkle:shortVersionString="1.2.21" length="10475559" type="application/octet-stream" sparkle:edSignature="GzsnYgFo2bmXlI/8XXhNMNk0kStf/KikooxGVgOXhAdwT5Kd4tRjkDIMoN6MGtxRbC3oelQK8iOpCYY/PHY3Bw==" />
     </item>
   </channel>
 </rss>
