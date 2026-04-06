@@ -6,24 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260406)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406</link>
-      <sparkle:version>20260406</sparkle:version>
+      <title>Version 1.2.21 (Build 20260406.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406.1</link>
+      <sparkle:version>20260406.1</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: make free mark always-on and add single-instance guard</p>
-<ul>
-<li>Remove vFreeMark config variable and UI toggle (free mark is now always enabled)</li>
-<li>Clean up related code in VNEngine, SharedSettings, Preferences, GeneralSection</li>
-<li>Add single-instance guard in AppDelegate to prevent duplicate instances</li>
-<li>New instance terminates old instance(s) and takes over, ensuring only one XKey runs</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406">Xem chi tiết trên GitHub</a></p>
+<p>feat: replace allowConsonantZFWJ toggle with customizable consonant list</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 06 Apr 2026 01:21:24 +0000</pubDate>
+      <pubDate>Mon, 06 Apr 2026 13:35:50 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260406/XKey.dmg" sparkle:version="20260406" sparkle:shortVersionString="1.2.21" length="10475559" type="application/octet-stream" sparkle:edSignature="GzsnYgFo2bmXlI/8XXhNMNk0kStf/KikooxGVgOXhAdwT5Kd4tRjkDIMoN6MGtxRbC3oelQK8iOpCYY/PHY3Bw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260406.1/XKey.dmg" sparkle:version="20260406.1" sparkle:shortVersionString="1.2.21" length="10562163" type="application/octet-stream" sparkle:edSignature="bIr2UtwaLuaFq9aw+pKmzJ90rZwReBaoNfJTLjOOYdbW9uWjYjkzv2pOwCurm+zxzG/a+Ysx4A+IkwpMYBddDA==" />
     </item>
   </channel>
 </rss>
