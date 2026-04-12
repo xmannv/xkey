@@ -6,18 +6,46 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260406.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406.1</link>
-      <sparkle:version>20260406.1</sparkle:version>
+      <title>Version 1.2.21 (Build 20260412)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260412</link>
+      <sparkle:version>20260412</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: replace allowConsonantZFWJ toggle with customizable consonant list</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260406.1">Xem chi tiết trên GitHub</a></p>
+<p>fix: add session-aware event tap for multi-user macOS (Fast User Switching)</p>
+<p>Problem:</p>
+<p>XKey uses .cghidEventTap (HID level) which intercepts ALL keyboard events</p>
+<p>system-wide, including those from other macOS user sessions. When user A</p>
+<p>has XKey active and switches to user B, XKey continues to "steal" keystrokes</p>
+<p>from user B, causing missing characters and incorrect input method switching.</p>
+<p>Solution:</p>
+<ul>
+<li>Add session monitoring via NSWorkspace notifications</li>
+</ul>
+<p>  (sessionDidResignActiveNotification / sessionDidBecomeActiveNotification)</p>
+<ul>
+<li>Cache session state as isSessionOnConsole boolean (O(1) check per keystroke)</li>
+<li>Guard event callback to pass-through all events when off-console</li>
+<li>Reset engine buffer on session return via sessionDidBecomeActive() delegate</li>
+<li>Move tapDisabledByTimeout handler before session guard for robustness</li>
+<li>Use typed kCGSessionOnConsoleKey constant instead of hardcoded string</li>
+</ul>
+<p>Testing:</p>
+<ul>
+<li>Add 15 unit tests (SessionMonitoringTests, KeyboardEventHandlerSessionTests,</li>
+</ul>
+<p>  EventTapDelegateDefaultTests) covering state transitions, delegate callbacks,</p>
+<p>  cleanup, and edge cases</p>
+<p>Debug:</p>
+<ul>
+<li>Show plist settings file path in debug window config summary to verify</li>
+</ul>
+<p>  per-user isolation (App Group containers are per-user by design)</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260412">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 06 Apr 2026 13:35:50 +0000</pubDate>
+      <pubDate>Sun, 12 Apr 2026 14:03:08 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260406.1/XKey.dmg" sparkle:version="20260406.1" sparkle:shortVersionString="1.2.21" length="10562163" type="application/octet-stream" sparkle:edSignature="bIr2UtwaLuaFq9aw+pKmzJ90rZwReBaoNfJTLjOOYdbW9uWjYjkzv2pOwCurm+zxzG/a+Ysx4A+IkwpMYBddDA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260412/XKey.dmg" sparkle:version="20260412" sparkle:shortVersionString="1.2.21" length="10599629" type="application/octet-stream" sparkle:edSignature="BzUIPhSG1WrW9bEC1hiKbuFdyg9BJ+TZs+UHjmXGXt7O0LiM3ziYxu2MgUqY+ACpbp4Zdl4jbssAIajwnDh2Cg==" />
     </item>
   </channel>
 </rss>
