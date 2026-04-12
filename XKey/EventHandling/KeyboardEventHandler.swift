@@ -790,6 +790,17 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         injector.markNewSession(cursorMoved: true)  // Assume typing mid-sentence after app switch
         injector.clearMethodCache()
     }
+    
+    /// Reset engine state when user session becomes active after Fast User Switch.
+    /// While off-console, the HID event tap passes through all events untouched,
+    /// but the engine buffer may have accumulated stale state. This ensures a
+    /// clean slate when the user returns to this session.
+    func sessionDidBecomeActive() {
+        engine.resetWithCursorMoved()
+        injector.markNewSession(cursorMoved: true)
+        injector.clearMethodCache()
+        debugLogCallback?("🖥️ Session active — engine/injector reset for clean Vietnamese input")
+    }
 
     /// Reset mid-sentence flag only (without resetting engine)
     /// Used when clicking into overlay app (Spotlight/Raycast/Alfred) with empty input field

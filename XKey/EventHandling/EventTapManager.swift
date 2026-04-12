@@ -17,6 +17,13 @@ class EventTapManager {
     private var isEnabled = false
     private var isSuspended = false  // Track suspension state for IMKit mode
     private var isHotkeyRecording = false  // Track if hotkey recording is in progress
+    
+    // Multi-user session tracking
+    // When another macOS user session is active (Fast User Switching),
+    // the HID-level event tap still fires for the inactive session.
+    // This flag prevents intercepting events that belong to other sessions.
+    var isSessionOnConsole = true
+    var sessionObservers: [Any] = []
 
     weak var delegate: EventTapDelegate?
     var debugLogCallback: ((String) -> Void)?
@@ -67,7 +74,13 @@ class EventTapManager {
     protocol EventTapDelegate: AnyObject {
         func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool
         func processKeyEvent(_ event: CGEvent, type: CGEventType, proxy: CGEventTapProxy) -> CGEvent?
+        
+        /// Called when the user session becomes active again after a Fast User Switch.
+        /// Implementors should reset any stale engine state (word buffer, etc.)
+        /// since the buffer may have accumulated phantom data while off-console.
+        func sessionDidBecomeActive()
     }
+    
     
     // MARK: - Errors
     
@@ -92,9 +105,13 @@ class EventTapManager {
                 self?.debugLogCallback?("🎹 Hotkey recording: \(isRecording ? "STARTED" : "STOPPED")")
             }
         }
+        
+        // Setup multi-user session monitoring
+        setupSessionMonitoring()
     }
     
     deinit {
+        removeSessionMonitoring()
         NotificationCenter.default.removeObserver(self)
         stop()
     }
@@ -247,6 +264,27 @@ class EventTapManager {
         type: CGEventType,
         event: CGEvent
     ) -> Unmanaged<CGEvent>? {
+        // Handle tap disabled event FIRST — unconditionally, regardless of session state.
+        // If the system auto-disables our tap (timeout/user input), we must re-enable it
+        // even when off-console, otherwise XKey will stop working when the user returns.
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        
+        // CRITICAL: Multi-user session guard
+        // When another macOS user is active via Fast User Switching,
+        // the HID-level event tap still receives their keystrokes.
+        // We must pass them through untouched to avoid:
+        // - Consuming/swallowing keystrokes meant for the other user
+        // - XKey hotkeys firing in the wrong session
+        // - Vietnamese processing injecting text into our (inactive) session
+        if !isSessionOnConsole {
+            return Unmanaged.passUnretained(event)
+        }
+        
         // IMPORTANT: If suspended (IMKit mode active), pass ALL events through
         // This allows IMKit to receive and handle keyboard events
         if isSuspended {
@@ -291,14 +329,6 @@ class EventTapManager {
         }
 
         debugLogCallback?("EventTapManager.eventCallback: type=\(type.rawValue), delegate=\(delegate != nil)")
-
-        // Handle tap disabled event
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap = eventTap {
-                CGEvent.tapEnable(tap: tap, enable: true)
-            }
-            return Unmanaged.passUnretained(event)
-        }
 
         // Check for toggle hotkey FIRST (before delegate processing)
         // This ensures the hotkey is consumed and doesn't reach other apps
@@ -581,6 +611,83 @@ class EventTapManager {
     var isRunning: Bool {
         return isEnabled
     }
+    
+    // MARK: - Multi-User Session Monitoring
+    
+    /// Setup observers for macOS Fast User Switching (multi-user sessions).
+    ///
+    /// Problem: When XKey uses `.cghidEventTap` (HID level), the event tap intercepts
+    /// ALL keyboard events system-wide, including those from other user sessions.
+    /// This causes XKey to "steal" keystrokes from other users and inject Vietnamese
+    /// text into the wrong session.
+    ///
+    /// Solution: Listen for session activation/deactivation notifications and set a cached
+    /// flag that the event callback checks (O(1) boolean comparison) before processing.
+    /// Both reads (event callback) and writes (notification handlers) occur on the main
+    /// thread, so no synchronization is needed.
+    private func setupSessionMonitoring() {
+        // Check initial session state
+        isSessionOnConsole = checkSessionOnConsole()
+        debugLogCallback?("🖥️ Initial session state: \(isSessionOnConsole ? "on-console" : "off-console")")
+        
+        // Listen for session deactivation (user switches AWAY from this session)
+        let resignObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.sessionDidResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.isSessionOnConsole = false
+            self.debugLogCallback?("🖥️ Session resigned active — event tap passthrough enabled (multi-user switch)")
+        }
+        sessionObservers.append(resignObserver)
+        
+        // Listen for session activation (user switches BACK to this session)
+        let becomeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.isSessionOnConsole = true
+            self.debugLogCallback?("🖥️ Session became active — event tap processing resumed")
+            
+            // Reset engine state when returning to this session.
+            // The engine buffer may be stale (accumulated ghost keystrokes while
+            // events passed through another user's session).
+            // Notifying the delegate ensures a clean slate for Vietnamese input.
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.sessionDidBecomeActive()
+            }
+        }
+        sessionObservers.append(becomeObserver)
+    }
+    
+    /// Remove session monitoring observers
+    private func removeSessionMonitoring() {
+        for observer in sessionObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        sessionObservers.removeAll()
+    }
+    
+    /// Check if current session is the active console session
+    /// (only called once at init, not on every keystroke)
+    private func checkSessionOnConsole() -> Bool {
+        guard let sessionDict = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+            // Can't determine session state — assume on-console (safe default for single-user)
+            return true
+        }
+        // kCGSessionOnConsoleKey indicates if this session owns the console
+        return sessionDict[kCGSessionOnConsoleKey as String] as? Bool ?? true
+    }
+}
+
+// MARK: - Default Delegate Implementations
+
+extension EventTapManager.EventTapDelegate {
+    /// Default no-op: conformers only override if they need session-aware reset
+    func sessionDidBecomeActive() {}
 }
 
 // MARK: - ModifierFlags Helper

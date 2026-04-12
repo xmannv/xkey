@@ -318,7 +318,7 @@ class DebugViewModel: ObservableObject {
         
         // Header
         lines.append("=== CURRENT CONFIGURATION ===")
-        
+        lines.append("Settings File: \(settings.settingsFilePath)")
         // Input Method
         let inputMethodName: String
         switch settings.inputMethod {

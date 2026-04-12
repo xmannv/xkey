@@ -159,6 +159,11 @@ class SharedSettings {
     // MARK: - Initialization
 
     private init() {}
+    
+    /// Public read-only access to the plist file path (for debug/diagnostics)
+    var settingsFilePath: String {
+        plistURL?.path ?? "(unavailable)"
+    }
 
     // MARK: - Plist Read/Write Helpers
     
