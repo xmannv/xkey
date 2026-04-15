@@ -176,6 +176,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return OverlayAppDetector.shared.getVisibleOverlayAppName()
         }
         
+        // Connect debug logging from AppBehaviorDetector to Debug Window
+        AppBehaviorDetector.shared.debugLogCallback = { [weak self] message in
+            self?.debugWindowController?.logEvent(message)
+        }
+        
         // Initialize components
         setupKeyboardHandling()
         setupStatusBar()
@@ -212,6 +217,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup debug hotkey
         setupDebugHotkey()
+
+        // Setup toggle exclusion rules hotkey
+        setupToggleExclusionHotkey()
+
+        // Setup toggle window title rules hotkey
+        setupToggleWindowRulesHotkey()
 
         // Setup Sparkle auto-update
         setupSparkleUpdater()
@@ -621,6 +632,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("Undo typing disabled")
         }
 
+
+        // Apply toggle states
+        keyboardHandler?.exclusionRulesEnabled = preferences.exclusionRulesEnabled
+        AppBehaviorDetector.shared.windowTitleRulesEnabled = preferences.windowTitleRulesEnabled
+
+        // Update toggle exclusion hotkey (pass hotkey directly to avoid re-loading preferences)
+        updateToggleExclusionHotkey(hotkey: preferences.toggleExclusionHotkey)
+
+        // Update toggle window rules hotkey (pass hotkey directly to avoid re-loading preferences)
+        updateToggleWindowRulesHotkey(hotkey: preferences.toggleWindowRulesHotkey)
 
         debugWindowController?.logEvent("Preferences applied (including advanced features)")
     }
@@ -1066,9 +1087,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             AppBehaviorDetector.shared.clearConfirmedInjectionMethod()
 
-            // Handle Smart Switch - auto switch language per app
-            self.handleSmartSwitch(notification: notification)
-            
             // Apply Force Accessibility (AXManualAccessibility) FIRST if matching rule exists
             // This MUST happen BEFORE detectInjectionMethod() because:
             // 1. Force AX enables enhanced accessibility for Electron/Chromium apps
@@ -1078,16 +1096,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Small delay to allow AX tree to update after setting AXManualAccessibility
             // Electron/Chromium apps need a moment to refresh their accessibility tree
+            // NOTE: handleSmartSwitch is also inside this delay because it evaluates window
+            // title rules via getTargetInputSourceOverride() → getMergedRuleResult().
+            // Without the delay, window title may not be available yet (AX timing issue).
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                 guard let self = self else { return }
+                
+                // Handle Smart Switch - auto switch language per app
+                // Moved INSIDE delay to ensure window title is available for rule-based
+                // input source switching (targetInputSourceId in rules)
+                self.handleSmartSwitch(notification: notification)
                 
                 // Detect and set confirmed injection method for the new app
                 // This ensures keystrokes use correct method immediately after app switch
                 let detector = AppBehaviorDetector.shared
-                let injectionInfo = detector.detectInjectionMethod()
+                let focusedInfo = detector.getFocusedElementInfo()
+                let injectionInfo = detector.detectInjectionMethod(focusedInfo: focusedInfo)
                 detector.setConfirmedInjectionMethod(injectionInfo)
 
+                // DEBUG: Log window title available at app switch time
+                let switchWindowTitle = focusedInfo.windowTitle ?? "(nil)"
                 self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
+                self.debugWindowController?.logEvent("   Window: \(switchWindowTitle)")
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
                 
@@ -2010,9 +2040,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Log injection method change
         if let prev = previousMethod, (prev.method != injectionInfo.method || prev.description != injectionInfo.description) {
+            let axWindowTitle = elementInfo.windowTitle ?? "(nil)"
             let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
             let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
             debugWindowController?.logEvent("   Injection: \(prev.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
+            debugWindowController?.logEvent("   Window: \(axWindowTitle)")
         }
         
         // NOTE: Engine reset is NOT done here!
@@ -2546,6 +2578,113 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         debugWindowController?.logEvent("Debug hotkey set: \(hotkey.displayString)")
+    }
+    // MARK: - Toggle Exclusion Rules Hotkey
+
+    private func setupToggleExclusionHotkey() {
+        // Single load for both hotkey config and persisted state
+        let preferences = SharedSettings.shared.loadPreferences()
+        updateToggleExclusionHotkey(hotkey: preferences.toggleExclusionHotkey)
+        keyboardHandler?.exclusionRulesEnabled = preferences.exclusionRulesEnabled
+    }
+
+    private func updateToggleExclusionHotkey(hotkey: Hotkey? = nil) {
+        let resolvedHotkey = hotkey ?? SharedSettings.shared.loadPreferences().toggleExclusionHotkey
+
+        // If no keycode, disable hotkey
+        guard resolvedHotkey.keyCode != 0 else {
+            eventTapManager?.toggleExclusionHotkey = nil
+            eventTapManager?.onToggleExclusionHotkey = nil
+            return
+        }
+
+        // Configure EventTapManager to handle toggle exclusion hotkey
+        eventTapManager?.toggleExclusionHotkey = resolvedHotkey
+        eventTapManager?.onToggleExclusionHotkey = { [weak self] in
+            self?.toggleExclusionRules()
+        }
+
+        debugWindowController?.logEvent("Toggle exclusion hotkey set: \(resolvedHotkey.displayString)")
+    }
+
+    private func toggleExclusionRules() {
+        let settings = SharedSettings.shared
+        let newValue = !settings.exclusionRulesEnabled
+        settings.exclusionRulesEnabled = newValue
+
+        // Apply immediately to runtime
+        keyboardHandler?.exclusionRulesEnabled = newValue
+
+        // Re-detect injection method since exclusion state changed
+        let newMethod = AppBehaviorDetector.shared.detectInjectionMethod()
+        AppBehaviorDetector.shared.setConfirmedInjectionMethod(newMethod)
+
+        // Beep feedback
+        if SharedSettings.shared.beepOnToggle {
+            NSSound.beep()
+        }
+
+        // Debug log
+        let state = newValue ? "ON" : "OFF"
+        debugWindowController?.logEvent("🔀 Exclusion rules toggled: \(state)")
+        DebugLogger.shared.log("Exclusion rules toggled: \(state)")
+
+        // Visual HUD feedback
+        ToggleHUDWindow.shared.show(title: "Loại trừ ứng dụng", isEnabled: newValue)
+    }
+
+    // MARK: - Toggle Window Title Rules Hotkey
+
+    private func setupToggleWindowRulesHotkey() {
+        // Single load for both hotkey config and persisted state
+        let preferences = SharedSettings.shared.loadPreferences()
+        updateToggleWindowRulesHotkey(hotkey: preferences.toggleWindowRulesHotkey)
+        AppBehaviorDetector.shared.windowTitleRulesEnabled = preferences.windowTitleRulesEnabled
+    }
+
+    private func updateToggleWindowRulesHotkey(hotkey: Hotkey? = nil) {
+        let resolvedHotkey = hotkey ?? SharedSettings.shared.loadPreferences().toggleWindowRulesHotkey
+
+        // If no keycode, disable hotkey
+        guard resolvedHotkey.keyCode != 0 else {
+            eventTapManager?.toggleWindowRulesHotkey = nil
+            eventTapManager?.onToggleWindowRulesHotkey = nil
+            return
+        }
+
+        // Configure EventTapManager to handle toggle window rules hotkey
+        eventTapManager?.toggleWindowRulesHotkey = resolvedHotkey
+        eventTapManager?.onToggleWindowRulesHotkey = { [weak self] in
+            self?.toggleWindowTitleRules()
+        }
+
+        debugWindowController?.logEvent("Toggle window rules hotkey set: \(resolvedHotkey.displayString)")
+    }
+
+    private func toggleWindowTitleRules() {
+        let settings = SharedSettings.shared
+        let newValue = !settings.windowTitleRulesEnabled
+        settings.windowTitleRulesEnabled = newValue
+
+        // Apply immediately to runtime
+        AppBehaviorDetector.shared.windowTitleRulesEnabled = newValue
+
+        // Re-detect injection method since rules state changed
+        let newMethod = AppBehaviorDetector.shared.detectInjectionMethod()
+        AppBehaviorDetector.shared.setConfirmedInjectionMethod(newMethod)
+
+        // Beep feedback
+        if SharedSettings.shared.beepOnToggle {
+            NSSound.beep()
+        }
+
+        // Debug log
+        let state = newValue ? "ON" : "OFF"
+        debugWindowController?.logEvent("🔀 Window Title Rules toggled: \(state)")
+        DebugLogger.shared.log("Window Title Rules toggled: \(state)")
+
+        // Visual HUD feedback
+        ToggleHUDWindow.shared.show(title: "Hiệu chỉnh Engine", isEnabled: newValue)
     }
 }
 

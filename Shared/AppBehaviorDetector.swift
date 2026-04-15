@@ -687,6 +687,7 @@ class AppBehaviorDetector {
     func clearConfirmedInjectionMethod() {
         confirmedInjectionMethod = nil
         clearAddressBarCache()
+        _lastLoggedRuleMatchKey = ""  // Reset to log rule match after context change
     }
     
     // MARK: - Cache (only for detect() which is used for UI display)
@@ -697,6 +698,16 @@ class AppBehaviorDetector {
     private var cachedBehavior: AppBehavior?
     
     // MARK: - Window Title Rules
+    
+    /// Track last logged rule match to reduce log noise (only log when changed)
+    private var _lastLoggedRuleMatchKey: String = ""
+    
+    /// Debug logging callback (connected to DebugWindowController)
+    var debugLogCallback: ((String) -> Void)?
+    
+    /// Master switch for Window Title Rules (can be toggled via hotkey)
+    /// When disabled, findAllMatchingRules() returns empty — all detection falls back to bundle ID
+    var windowTitleRulesEnabled: Bool = true
     
     /// User-defined custom rules (loaded from preferences)
     private var customRules: [WindowTitleRule] = []
@@ -1414,6 +1425,9 @@ class AppBehaviorDetector {
     ///
     /// Note: No caching is used here for same reasons as findMatchingRule()
     func findAllMatchingRules(focusedInfo: FocusedElementInfo? = nil) -> [WindowTitleRule] {
+        // Master switch: skip all rule matching when disabled
+        guard windowTitleRulesEnabled else { return [] }
+        
         guard let bundleId = getCurrentBundleId() else {
             return []
         }
@@ -1421,6 +1435,11 @@ class AppBehaviorDetector {
         let windowTitle = focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""
         var matchingRules: [WindowTitleRule] = []
         var cachedAXInfo: FocusedElementInfo? = nil
+        
+        // DEBUG: Log when window title is empty (potential AX timing issue)
+        if windowTitle.isEmpty, let callback = debugLogCallback {
+            callback("[RuleMatch] windowTitle is EMPTY (bundleId=\(bundleId))")
+        }
         
         // FIRST: Search in built-in rules (lower priority - applied first)
         // This allows custom rules to override built-in rules
@@ -1438,6 +1457,21 @@ class AppBehaviorDetector {
         matchRules(activeCustomRules, bundleId: bundleId, windowTitle: windowTitle,
                    cachedAXInfo: &cachedAXInfo, matches: &matchingRules,
                    focusedInfo: focusedInfo)
+        
+        // DEBUG: Log matched rules (only when result changes to reduce noise)
+        if let callback = debugLogCallback {
+            let currentKey = matchingRules.map { $0.name }.joined(separator: "+")
+            if currentKey != _lastLoggedRuleMatchKey {
+                let previousKey = _lastLoggedRuleMatchKey
+                _lastLoggedRuleMatchKey = currentKey
+                if !matchingRules.isEmpty {
+                    callback("[RuleMatch] Matched: [\(currentKey.replacingOccurrences(of: "+", with: ", "))] (title: \"\(windowTitle.prefix(80))\")")
+                } else if !previousKey.isEmpty {
+                    // Rules were matching before but now stopped — always log this transition
+                    callback("[RuleMatch] Rules cleared → no match (title: \"\(windowTitle.isEmpty ? "(empty)" : String(windowTitle.prefix(60)))\")")
+                }
+            }
+        }
         
         return matchingRules
     }

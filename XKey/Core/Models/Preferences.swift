@@ -85,6 +85,12 @@ struct Preferences: Codable {
     
     // Excluded apps - apps where Vietnamese input is disabled
     var excludedApps: [ExcludedApp] = []
+    var exclusionRulesEnabled: Bool = true          // Master switch for exclusion rules (can be toggled via hotkey)
+    var toggleExclusionHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
+    
+    // Window Title Rules toggle
+    var windowTitleRulesEnabled: Bool = true         // Master switch for Window Title Rules (can be toggled via hotkey)
+    var toggleWindowRulesHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
     
     // Translation settings
     var translationEnabled: Bool = false         // Enable translation feature

@@ -407,6 +407,16 @@ class DebugViewModel: ObservableObject {
         } else {
             lines.append("[Excluded Apps] Count: 0")
         }
+        lines.append("")
+        
+        // Toggle Rules
+        lines.append("[Toggle Rules]")
+        lines.append("  Exclusion Rules: \(settings.exclusionRulesEnabled ? "ON" : "OFF")")
+        let exclHotkey = Hotkey(keyCode: settings.toggleExclusionHotkeyCode, modifiers: ModifierFlags(rawValue: settings.toggleExclusionHotkeyModifiers))
+        lines.append("  Exclusion Hotkey: \(exclHotkey.keyCode != 0 ? exclHotkey.displayString : "(not set)")")
+        lines.append("  Window Title Rules: \(settings.windowTitleRulesEnabled ? "ON" : "OFF")")
+        let wtrHotkey = Hotkey(keyCode: settings.toggleWindowRulesHotkeyCode, modifiers: ModifierFlags(rawValue: settings.toggleWindowRulesHotkeyModifiers))
+        lines.append("  Window Rules Hotkey: \(wtrHotkey.keyCode != 0 ? wtrHotkey.displayString : "(not set)")")
         
         lines.append("=== END CONFIGURATION ===")
         

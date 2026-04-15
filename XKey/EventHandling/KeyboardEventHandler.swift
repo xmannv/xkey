@@ -95,6 +95,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     // Excluded apps
     @Published var excludedApps: [ExcludedApp] = []
+    @Published var exclusionRulesEnabled: Bool = true  // Master switch for user-defined exclusion rules
 
     // Undo typing with Esc key
     @Published var undoTypingEnabled: Bool = false
@@ -850,8 +851,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return true
         }
         
-        // Check user-defined excluded apps
-        guard !excludedApps.isEmpty else { return false }
+        // Check user-defined excluded apps (respects master switch)
+        guard exclusionRulesEnabled, !excludedApps.isEmpty else { return false }
         return excludedApps.contains { $0.bundleIdentifier == bundleId }
     }
     

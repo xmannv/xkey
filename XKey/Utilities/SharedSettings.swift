@@ -77,6 +77,14 @@ enum SharedSettingsKey: String {
 
     // Excluded apps
     case excludedApps = "XKey.excludedApps"
+    case exclusionRulesEnabled = "XKey.exclusionRulesEnabled"
+    case toggleExclusionHotkeyCode = "XKey.toggleExclusionHotkeyCode"
+    case toggleExclusionHotkeyModifiers = "XKey.toggleExclusionHotkeyModifiers"
+    
+    // Window Title Rules toggle
+    case windowTitleRulesEnabled = "XKey.windowTitleRulesEnabled"
+    case toggleWindowRulesHotkeyCode = "XKey.toggleWindowRulesHotkeyCode"
+    case toggleWindowRulesHotkeyModifiers = "XKey.toggleWindowRulesHotkeyModifiers"
 
     // Input Source Management
     case inputSourceConfig = "XKey.inputSourceConfig"
@@ -139,7 +147,9 @@ class SharedSettings {
         SharedSettingsKey.imkitUseMarkedText.rawValue: true,
         SharedSettingsKey.translationCopyToClipboard.rawValue: true,
         SharedSettingsKey.translateToSourceShowPopup.rawValue: true,
-        SharedSettingsKey.translateToSourceAutoHideSeconds.rawValue: 4
+        SharedSettingsKey.translateToSourceAutoHideSeconds.rawValue: 4,
+        SharedSettingsKey.exclusionRulesEnabled.rawValue: true,
+        SharedSettingsKey.windowTitleRulesEnabled.rawValue: true
     ]
     
     /// Cache of plist URL (computed once)
@@ -736,6 +746,44 @@ class SharedSettings {
         writeData(data, forKey: SharedSettingsKey.excludedApps.rawValue)
     }
 
+    var exclusionRulesEnabled: Bool {
+        get { readBool(forKey: SharedSettingsKey.exclusionRulesEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.exclusionRulesEnabled.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    var toggleExclusionHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.toggleExclusionHotkeyCode.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleExclusionHotkeyCode.rawValue) }
+    }
+
+    var toggleExclusionHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.toggleExclusionHotkeyModifiers.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleExclusionHotkeyModifiers.rawValue) }
+    }
+
+    // MARK: - Window Title Rules Toggle
+
+    var windowTitleRulesEnabled: Bool {
+        get { readBool(forKey: SharedSettingsKey.windowTitleRulesEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.windowTitleRulesEnabled.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    var toggleWindowRulesHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.toggleWindowRulesHotkeyCode.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleWindowRulesHotkeyCode.rawValue) }
+    }
+
+    var toggleWindowRulesHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.toggleWindowRulesHotkeyModifiers.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleWindowRulesHotkeyModifiers.rawValue) }
+    }
+
     // MARK: - Input Source Management
 
     func getInputSourceConfig() -> Data? {
@@ -1103,6 +1151,26 @@ class SharedSettings {
            let apps = try? JSONDecoder().decode([ExcludedApp].self, from: data) {
             prefs.excludedApps = apps
         }
+        prefs.exclusionRulesEnabled = exclusionRulesEnabled
+        let exclHotkeyCode = toggleExclusionHotkeyCode
+        let exclHotkeyModifiers = toggleExclusionHotkeyModifiers
+        if exclHotkeyCode != 0 || exclHotkeyModifiers != 0 {
+            prefs.toggleExclusionHotkey = Hotkey(
+                keyCode: exclHotkeyCode,
+                modifiers: ModifierFlags(rawValue: exclHotkeyModifiers)
+            )
+        }
+
+        // Window Title Rules toggle
+        prefs.windowTitleRulesEnabled = windowTitleRulesEnabled
+        let wtrHotkeyCode = toggleWindowRulesHotkeyCode
+        let wtrHotkeyModifiers = toggleWindowRulesHotkeyModifiers
+        if wtrHotkeyCode != 0 || wtrHotkeyModifiers != 0 {
+            prefs.toggleWindowRulesHotkey = Hotkey(
+                keyCode: wtrHotkeyCode,
+                modifiers: ModifierFlags(rawValue: wtrHotkeyModifiers)
+            )
+        }
 
         // Translation settings
         prefs.translationEnabled = translationEnabled
@@ -1237,6 +1305,14 @@ class SharedSettings {
         if let data = try? JSONEncoder().encode(prefs.excludedApps) {
             setExcludedApps(data)
         }
+        exclusionRulesEnabled = prefs.exclusionRulesEnabled
+        toggleExclusionHotkeyCode = prefs.toggleExclusionHotkey.keyCode
+        toggleExclusionHotkeyModifiers = prefs.toggleExclusionHotkey.modifiers.rawValue
+
+        // Window Title Rules toggle
+        windowTitleRulesEnabled = prefs.windowTitleRulesEnabled
+        toggleWindowRulesHotkeyCode = prefs.toggleWindowRulesHotkey.keyCode
+        toggleWindowRulesHotkeyModifiers = prefs.toggleWindowRulesHotkey.modifiers.rawValue
 
         // Translation settings
         translationEnabled = prefs.translationEnabled

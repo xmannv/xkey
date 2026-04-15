@@ -74,6 +74,7 @@
 		48B758BE0BDCAB95CFBADD3D /* VNEngineSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7801294053CCB45DE7232D2 /* VNEngineSettings.swift */; };
 		4CA5C6995A6B89E33A173709 /* LogFileReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1AFFFF1204DAB29F3AAE19 /* LogFileReader.swift */; };
 		504A8EDB4750AC97ED723345 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3AC1443684F88A6422F6F1 /* AudioManager.swift */; };
+		5057F4299DB8BF5B89E61876 /* ToggleHUDWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D985D8F505677F8358B5125E /* ToggleHUDWindow.swift */; };
 		564995EF131811377C4F3FF6 /* VNEngineAdvanced.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6BDFF6F99DC1B577BA425 /* VNEngineAdvanced.swift */; };
 		5A61FAA58A29AD3225DD649C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803B94EF161FE79A022FF806 /* SettingsView.swift */; };
 		5FEB1775ED6A86BD90EEE11F /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EAA0ED7079ABD1980FBFFAE /* SettingsWindowController.swift */; };
@@ -81,6 +82,7 @@
 		795D22D182670DD83BDECF21 /* WindowTitleRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9E201050648938B3927D7A /* WindowTitleRulesView.swift */; };
 		7FBD214005ADB766CB3DF3B8 /* VNEngineMacro.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF69262CDE29C3D3410A3567 /* VNEngineMacro.swift */; };
 		81891108B8C7C600973DBBB2 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE144E0F510944E89100C852 /* SharedComponents.swift */; };
+		8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */; };
 		96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */; };
 		A1000001 /* XKeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001 /* XKeyApp.swift */; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* AppDelegate.swift */; };
@@ -201,6 +203,7 @@
 		608CA8088C2F70FEC4ABA340 /* XKeyIMUpdateManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = XKeyIMUpdateManager.swift; sourceTree = "<group>"; };
 		69901F64AACBE0FBAC7C0E0F /* BackupRestoreSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupRestoreSection.swift; sourceTree = "<group>"; };
 		803B94EF161FE79A022FF806 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToggleRulesTests.swift; sourceTree = "<group>"; };
 		8C93A308BF783CDE94C5E53A /* TempOffToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarController.swift; sourceTree = "<group>"; };
 		8EAA0ED7079ABD1980FBFFAE /* SettingsWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		98D22A491FA1C51411B4A156 /* AppearanceSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppearanceSection.swift; sourceTree = "<group>"; };
@@ -228,6 +231,7 @@
 		CE144E0F510944E89100C852 /* SharedComponents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedComponents.swift; sourceTree = "<group>"; };
 		CF3AC1443684F88A6422F6F1 /* AudioManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
 		CONVERTVM002 /* ConvertToolViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvertToolViewModel.swift; sourceTree = "<group>"; };
+		D985D8F505677F8358B5125E /* ToggleHUDWindow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToggleHUDWindow.swift; sourceTree = "<group>"; };
 		DEBUGVIEW002 /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 		DEBUGVM002 /* DebugViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugViewModel.swift; sourceTree = "<group>"; };
 		DEE7E2573F13A339D2A850E5 /* InputSourcesSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputSourcesSection.swift; sourceTree = "<group>"; };
@@ -484,6 +488,7 @@
 				TRANSLATTB007 /* TranslationToolbar */,
 				C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */,
 				66372C6A89C941917C844E21 /* Components */,
+				D985D8F505677F8358B5125E /* ToggleHUDWindow.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -533,6 +538,7 @@
 				TEST00024 /* TranslationProviderTests.swift */,
 				TEST00026 /* AXDirectFallbackTests.swift */,
 				2259E2E83868C7ADD9DD4FF3 /* SessionMonitoringTests.swift */,
+				82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -803,6 +809,7 @@
 				504A8EDB4750AC97ED723345 /* AudioManager.swift in Sources */,
 				96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */,
 				FC31E5BF03BAE76EB0EF5881 /* CustomConsonantChipEditor.swift in Sources */,
+				5057F4299DB8BF5B89E61876 /* ToggleHUDWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -818,6 +825,7 @@
 				TEST00023 /* TranslationProviderTests.swift in Sources */,
 				TEST00025 /* AXDirectFallbackTests.swift in Sources */,
 				64C427CD211649CE8B7DDCE2 /* SessionMonitoringTests.swift in Sources */,
+				8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

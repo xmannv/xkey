@@ -222,12 +222,34 @@ struct AdvancedSection: View {
                 
                 // Window Title Rules
                 SettingsGroup(title: "Hiệu chỉnh XKey Engine theo ứng dụng") {
-                    if #available(macOS 13.0, *) {
-                        WindowTitleRulesView()
-                    } else {
-                        Text("Tính năng này yêu cầu macOS 13.0 trở lên")
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Master toggle for window title rules
+                        Toggle("Bật tính năng hiệu chỉnh engine", isOn: $viewModel.preferences.windowTitleRulesEnabled)
+                        
+                        // Hotkey to toggle window title rules
+                        HStack {
+                            Text("Phím tắt bật/tắt:")
+                                .font(.caption)
+                            Spacer()
+                            HotkeyRecorderView(hotkey: $viewModel.preferences.toggleWindowRulesHotkey, minimumModifiers: 2)
+                                .frame(width: 150)
+                        }
+                        
+                        Text("Nhấn phím tắt để nhanh chóng bật/tắt tính năng hiệu chỉnh engine theo ứng dụng")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
+                        Divider()
+                        
+                        if #available(macOS 13.0, *) {
+                            WindowTitleRulesView()
+                                .disabled(!viewModel.preferences.windowTitleRulesEnabled)
+                                .opacity(viewModel.preferences.windowTitleRulesEnabled ? 1.0 : 0.5)
+                        } else {
+                            Text("Tính năng này yêu cầu macOS 13.0 trở lên")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 

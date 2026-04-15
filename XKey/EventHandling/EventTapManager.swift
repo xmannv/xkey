@@ -57,6 +57,14 @@ class EventTapManager {
     var debugHotkey: Hotkey?
     var onDebugHotkey: (() -> Void)?
     
+    // Toggle exclusion rules hotkey configuration
+    var toggleExclusionHotkey: Hotkey?
+    var onToggleExclusionHotkey: (() -> Void)?
+    
+    // Toggle window title rules hotkey configuration
+    var toggleWindowRulesHotkey: Hotkey?
+    var onToggleWindowRulesHotkey: (() -> Void)?
+    
     // Modifier-only hotkey tracking (for toggle hotkey)
     private var modifierOnlyState: ModifierOnlyState = ModifierOnlyState()
     
@@ -471,6 +479,34 @@ class EventTapManager {
                     self?.onDebugHotkey?()
                 }
                 // Consume the event completely - don't pass to other apps
+                return nil
+            }
+        }
+
+        // Check for toggle exclusion rules hotkey
+        // Skip if user is recording a new hotkey
+        if let hotkey = toggleExclusionHotkey, type == .keyDown, !isHotkeyRecording {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
+            if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
+                debugLogCallback?("  → TOGGLE EXCLUSION HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                DispatchQueue.main.async { [weak self] in
+                    self?.onToggleExclusionHotkey?()
+                }
+                return nil
+            }
+        }
+
+        // Check for toggle window title rules hotkey
+        // Skip if user is recording a new hotkey
+        if let hotkey = toggleWindowRulesHotkey, type == .keyDown, !isHotkeyRecording {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
+            if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
+                debugLogCallback?("  → TOGGLE WINDOW RULES HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                DispatchQueue.main.async { [weak self] in
+                    self?.onToggleWindowRulesHotkey?()
+                }
                 return nil
             }
         }

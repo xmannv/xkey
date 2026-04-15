@@ -24,11 +24,30 @@ struct ExcludedAppsSettingsSection: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
+                        // Master toggle for exclusion rules
+                        Toggle("Bật tính năng loại trừ ứng dụng", isOn: $viewModel.preferences.exclusionRulesEnabled)
+                        
+                        // Hotkey to toggle exclusion rules
+                        HStack {
+                            Text("Phím tắt bật/tắt:")
+                                .font(.caption)
+                            Spacer()
+                            HotkeyRecorderView(hotkey: $viewModel.preferences.toggleExclusionHotkey, minimumModifiers: 2)
+                                .frame(width: 150)
+                        }
+                        
+                        Text("Nhấn phím tắt để nhanh chóng bật/tắt tính năng loại trừ ứng dụng")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Divider()
+                        
                         HStack(spacing: 12) {
                             Button(action: { showAppPicker = true }) {
                                 Label("Thêm ứng dụng", systemImage: "plus.app")
                             }
                             .buttonStyle(.borderedProminent)
+                            .disabled(!viewModel.preferences.exclusionRulesEnabled)
                             
                             Spacer()
                             
@@ -39,6 +58,7 @@ struct ExcludedAppsSettingsSection: View {
                                     Label("Xóa tất cả", systemImage: "trash")
                                 }
                                 .buttonStyle(.bordered)
+                                .disabled(!viewModel.preferences.exclusionRulesEnabled)
                             }
                         }
                     }
@@ -69,6 +89,8 @@ struct ExcludedAppsSettingsSection: View {
                         }
                     }
                 }
+                .disabled(!viewModel.preferences.exclusionRulesEnabled)
+                .opacity(viewModel.preferences.exclusionRulesEnabled ? 1.0 : 0.5)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
