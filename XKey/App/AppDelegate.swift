@@ -11,9 +11,10 @@ import Sparkle
 
 // MARK: - AXObserver Callback (C function)
 
-/// C callback for AXObserver focus change notifications
+/// C callback for AXObserver notifications (focus change + title change)
 /// Must be outside class since AXObserver requires a C function pointer
-private func axFocusChangedCallback(
+/// Dispatches to appropriate handler based on notification type
+private func axNotificationCallback(
     observer: AXObserver,
     element: AXUIElement,
     notificationName: CFString,
@@ -22,10 +23,15 @@ private func axFocusChangedCallback(
     // Get AppDelegate instance from refcon
     guard let refcon = refcon else { return }
     let appDelegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
+    let name = notificationName as String
     
-    // Handle on main thread
+    // Handle on main thread — dispatch to appropriate handler
     DispatchQueue.main.async {
-        appDelegate.handleAXFocusChanged(element)
+        if name == kAXFocusedUIElementChangedNotification as String {
+            appDelegate.handleAXFocusChanged(element)
+        } else if name == kAXTitleChangedNotification as String {
+            appDelegate.handleAXTitleChanged()
+        }
     }
 }
 
@@ -85,6 +91,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// When apps have animations or autocomplete, AXObserver can fire many times per second
     private var lastAXFocusChangeTime: CFAbsoluteTime = 0
     private let axFocusChangeThrottleInterval: CFAbsoluteTime = 0.1 // 100ms
+    
+    /// Delayed title verification after AXObserver focus change (Layer 2)
+    /// Catches stale window titles when apps update title AFTER focus change notification
+    private var titleVerificationWorkItem: DispatchWorkItem?
+    
+    /// Window title used in last detection — for comparing in delayed verification
+    private var lastDetectedTitle: String?
+    
+    /// Debounce for kAXTitleChangedNotification (Layer 1)
+    /// Apps may fire multiple title changes during a single navigation (e.g., "Loading..." → final title)
+    private var titleChangeDebounceWorkItem: DispatchWorkItem?
 
     // MARK: - Initialization
 
@@ -1086,6 +1103,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.keyboardHandler?.resetForAppSwitch()
 
             AppBehaviorDetector.shared.clearConfirmedInjectionMethod()
+            
+            // Cancel pending title verifications from previous app
+            self.titleVerificationWorkItem?.cancel()
+            self.titleChangeDebounceWorkItem?.cancel()
+            self.lastDetectedTitle = nil
 
             // Apply Force Accessibility (AXManualAccessibility) FIRST if matching rule exists
             // This MUST happen BEFORE detectInjectionMethod() because:
@@ -1946,7 +1968,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create new observer for this app
         var observer: AXObserver?
-        let result = AXObserverCreate(pid, axFocusChangedCallback, &observer)
+        let result = AXObserverCreate(pid, axNotificationCallback, &observer)
         
         guard result == .success, let newObserver = observer else {
             debugWindowController?.logEvent("AXObserver: Failed to create for PID \(pid) (error: \(result.rawValue))")
@@ -1955,18 +1977,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Get the app's AXUIElement
         let appElement = AXUIElementCreateApplication(pid)
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
         
         // Register for focused UI element changed notification
         let addResult = AXObserverAddNotification(
             newObserver,
             appElement,
             kAXFocusedUIElementChangedNotification as CFString,
-            Unmanaged.passUnretained(self).toOpaque()
+            refcon
         )
         
         guard addResult == .success else {
-            debugWindowController?.logEvent("AXObserver: Failed to add notification for PID \(pid) (error: \(addResult.rawValue))")
+            debugWindowController?.logEvent("AXObserver: Failed to add focus notification for PID \(pid) (error: \(addResult.rawValue))")
             return
+        }
+        
+        // Register for window title changed notification (Layer 1)
+        // Catches apps that update window title AFTER focus change (e.g., Slack channel switch)
+        let titleResult = AXObserverAddNotification(
+            newObserver,
+            appElement,
+            kAXTitleChangedNotification as CFString,
+            refcon
+        )
+        
+        if titleResult != .success {
+            // Non-fatal: some apps may not support this notification
+            // Layer 2 (delayed verification) will handle those cases
+            debugWindowController?.logEvent("AXObserver: Title notification not supported for PID \(pid)")
         }
         
         // Add observer to run loop
@@ -1985,6 +2023,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Remove current AXObserver
     private func removeAXObserver() {
+        // Cancel pending title verifications
+        titleVerificationWorkItem?.cancel()
+        titleVerificationWorkItem = nil
+        titleChangeDebounceWorkItem?.cancel()
+        titleChangeDebounceWorkItem = nil
+        lastDetectedTitle = nil
+        
         guard let observer = focusObserver else { return }
         
         // Remove from run loop
@@ -2047,6 +2092,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("   Window: \(axWindowTitle)")
         }
         
+        // Layer 2: Schedule delayed title verification
+        // Apps like Slack update window title 200-500ms AFTER focus change notification.
+        // The detection above may have used a STALE title → wrong rule applied.
+        // This re-checks the title after a delay and re-detects if it changed.
+        // Note: windowTitle was lazy-loaded by detectInjectionMethod → now cached in elementInfo
+        lastDetectedTitle = elementInfo.windowTitle
+        titleVerificationWorkItem?.cancel()
+        let verifyWork = DispatchWorkItem { [weak self] in
+            self?.performTitleChangeRedetection()
+        }
+        titleVerificationWorkItem = verifyWork
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: verifyWork)
+        
         // NOTE: Engine reset is NOT done here!
         // See checkIntraAppFocusChange for explanation.
         
@@ -2071,6 +2129,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             // Just update for tracking
             lastFocusedElement = element
+        }
+    }
+    
+    // MARK: - Window Title Change Re-detection
+    
+    /// Handle window title changed notification from AXObserver (Layer 1)
+    /// Apps like Slack fire this when switching channels/conversations
+    /// Uses debounce to coalesce rapid-fire title updates
+    func handleAXTitleChanged() {
+        // Guard: Only re-detect if we have a confirmed method (active context)
+        guard AppBehaviorDetector.shared.confirmedInjectionMethod != nil else { return }
+        
+        // Debounce: Coalesce rapid title changes (e.g., "Loading..." → "vn-abc - Slack")
+        // We want the FINAL title, not intermediate states
+        titleChangeDebounceWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.performTitleChangeRedetection()
+        }
+        titleChangeDebounceWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+    
+    /// Re-detect injection method after window title changed
+    /// Called by both Layer 1 (kAXTitleChangedNotification) and Layer 2 (delayed verification)
+    /// Uses lastDetectedTitle guard to avoid duplicate work when both layers trigger
+    private func performTitleChangeRedetection() {
+        let detector = AppBehaviorDetector.shared
+        
+        // Query fresh window title (1-3 AX calls — lightweight)
+        let freshTitle = detector.getCurrentWindowTitle() ?? ""
+        
+        // Skip if title hasn't actually changed from last detection
+        guard freshTitle != (lastDetectedTitle ?? "") else { return }
+        
+        // Title DID change — re-detect with fresh state
+        lastDetectedTitle = freshTitle
+        
+        let previousMethod = detector.confirmedInjectionMethod
+        let injectionInfo = detector.detectInjectionMethod()
+        
+        // Only update and log if detection result actually changed
+        if previousMethod == nil ||
+           injectionInfo.method != previousMethod!.method ||
+           injectionInfo.description != previousMethod!.description {
+            detector.setConfirmedInjectionMethod(injectionInfo)
+            debugWindowController?.logEvent("[TitleVerify] \"\(freshTitle.prefix(60))\"")
+            debugWindowController?.logEvent("   Injection: \(previousMethod?.description ?? "nil") → \(injectionInfo.description)")
         }
     }
     
