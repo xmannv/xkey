@@ -2528,19 +2528,14 @@ class VNEngine {
         vowelWillSetMark = vowelEndIndex
         hookState.backspaceCount = Int(index) - vowelEndIndex
         
-        // Rule 2: Special 3-vowel combinations
+        // Rule 2: Triple vowel combinations
+        // For ALL triple vowel sequences in Vietnamese (oai, oay, oeo, uya, uyu, uây, iêu, ươi, etc.),
+        // tone mark ALWAYS goes on the middle vowel (index 1).
+        // This matches Vietnamese phonetic rules and VowelSequenceValidator.calculateTonePosition behavior.
+        // Rule 3.1 below may further refine for circumflex/horn patterns (iê, yê, uô, ươ).
         if vowelCount == 3 {
-            let v1 = chr(vowelStartIndex)
-            let v2 = chr(vowelStartIndex + 1)
-            let v3 = chr(vowelStartIndex + 2)
-            
-            if (v1 == VietnameseData.KEY_O && v2 == VietnameseData.KEY_A && v3 == VietnameseData.KEY_I) ||
-               (v1 == VietnameseData.KEY_U && v2 == VietnameseData.KEY_Y && v3 == VietnameseData.KEY_U) ||
-               (v1 == VietnameseData.KEY_O && v2 == VietnameseData.KEY_E && v3 == VietnameseData.KEY_O) ||
-               (v1 == VietnameseData.KEY_U && v2 == VietnameseData.KEY_Y && v3 == VietnameseData.KEY_A) {
-                vowelWillSetMark = vowelStartIndex + 1
-                hookState.backspaceCount = Int(index) - vowelWillSetMark
-            }
+            vowelWillSetMark = vowelStartIndex + 1
+            hookState.backspaceCount = Int(index) - vowelWillSetMark
         } else if vowelCount == 2 {
             let v1 = chr(vowelStartIndex)
             let v2 = chr(vowelStartIndex + 1)
@@ -2633,10 +2628,14 @@ class VNEngine {
             }
         }
         // Rule 3.2: ia, ya, ua, ưu patterns - mark on 1st vowel
-        else if (rule3v1 == VietnameseData.KEY_I && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
-                (rule3v1 == VietnameseData.KEY_Y && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
-                (rule3v1 == VietnameseData.KEY_U && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
-                (rule3v1 == VietnameseData.KEY_U && rule3v2Data == (UInt32(VietnameseData.KEY_U) | VNEngine.TONEW_MASK)) {
+        // IMPORTANT: Only apply for double vowels (vowelCount != 3).
+        // For triple vowels (e.g., "uây", "oay"), the mark should stay on the middle vowel
+        // as set by Rule 2 above, NOT be overridden to the 1st vowel.
+        else if vowelCount != 3 &&
+                ((rule3v1 == VietnameseData.KEY_I && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
+                 (rule3v1 == VietnameseData.KEY_Y && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
+                 (rule3v1 == VietnameseData.KEY_U && chr(vowelStartIndex + 1) == VietnameseData.KEY_A) ||
+                 (rule3v1 == VietnameseData.KEY_U && rule3v2Data == (UInt32(VietnameseData.KEY_U) | VNEngine.TONEW_MASK))) {
             vowelWillSetMark = vowelStartIndex
             hookState.backspaceCount = Int(index) - vowelWillSetMark
         }

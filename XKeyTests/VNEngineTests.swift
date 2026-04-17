@@ -814,6 +814,264 @@ class VNEngineTests: XCTestCase {
         
         XCTAssertEqual(engine.getCurrentWord(), "ngoài", "Mark should move from 'o' to 'a' when vowels are added after the mark")
     }
+
+    /// Test tone placement for "xoáy" (triple vowel "oay") - Modern Style ON
+    /// Bug: Modern style incorrectly placed tone on 'y' instead of 'a' → "xoaý" instead of "xoáy"
+    /// Root cause: handleModernMark() didn't handle triple vowel "oay" pattern
+    func testTonePlacement_XOAY_ModernStyle_TripleVowel() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // Test case 1: x-o-a-s-y → xoáy
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)  // acute mark
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)  // mark should stay on 'a'
+        
+        XCTAssertEqual(engine.getCurrentWord(), "xoáy", "Tone should be on 'a' (middle vowel of 'oay'), not 'y'")
+    }
+    
+    /// Test tone placement for "xoáy" with tone typed after all vowels
+    func testTonePlacement_XOAY_ToneAfterVowels() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // Test case: x-o-a-y-s → xoáy (tone typed last)
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)  // acute mark on middle vowel
+        
+        XCTAssertEqual(engine.getCurrentWord(), "xoáy", "Tone should be on 'a' (middle vowel of 'oay')")
+    }
+    
+    /// Test tone placement for "uầy" (triple vowel "uây") - Modern Style ON
+    /// Bug: Modern style incorrectly placed tone on 'u' instead of 'â' → "ùây" instead of "uầy"
+    /// Root cause: Rule 3.2 "ua" pattern in handleModernMark() overrode the correct triple vowel position
+    func testTonePlacement_UAY_ModernStyle_TripleVowelWithCircumflex() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // u-a-a-f-y → uầy (u + â + huyền + y)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)  // aa → â
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // grave mark on â → uầ
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)  // mark should stay on â
+        
+        XCTAssertEqual(engine.getCurrentWord(), "uầy", "Tone should be on 'â' (circumflex vowel in middle), not 'u'")
+    }
+    
+    /// Test tone placement for "hoáy" (triple vowel "oay" with different initial consonant)
+    func testTonePlacement_HOAY_ModernStyle_TripleVowel() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // h-o-a-y-s → hoáy
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "hoáy", "Tone should be on 'a' (middle vowel of 'oay')")
+    }
+
+    // MARK: - Comprehensive Triple Vowel Tone Placement Tests (Modern Style)
+    
+    /// Test ALL 12 Vietnamese triple vowel sequences for correct tone placement in Modern Style.
+    /// Vietnamese phonetic rule: tone mark ALWAYS goes on the middle vowel for triple vowel sequences.
+    /// For sequences with circumflex/horn, the mark goes on the vowel with that diacritic (which IS the middle).
+    
+    /// 1. iêu: "hiểu" → tone on ê (middle, circumflex)
+    func testTripleVowel_IEU_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // h-i-e-e-r-u → hiểu
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)  // ee → ê
+        _ = engine.processKey(character: "r", keyCode: VietnameseData.KEY_R, isUppercase: false)  // hỏi mark
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "hiểu", "iêu: tone should be on ê (middle)")
+    }
+    
+    /// 2. yêu: "yếu" → tone on ê (middle, circumflex)
+    func testTripleVowel_YEU_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // y-e-e-s-u → yếu
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)  // ee → ê
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)  // sắc mark
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "yếu", "yêu: tone should be on ê (middle)")
+    }
+    
+    /// 3. oai: "ngoài" → tone on a (middle)
+    func testTripleVowel_OAI_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // n-g-o-a-f-i → ngoài (tone before last vowel)
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // huyền
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ngoài", "oai: tone should be on a (middle)")
+    }
+    
+    /// 4. oay: "xoáy" → tone on a (middle) — was the main bug
+    /// Already tested in testTonePlacement_XOAY_ModernStyle_TripleVowel
+    
+    /// 5. oeo: "ngoéo" → tone on e (middle)
+    func testTripleVowel_OEO_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // n-g-o-e-s-o → ngoéo
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        _ = engine.processKey(character: "g", keyCode: VietnameseData.KEY_G, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)  // sắc
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "ngoéo", "oeo: tone should be on e (middle)")
+    }
+    
+    /// 6. uây: "uầy" → tone on â (middle, circumflex) — was the second bug
+    /// Already tested in testTonePlacement_UAY_ModernStyle_TripleVowelWithCircumflex
+    
+    /// 7. uôi: "tuổi" → tone on ô (middle, circumflex)
+    func testTripleVowel_UOI_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // t-u-o-o-r-i → tuổi
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)  // oo → ô
+        _ = engine.processKey(character: "r", keyCode: VietnameseData.KEY_R, isUppercase: false)  // hỏi
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "tuổi", "uôi: tone should be on ô (middle)")
+    }
+    
+    /// 8. uya: "khuya" — test with tone
+    /// Triple vowel uya: middle vowel is 'y', tone goes on 'y' → khuýa
+    func testTripleVowel_UYA_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // k-h-u-y-a-s → khuýa (tone on middle vowel 'y')
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        let actual = engine.getCurrentWord()
+        print("DEBUG UYA: actual='\(actual)'")
+        // Triple vowel uya: middle is 'y', tone should go on 'y'
+        XCTAssertEqual(actual, "khuýa", "uya: tone should be on y (middle vowel)")
+    }
+    
+    /// 9. uyê: "tuyền" → tone on ê (circumflex, last vowel)
+    func testTripleVowel_UYE_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // t-u-y-e-e-f-n → tuyền
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)
+        _ = engine.processKey(character: "e", keyCode: VietnameseData.KEY_E, isUppercase: false)  // ee → ê
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // huyền
+        _ = engine.processKey(character: "n", keyCode: VietnameseData.KEY_N, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "tuyền", "uyê: tone should be on ê (circumflex vowel)")
+    }
+    
+    /// 10. uyu: "khuỷu" → tone on y (middle)
+    func testTripleVowel_UYU_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // k-h-u-y-r-u → khuỷu
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)
+        _ = engine.processKey(character: "r", keyCode: VietnameseData.KEY_R, isUppercase: false)  // hỏi
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "khuỷu", "uyu: tone should be on y (middle)")
+    }
+    
+    /// 11. ươi: "tươi" → tone on ơ (middle, horn)
+    func testTripleVowel_UOI_Horn_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // t-u-o-w-i-s → tưới
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)  // horn: uo → ươ
+        _ = engine.processKey(character: "i", keyCode: VietnameseData.KEY_I, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "tưới", "ươi: tone should be on ơ (middle, horn)")
+    }
+    
+    /// 12. ươu: "hươu" → tone on ơ (middle, horn)
+    func testTripleVowel_UOU_Horn_ModernStyle() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        // h-u-o-w-f-u → hươù... actually "hưởu"? Let me use "hươu" without tone
+        // Better test: type h-u-o-w-u-f → hườu (huyền on ơ)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)  // horn: uo → ươ
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)  // huyền
+        
+        XCTAssertEqual(engine.getCurrentWord(), "hườu", "ươu: tone should be on ơ (middle, horn)")
+    }
+    
+    // MARK: - Tone typed at different positions (edge cases)
+    
+    /// Test: tone typed BEFORE third vowel is added, then third vowel shifts the mark
+    /// x-o-s-a-y → xoáy (tone on 'o' first, then moves to 'a' when 'a' is added, stays on 'a' when 'y' is added)
+    func testTripleVowel_ToneThenVowels_XOAY() {
+        engine.reset()
+        engine.vUseModernOrthography = 1
+        
+        _ = engine.processKey(character: "x", keyCode: VietnameseData.KEY_X, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)  // xó
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)  // xoá (mark moves to a)
+        _ = engine.processKey(character: "y", keyCode: VietnameseData.KEY_Y, isUppercase: false)  // xoáy (mark stays on a)
+        
+        XCTAssertEqual(engine.getCurrentWord(), "xoáy", "Tone typed early should still end up on middle vowel 'a'")
+    }
     
     /// Test similar case with "hoà" → mark on 'a' not 'o'
     func testTonePlacement_HOA_MarkBeforeVowel() {

@@ -418,6 +418,25 @@ class VNWordBuffer {
                 break
             }
         }
+        
+        // FINAL PASS: Recalculate tone position based on the fully assembled word state.
+        // This is critical because tone position may have been calculated when the tone key
+        // appeared in the keystroke sequence, but the word structure may have changed since
+        // (e.g., adding a vowel after the tone key: "x-o-a-s-y" → oay triple vowel).
+        // The tone position must reflect the FINAL word structure, not the intermediate one.
+        if state.tone != .none && state.hasVowels {
+            let finalPosition = VowelSequenceValidator.calculateTonePosition(
+                vowels: state.vowelSequence,
+                hasEndingConsonant: state.hasEndingConsonant,
+                modernStyle: true,
+                firstConsonant: state.consonant1?.consonant,
+                hasPassThroughAfterVowels: hasPassThroughAfterVowels()
+            )
+            if finalPosition != state.tonePosition {
+                logCallback?("    → Tone position recalculated: \(state.tonePosition) → \(finalPosition)")
+                state.tonePosition = finalPosition
+            }
+        }
     }
 
     func markWordStart() {
