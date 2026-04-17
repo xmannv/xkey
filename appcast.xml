@@ -6,38 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260415)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260415</link>
-      <sparkle:version>20260415</sparkle:version>
+      <title>Version 1.2.21 (Build 20260417)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260417</link>
+      <sparkle:version>20260417</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: improve window rules detection timing and add diagnostic logging</p>
-<p>Bug fixes:</p>
-<ul>
-<li>Move handleSmartSwitch() inside 50ms AX delay block to fix rule evaluation</li>
-</ul>
-<p>  timing. Previously, getTargetInputSourceOverride() evaluated window title</p>
-<p>  rules immediately on app switch, before AX tree had updated, causing</p>
-<p>  rules to fail matching when window title was not yet available.</p>
-<p>Diagnostic logging (for debugging rule match failures):</p>
-<ul>
-<li>[RuleMatch] windowTitle is EMPTY — fires when title unavailable at detection</li>
-<li>[RuleMatch] Matched: [ruleName] — fires when matched rules change</li>
-<li>[RuleMatch] Rules cleared → no match — fires when rules stop matching</li>
-<li>Window title logged in app switch and AX focus change handlers</li>
-</ul>
-<p>Performance optimizations:</p>
-<ul>
-<li>Guard debugLogCallback with if-let to avoid string creation when inactive</li>
-<li>Track _lastLoggedRuleMatchKey to only log when matched rules change</li>
-<li>Reuse FocusedElementInfo lazy cache for window title logging</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260415">Xem chi tiết trên GitHub</a></p>
+<p>fix: resolve window title race condition in AXObserver focus detection</p>
+<p>Dual-layer protection ensures window title rules apply correctly when</p>
+<p>switching channels/groups in apps like Slack:</p>
+<p>Layer 1: Register kAXTitleChangedNotification with 150ms debounce</p>
+<p>Layer 2: Delayed title verification 250ms after focus change</p>
+<p>Both layers share performTitleChangeRedetection() with lastDetectedTitle</p>
+<p>guard to avoid duplicate work. Zero impact on typing latency.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260417">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 15 Apr 2026 15:49:20 +0000</pubDate>
+      <pubDate>Fri, 17 Apr 2026 02:40:20 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260415/XKey.dmg" sparkle:version="20260415" sparkle:shortVersionString="1.2.21" length="10646191" type="application/octet-stream" sparkle:edSignature="1xKoMmLODAz8sukM05bB/viRwYTDUuOKAMZpF026x7LWfgI1LQa94BEgQ5WltYMZfeeWRUkTIsxbvuAxhtBtCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260417/XKey.dmg" sparkle:version="20260417" sparkle:shortVersionString="1.2.21" length="10660625" type="application/octet-stream" sparkle:edSignature="c+7I91W5meZHuIvMdx+dIrB4Hy7wh16oVzAPzmivh+L015PtD3nnf6L4sdeJtbg9voI0n1qMfx+4QsooGOIuBA==" />
     </item>
   </channel>
 </rss>
