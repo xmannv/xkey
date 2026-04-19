@@ -3487,9 +3487,13 @@ extension VNEngine {
             saveWord()
         }
 
-        // Only reset session and clear macroKey for SPACE
-        // For other special characters (!, @, #, etc.), we preserve macroKey
-        // to allow macros like "!bb" or "@hello"
+        // Determine if this is an Enter/Return key (definitive sentence boundary)
+        let isEnterOrReturn = (character == "\n" || character == "\r")
+        
+        // Reset session based on word break type:
+        // - SPACE: definitive word boundary → full session reset (startNewSession)
+        // - ENTER/RETURN: definitive sentence boundary → full session reset + no phantom space
+        // - Other chars (!, @, #, etc.): preserve macroKey for building macros like "!bb"
         if isSpace {
             // Increment space count for the current space
             spaceCount = 1
@@ -3500,6 +3504,23 @@ extension VNEngine {
             
             // macroKey is cleared by startNewSession()
             // This allows macros like "hello" -> "hello world" to work correctly
+        } else if isEnterOrReturn {
+            // Enter/Return = definitive sentence boundary
+            // Must use startNewSession() to clear ALL state including macroKey.
+            //
+            // Without this, macroKey from the previous word survives across Enter.
+            // When user types a new word on the next line/message, processKey()
+            // appends new keystrokes to stale macroKey, creating corrupted macro
+            // data like ['o','l','d','n','e','w'] that can trigger false macro matches
+            // → unexpected text replacement → "text overflow" bug.
+            //
+            // Also reset focusChangedDuringTyping which may have been set by
+            // autocomplete popup focus changes. Without this reset, the flag
+            // persists across Enter boundary, causing backspace restore to be
+            // incorrectly skipped (clearWithoutRestore) for the entire next word.
+            startNewSession()
+            spaceCount = 0  // Enter is not a space — no phantom separator in history
+            focusChangedDuringTyping = false  // Clean slate for next typing session
         } else {
             // For non-space word breaks (!, @, #, etc.), we still need to reset the buffer
             // but preserve macroKey to build macros like "!bb"

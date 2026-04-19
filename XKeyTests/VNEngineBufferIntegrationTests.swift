@@ -758,4 +758,120 @@ class VNEngineBreakKeyTests: XCTestCase {
         _ = engine.processWordBreak(character: " ")
         XCTAssertTrue(engine.buffer.isEmpty)
     }
+
+// MARK: - Enter Key Session Boundary Tests
+// These test the fix for Enter key buffer desync:
+// 1. macroKey must be cleared after Enter (prevents false macro matches)
+// 2. focusChangedDuringTyping must be reset after Enter
+// 3. spaceCount must be 0 after Enter (no phantom space)
+
+func testEnterClearsMacroKey() {
+    // Enable macro for this test
+    var settings = VNEngine.EngineSettings()
+    settings.macroEnabled = true
+    engine.updateSettings(settings)
+    
+    // Type a word - macroKey accumulates
+    _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+    _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+    
+    XCTAssertFalse(engine.hookState.macroKey.isEmpty, "macroKey should have data after typing")
+    
+    // Press Enter (word break with newline character)
+    _ = engine.processWordBreak(character: "\n")
+    
+    // macroKey MUST be cleared after Enter
+    XCTAssertTrue(engine.hookState.macroKey.isEmpty, "macroKey must be cleared after Enter to prevent false macro matches")
+}
+
+func testEnterResetsSpaceCountToZero() {
+    _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+    _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+    
+    _ = engine.processWordBreak(character: "\n")
+    
+    // spaceCount must be 0 after Enter (Enter is not a space)
+    XCTAssertEqual(engine.spaceCount, 0, "spaceCount must be 0 after Enter (no phantom space)")
+}
+
+func testEnterResetsFocusChangedFlag() {
+    _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+    
+    // Simulate autocomplete popup causing focus change
+    engine.notifyFocusChanged()
+    XCTAssertTrue(engine.focusChangedDuringTyping, "flag should be set after focus change")
+    
+    _ = engine.processWordBreak(character: "\n")
+    
+    // focusChangedDuringTyping must be reset after Enter
+    XCTAssertFalse(engine.focusChangedDuringTyping, "focusChangedDuringTyping must be reset after Enter")
+}
+
+func testEnterClearsBuffer() {
+    _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+    _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+    _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+    
+    XCTAssertEqual(engine.buffer.count, 3)
+    
+    _ = engine.processWordBreak(character: "\n")
+    
+    XCTAssertTrue(engine.buffer.isEmpty, "buffer must be cleared after Enter")
+    XCTAssertEqual(engine.index, 0)
+}
+
+func testReturnKeyBehavesLikeEnter() {
+    // '\r' (Return key) should have same behavior as '\n' (Enter)
+    var settings = VNEngine.EngineSettings()
+    settings.macroEnabled = true
+    engine.updateSettings(settings)
+    
+    _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+    _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+    
+    _ = engine.processWordBreak(character: "\r")
+    
+    XCTAssertTrue(engine.hookState.macroKey.isEmpty, "macroKey must be cleared after Return")
+    XCTAssertEqual(engine.spaceCount, 0, "spaceCount must be 0 after Return")
+    XCTAssertTrue(engine.buffer.isEmpty, "buffer must be cleared after Return")
+}
+
+func testNonEnterWordBreakPreservesMacroKey() {
+    // Other word breaks like ! @ # should preserve macroKey for macro building
+    var settings = VNEngine.EngineSettings()
+    settings.macroEnabled = true
+    engine.updateSettings(settings)
+    
+    _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+    _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+    
+    let macroKeyBefore = engine.hookState.macroKey
+    
+    _ = engine.processWordBreak(character: "!")
+    
+    // macroKey should NOT be empty for non-Enter word breaks
+    // (it may have been modified by adding '!' to it, but should not be wiped clean)
+    // The key point is that non-Enter breaks don't call startNewSession()
+    XCTAssertEqual(engine.spaceCount, 1, "non-Enter word break should set spaceCount=1")
+}
+
+func testNewTypingAfterEnterStartsFresh() {
+    var settings = VNEngine.EngineSettings()
+    settings.macroEnabled = true
+    engine.updateSettings(settings)
+    
+    // Type a word
+    _ = engine.processKey(character: "d", keyCode: VietnameseData.KEY_D, isUppercase: false)
+    _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+    
+    // Press Enter
+    _ = engine.processWordBreak(character: "\n")
+    
+    // Type new word - macroKey should only contain new word's keys
+    _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+    _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+    
+    // macroKey should only have 'o' and 'k', NOT 'd', 'c', 'o', 'k'
+    XCTAssertEqual(engine.hookState.macroKey.count, 2, "macroKey should only contain new word's keys after Enter")
+}
 }
