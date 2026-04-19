@@ -6,39 +6,37 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260417.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260417.1</link>
-      <sparkle:version>20260417.1</sparkle:version>
+      <title>Version 1.2.21 (Build 20260419)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260419</link>
+      <sparkle:version>20260419</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: correct Modern Style tone placement for triple vowels</p>
-<p>Bug: When Modern Style is ON, tone marks are misplaced for triple vowel</p>
-<p>sequences like "oay" and "uây":</p>
-<p>  - "xoáy" → typed as "xoaý" (tone on 'y' instead of 'a')</p>
-<p>  - "uầy" → typed as "ùây" (tone on 'u' instead of 'â')</p>
-<p>Root cause (2 issues in handleModernMark):</p>
+<p>fix: treat Enter/Return as definitive session boundary in processWordBreak</p>
+<p>Previously, Enter/Return used the generic non-space word break path which:</p>
 <ol>
-<li>Triple vowel block only listed 4 specific patterns (oai, uyu, oeo,</li>
+<li>Preserved macroKey (stale macro data leaked across Enter boundary,</li>
 </ol>
-<p>   uya), missing others like "oay". Replaced with catch-all rule: ALL</p>
-<p>   triple vowels place tone on the middle vowel (Vietnamese phonetic rule).</p>
+<p>   causing false macro matches → 'text overflow' bug in Messenger)</p>
 <ol>
-<li>Rule 3.2 (ia/ya/ua/ưu) had no vowelCount guard, causing it to</li>
+<li>Did not reset focusChangedDuringTyping (flag from autocomplete popup</li>
 </ol>
-<p>   override triple vowel positions (e.g., "uây" matched "ua" pattern).</p>
-<p>   Added vowelCount != 3 guard.</p>
-<p>Also added tone position recalculation as final pass in</p>
-<p>VNWordBuffer.rebuildStateFromKeyStrokes() to handle cases where vowels</p>
-<p>are added after the tone key.</p>
-<p>Verified all 12 Vietnamese triple vowel sequences:</p>
-<p>iêu, yêu, oai, oay, oeo, uây, uôi, uya, uyê, uyu, ươi, ươu</p>
-<p>Added 15 test cases covering bug fixes and comprehensive coverage.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260417.1">Xem chi tiết trên GitHub</a></p>
+<p>   persisted, causing backspace restore to be incorrectly skipped)</p>
+<ol>
+<li>Set spaceCount=1 (phantom space in history since Enter is not a space)</li>
+</ol>
+<p>Now Enter/Return gets its own path that calls startNewSession() for a</p>
+<p>complete state reset, sets spaceCount=0, and clears focusChangedDuringTyping.</p>
+<p>Other non-space word breaks (!, @, #, etc.) keep their existing behavior</p>
+<p>to support macro building across punctuation.</p>
+<p>Added 7 unit tests covering: macroKey cleared, spaceCount=0, focus flag</p>
+<p>reset, buffer cleared, Return behaves like Enter, non-Enter breaks</p>
+<p>unaffected, and new typing after Enter starts with clean macroKey.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260419">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 17 Apr 2026 08:13:27 +0000</pubDate>
+      <pubDate>Sun, 19 Apr 2026 02:01:48 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260417.1/XKey.dmg" sparkle:version="20260417.1" sparkle:shortVersionString="1.2.21" length="10657827" type="application/octet-stream" sparkle:edSignature="f/EaJUX92T6a4jr8FXwJvj5iERycV8wIQKNEuy5EAalDNx04bHWi78eVF3U96mvZ6+rl//vKzc9AmKm2i92hCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260419/XKey.dmg" sparkle:version="20260419" sparkle:shortVersionString="1.2.21" length="10656374" type="application/octet-stream" sparkle:edSignature="CXM1sWSZHbkmJU431H/2DjIurbzuUVkNTPL5dC582CNdAZE6y2xyTYHiwuBsHz2ZvxAjvEnNAoHbghKpPbj0BQ==" />
     </item>
   </channel>
 </rss>
