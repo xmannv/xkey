@@ -177,14 +177,23 @@ class StatusBarManager: ObservableObject {
     private func updateStatusIcon() {
         guard let button = statusItem?.button else { return }
         
-        // Determine icon text based on icon style and Vietnamese mode
-        let iconText: String
-        switch menuBarIconStyle {
-        case .x:
-            iconText = viewModel.isVietnameseEnabled ? "X" : "E"
-        case .v:
-            iconText = viewModel.isVietnameseEnabled ? "V" : "E"
+        if menuBarIconStyle == .emoji {
+            // Emoji flags render in natural color, no template image needed
+            let iconText = viewModel.isVietnameseEnabled ? "🇻🇳" : "🇬🇧"
+            button.image = nil
+            button.imagePosition = .noImage
+            button.title = ""
+            button.attributedTitle = NSAttributedString(
+                string: iconText,
+                attributes: [.font: NSFont.systemFont(ofSize: 16)]
+            )
+            return
         }
+        
+        // Letter style (X or V) — render as template image with border
+        let iconText = menuBarIconStyle == .x
+            ? (viewModel.isVietnameseEnabled ? "X" : "E")
+            : (viewModel.isVietnameseEnabled ? "V" : "E")
         
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 14, weight: .semibold),
@@ -213,6 +222,9 @@ class StatusBarManager: ObservableObject {
         }
         
         image.isTemplate = true
+        button.attributedTitle = NSAttributedString(string: "")
+        button.title = ""
+        button.imagePosition = .imageOnly
         button.image = image
     }
     
