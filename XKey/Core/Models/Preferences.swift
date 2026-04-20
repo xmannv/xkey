@@ -11,11 +11,13 @@ import Cocoa
 enum MenuBarIconStyle: String, Codable, CaseIterable {
     case x = "X"
     case v = "V"
+    case icon = "🇻🇳"
     
     var displayName: String {
         switch self {
         case .x: return "Chữ X"
         case .v: return "Chữ V"
+        case .icon: return "Emoji 🇻🇳 / 🇬🇧"
         }
     }
 }

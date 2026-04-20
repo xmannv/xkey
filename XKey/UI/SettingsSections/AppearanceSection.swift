@@ -19,7 +19,7 @@ struct AppearanceSection: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 10) {
                             ForEach(MenuBarIconStyle.allCases, id: \.self) { style in
                                 SettingsRadioButton(
                                     title: style.displayName,
@@ -30,6 +30,10 @@ struct AppearanceSection: View {
                             }
                         }
                         .padding(.leading, 8)
+
+                        Text("Emoji sẽ hiển thị 🇻🇳 khi ở tiếng Việt và 🇬🇧 khi ở tiếng Anh.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
