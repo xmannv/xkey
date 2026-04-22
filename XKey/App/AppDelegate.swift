@@ -255,6 +255,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = AudioManager.shared
         debugWindowController?.logEvent("AudioManager initialized for wake-from-sleep handling")
 
+        // Check for Secure Input mode — this blocks ALL CGEvent taps from receiving keyDown events.
+        // Common cause: 1Password, Terminal, browser password fields holding Secure Input ON.
+        checkAndWarnSecureInput()
+
         debugWindowController?.updateStatus("XKey started successfully")
         debugWindowController?.logEvent("XKey started successfully")
     }
@@ -1147,6 +1151,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
                     self.setupAXObserverForApp(app)
                 }
+                
+                // Check Secure Input on app switch — password managers often enable it when focused
+                self.checkAndWarnSecureInput()
             }
             
             // Reset intra-app focus tracking (new app = new baseline)
@@ -1723,6 +1730,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // This ensures XKeyIM is always in sync with XKey app
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             XKeyIMUpdateManager.shared.installBundledXKeyIM(showNotification: false)
+        }
+    }
+
+    // MARK: - Secure Input Detection
+    
+    /// Track Secure Input state to avoid spamming debug log
+    private var lastSecureInputLogTime: CFAbsoluteTime = 0
+    private var lastSecureInputPID: pid_t = 0
+    
+    /// Check if Secure Input is active and warn the user.
+    /// When Secure Input is ON, ALL CGEvent taps are blocked from receiving keyDown/keyUp events,
+    /// making XKey and all third-party input methods completely non-functional.
+    /// The overlay shows on EVERY check (e.g., every app switch) to remind the user.
+    /// Debug log is throttled to avoid spam.
+    @discardableResult
+    private func checkAndWarnSecureInput() -> Bool {
+        guard let manager = eventTapManager else { return false }
+        
+        let (isSecure, pid, appName) = manager.checkSecureInput()
+        
+        if isSecure {
+            let name = appName ?? "Unknown"
+            
+            // Only show overlay when Vietnamese mode is ON.
+            // If user is in English mode, Secure Input doesn't affect typing.
+            let isVietnamese = statusBarManager?.viewModel.isVietnameseEnabled ?? false
+            if isVietnamese {
+                SecureInputOverlay.shared.show(appName: name)
+            }
+            
+            // Throttle debug log: only log once per app, or every 30 seconds for the same app
+            let now = CFAbsoluteTimeGetCurrent()
+            let samePID = pid == lastSecureInputPID
+            if !samePID || (now - lastSecureInputLogTime) > 30.0 {
+                lastSecureInputLogTime = now
+                lastSecureInputPID = pid ?? 0
+                debugWindowController?.logEvent("⚠️ Secure Input đang BẬT bởi '\(name)' — XKey không thể nhận phím!")
+                debugWindowController?.updateStatus("⚠️ Secure Input: \(name)")
+            }
+            return true
+        } else {
+            // Clear state when Secure Input is released
+            if lastSecureInputPID != 0 {
+                lastSecureInputPID = 0
+                SecureInputOverlay.shared.hide()
+                debugWindowController?.logEvent("✅ Secure Input đã TẮT — XKey hoạt động bình thường")
+                debugWindowController?.updateStatus("Ready")
+            }
+            return false
         }
     }
 

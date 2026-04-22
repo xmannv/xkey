@@ -46,6 +46,8 @@
 		105B93912F38848D0018DC12 /* WindowPinManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93902F38848D0018DC12 /* WindowPinManager.swift */; };
 		105B93932F388AAA0018DC12 /* FloatingToolbarStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */; };
 		106779A62ED41FD400FE0B24 /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A22ED41FD400FE0B24 /* StatusBarManager.swift */; };
+		DBA9BF348A21403AA831BEA9 /* SecureInputOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F7194071724EF688135E9E /* SecureInputOverlay.swift */; };
+		076E1EE87A0B4E65964C01B1 /* FloatingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AE133FC7897416BBCED985C /* FloatingOverlay.swift */; };
 		106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A12ED41FD400FE0B24 /* DebugWindowController.swift */; };
 		107602EE2EF4E3BA00ADC084 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */; };
 		1084A5462ED41EB200EA2D2A /* PreferencesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1084A5442ED41EB200EA2D2A /* PreferencesViewModel.swift */; };
@@ -171,6 +173,8 @@
 		105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingToolbarStyle.swift; sourceTree = "<group>"; };
 		106779A12ED41FD400FE0B24 /* DebugWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWindowController.swift; sourceTree = "<group>"; };
 		106779A22ED41FD400FE0B24 /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
+		21F7194071724EF688135E9E /* SecureInputOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputOverlay.swift; sourceTree = "<group>"; };
+		8AE133FC7897416BBCED985C /* FloatingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingOverlay.swift; sourceTree = "<group>"; };
 		107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceManager.swift; sourceTree = "<group>"; };
 		1084A5432ED41EB200EA2D2A /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		1084A5442ED41EB200EA2D2A /* PreferencesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesViewModel.swift; sourceTree = "<group>"; };
@@ -471,6 +475,8 @@
 				10A214982ED42DFA005B52BD /* PreferencesWindowController.swift */,
 				106779A12ED41FD400FE0B24 /* DebugWindowController.swift */,
 				106779A22ED41FD400FE0B24 /* StatusBarManager.swift */,
+				21F7194071724EF688135E9E /* SecureInputOverlay.swift */,
+				8AE133FC7897416BBCED985C /* FloatingOverlay.swift */,
 				1084A5432ED41EB200EA2D2A /* PreferencesView.swift */,
 				1084A5442ED41EB200EA2D2A /* PreferencesViewModel.swift */,
 				803B94EF161FE79A022FF806 /* SettingsView.swift */,
@@ -742,6 +748,8 @@
 				10FDCC1C2EF5942400B2D9AC /* InputSourceSwitcher.swift in Sources */,
 				100D2BE42EF2C71E00C26B87 /* IMKitHelper.swift in Sources */,
 				106779A62ED41FD400FE0B24 /* StatusBarManager.swift in Sources */,
+				DBA9BF348A21403AA831BEA9 /* SecureInputOverlay.swift in Sources */,
+				076E1EE87A0B4E65964C01B1 /* FloatingOverlay.swift in Sources */,
 				106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */,
 				A1000009 /* EventTapManager.swift in Sources */,
 				1095C4DF2EFB02EA00C03826 /* VNEngineSpellCheck.swift in Sources */,

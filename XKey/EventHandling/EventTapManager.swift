@@ -7,6 +7,7 @@
 
 import Cocoa
 import Carbon
+import IOKit
 
 class EventTapManager {
 
@@ -646,6 +647,60 @@ class EventTapManager {
     
     var isRunning: Bool {
         return isEnabled
+    }
+    
+    // MARK: - Secure Input Detection
+    
+    /// Check if macOS Secure Input mode is active.
+    ///
+    /// When Secure Input is ON (typically enabled by password managers like 1Password,
+    /// Terminal, or browser password fields), macOS blocks ALL CGEvent taps from
+    /// receiving keyDown/keyUp events. Only flagsChanged (modifier keys) pass through.
+    /// This makes XKey and ALL third-party input methods completely non-functional.
+    ///
+    /// Uses IOKit IOConsoleUsers (same source as `ioreg`) instead of
+    /// CGSessionCopyCurrentDictionary, which can return the wrong PID.
+    ///
+    /// - Returns: Tuple with (isSecure, pid of app holding it, app name)
+    func checkSecureInput() -> (isSecure: Bool, pid: pid_t?, appName: String?) {
+        // Read IOConsoleUsers from IOKit registry (same data source as `ioreg -l | grep SecureInput`)
+        let root = IORegistryGetRootEntry(kIOMainPortDefault)
+        guard root != IO_OBJECT_NULL else { return (false, nil, nil) }
+        defer { IOObjectRelease(root) }
+        
+        guard let ref = IORegistryEntryCreateCFProperty(
+            root,
+            "IOConsoleUsers" as CFString,
+            kCFAllocatorDefault,
+            0
+        ) else {
+            return (false, nil, nil)
+        }
+        
+        let consoleUsers = ref.takeRetainedValue()
+        guard let users = consoleUsers as? [[String: Any]] else {
+            return (false, nil, nil)
+        }
+        
+        // Find the current session's Secure Input PID
+        for user in users {
+            // Only check sessions that are on console (active)
+            guard let onConsole = user["kCGSSessionOnConsoleKey"] as? Bool,
+                  onConsole else { continue }
+            
+            guard let securePIDValue = user["kCGSSessionSecureInputPID"] as? Int,
+                  securePIDValue != 0 else { continue }
+            
+            let securePID = pid_t(securePIDValue)
+            
+            // Resolve app name from PID
+            let app = NSRunningApplication(processIdentifier: securePID)
+            let appName = app?.localizedName ?? app?.bundleIdentifier ?? "PID \(securePID)"
+            
+            return (true, securePID, appName)
+        }
+        
+        return (false, nil, nil)
     }
     
     // MARK: - Multi-User Session Monitoring
