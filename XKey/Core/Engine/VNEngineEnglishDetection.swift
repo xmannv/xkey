@@ -249,7 +249,7 @@ extension String {
     /// In VNI (1) and Simple Telex 1 (2), 'w' has no special meaning, so these patterns indicate English
     private static let consonantWClusters: Set<String> = [
         "bw", "cw", "dw", "gw", "hw", "kw", "lw", "mw", "nw", "pw",
-        "rw", "sw", "tw", "vw", "xw", "yw"
+        "qw", "rw", "sw", "tw", "vw", "xw", "yw"
     ]
     
     /// Digraph + W clusters that are valid in Telex/Simple Telex 2.

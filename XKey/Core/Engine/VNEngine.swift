@@ -983,7 +983,12 @@ class VNEngine {
         logCallback?("handleVowelKey: keyCode=\(keyCode)\(charDisplay), index=\(index), tempDisableKey=\(tempDisableKey), buffer=\(getCurrentWord())")
         
         // Ignore "qu" case - OpenKey: checkCorrectVowel
-        if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q {
+        // NOTE: Must exclude standalone ư (from w→ư conversion). When user types "q+w",
+        // chr() returns KEY_U from processedData, but it's standalone ư, not plain u.
+        // Without this check, "qww" fails because engine treats "qư" as "qu" and
+        // skips the standalone undo path.
+        if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q
+            && (typingWord[Int(index) - 1] & VNEngine.STANDALONE_MASK) == 0 {
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
         }
@@ -1015,6 +1020,7 @@ class VNEngine {
                 keyForAEO = keyCode
             }
         }
+        
         
         guard let charsets = vietnameseData.vowelTable[keyForAEO] else {
             if keyCode == VietnameseData.KEY_W && vInputType != 2 {
@@ -2753,6 +2759,11 @@ class VNEngine {
             let lastKey = chr(Int(index) - 1)
             let hasToneW = (typingWord[Int(index) - 1] & VNEngine.TONEW_MASK) != 0
             
+            // Undo standalone/horn conversion: if previous char's base key matches
+            // keyWillReverse and has TONEW, reverse it back to the raw key.
+            // NOTE: chr() returns processedData base key (via CHAR_MASK), so for
+            // standalone ư (processedData = KEY_U | TONEW | STANDALONE), lastKey = KEY_U.
+            // This naturally matches keyWillReverse = KEY_U without needing separate checks.
             if lastKey == keyWillReverse && hasToneW {
                 hookState.code = UInt8(vWillProcess)
                 hookState.backspaceCount = 1

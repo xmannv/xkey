@@ -2337,6 +2337,104 @@ class VNEngineTests: XCTestCase {
         XCTAssertEqual(engine.getCurrentWord(), "ư", "] without caps should produce 'ư'")
     }
 
+    // MARK: - Bug Fix: Standalone Undo (qww → qw, ww → w)
+    // When typing 'w' after a standalone-converted 'ư', the second 'w' should undo
+    // the standalone conversion. The root cause was the "qu" guard in handleVowelKey:
+    // chr() returns processedData base key (KEY_U for standalone ư), so the guard
+    // wrongly treated "qư" (from q+w) as "qu" and skipped vowel processing entirely.
+    // Fix: add STANDALONE_MASK check to the "qu" guard condition.
+    
+    func testStandaloneUndo_WW_AtWordStart_ProducesW() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // w → ư (standalone at word start)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "ư", "First 'w' at word start should produce 'ư'")
+        
+        // w again → should undo standalone ư back to "w"
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "w", "Second 'w' should undo standalone 'ư' → 'w'")
+    }
+    
+    func testStandaloneUndo_QWW_ProducesQW() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_W]
+        
+        // q → q
+        _ = engine.processKey(character: "q", keyCode: VietnameseData.KEY_Q, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "q")
+        
+        // w → qư (standalone ư after valid consonant, W is custom consonant so not blocked)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "qư", "q + w should produce 'qư'")
+        
+        // w again → should undo standalone ư → "qw"
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "qw",
+                       "q + w + w should produce 'qw' (second w undoes standalone ư)")
+    }
+    
+    func testStandaloneUndo_HWW_ProducesHW() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // h + w → hư
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "hư", "h + w should produce 'hư'")
+        
+        // w again → should undo standalone ư → "hw"
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "hw",
+                       "h + w + w should produce 'hw' (second w undoes standalone ư)")
+    }
+    
+    func testStandaloneUndo_BWW_ProducesBW() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // b + w → bư
+        _ = engine.processKey(character: "b", keyCode: VietnameseData.KEY_B, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "bư", "b + w should produce 'bư'")
+        
+        // w again → should undo standalone ư → "bw"
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "bw",
+                       "b + w + w should produce 'bw' (second w undoes standalone ư)")
+    }
+    
+    func testStandaloneUndo_KHWW_ProducesKHW() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // k + h + w → khư (double consonant kh + standalone ư)
+        _ = engine.processKey(character: "k", keyCode: VietnameseData.KEY_K, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "khư", "k-h-w should produce 'khư'")
+        
+        // w again → should undo standalone ư → "khw"
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        XCTAssertEqual(engine.getCurrentWord(), "khw",
+                       "k-h-w-w should produce 'khw' (second w undoes standalone ư)")
+    }
+    
+    func testStandaloneUndo_WW_WithCapsLock() {
+        engine.reset()
+        engine.vCustomConsonants = []
+        
+        // W (uppercase) → Ư
+        _ = engine.processKey(character: "W", keyCode: VietnameseData.KEY_W, isUppercase: true)
+        XCTAssertEqual(engine.getCurrentWord(), "Ư", "W at word start should produce 'Ư'")
+        
+        // W again → should undo standalone Ư → "W"
+        _ = engine.processKey(character: "W", keyCode: VietnameseData.KEY_W, isUppercase: true)
+        XCTAssertEqual(engine.getCurrentWord(), "W",
+                       "Second 'W' should undo standalone 'Ư' → 'W'")
+    }
+
 }
 
 
