@@ -6,41 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260422.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260422.1</link>
-      <sparkle:version>20260422.1</sparkle:version>
+      <title>Version 1.2.21 (Build 20260423)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260423</link>
+      <sparkle:version>20260423</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: detect Secure Input blocking and show floating overlay warning</p>
-<p>Detect when macOS Secure Input mode is active (e.g., 1Password,</p>
-<p>Terminal) and warn the user via a floating overlay near the cursor.</p>
-<p>Implementation:</p>
+<p>fix(engine): resolve qww standalone undo bug - qu guard bypass</p>
+<p>Root cause: TypingBuffer.keyCode(at:) returns processedData base key</p>
+<p>(KEY<em>U) instead of raw keyCode (KEY</em>W) after w→ư standalone conversion.</p>
+<p>This caused handleVowelKey's 'qu' guard to wrongly match 'qư' as 'qu',</p>
+<p>bypassing checkForStandaloneChar undo logic entirely.</p>
+<p>Fix:</p>
 <ul>
-<li>FloatingOverlay.swift: shared overlay component with multiple</li>
+<li>VNEngine.swift: Add STANDALONE_MASK check to 'qu' guard in handleVowelKey</li>
+<li>VNEngine.swift: Check processedData bitmask in checkForStandaloneChar</li>
+<li>VNEngineEnglishDetection.swift: Add 'qw' to consonantWClusters</li>
+<li>VNEngineTests.swift: Add 6 standalone undo tests (ww, qww, hww, bww, khww, caps)</li>
 </ul>
-<p>  positions (nearMouse, topCenter), view types (loading, brief,</p>
-<p>  warning), fade animations, auto-dismiss, and race-safe lifecycle</p>
-<ul>
-<li>EventTapManager.checkSecureInput(): reads IOKit IOConsoleUsers</li>
-</ul>
-<p>  registry (same source as ioreg) for accurate PID detection</p>
-<ul>
-<li>AppDelegate.checkAndWarnSecureInput(): runs at startup and every</li>
-</ul>
-<p>  app switch, shows overlay only when Vietnamese mode is ON</p>
-<ul>
-<li>SecureInputOverlay/TranslationLoadingOverlay: thin wrappers with</li>
-</ul>
-<p>  independent FloatingOverlay instances to prevent cross-dismissal</p>
-<ul>
-<li>Overlay dismisses immediately when Secure Input is released</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260422.1">Xem chi tiết trên GitHub</a></p>
+<p>All tests pass.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260423">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 22 Apr 2026 07:49:29 +0000</pubDate>
+      <pubDate>Thu, 23 Apr 2026 05:09:16 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260422.1/XKey.dmg" sparkle:version="20260422.1" sparkle:shortVersionString="1.2.21" length="10687224" type="application/octet-stream" sparkle:edSignature="LowhkpC1x5jwI4hxr9TSP1lTm7NzkPurSEkRC8zB+r7hsYgckeKCPL5Qbe2EquyWQDtStRF9178ttpltNpsMBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260423/XKey.dmg" sparkle:version="20260423" sparkle:shortVersionString="1.2.21" length="10688511" type="application/octet-stream" sparkle:edSignature="uakxSLYigM4CpLp/yv2tSo8WHVLlIXqoQNpoPsS9szW73pyh+yMzLMM584Rrj81MGSc5ltIcnRoQfJcfjha4BA==" />
     </item>
   </channel>
 </rss>
