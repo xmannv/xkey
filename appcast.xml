@@ -6,100 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.21 (Build 20260512)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260512</link>
-      <sparkle:version>20260512</sparkle:version>
+      <title>Version 1.2.21 (Build 20260519)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260519</link>
+      <sparkle:version>20260519</sparkle:version>
       <sparkle:shortVersionString>1.2.21</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(engine): auto-capitalize sentence first char — full audit & fixes</p>
-<p>Thorough audit and fixes for the "Tự động viết hoa chữ đầu câu"</p>
-<p>feature. Covers 5 independent bugs across VNEngine core and the</p>
-<p>XKeyIM Input Method, introduces a DRY invariant to prevent future</p>
-<p>regressions, and adds full test coverage.</p>
-<p>Core bugs fixed</p>
-<p>---------------</p>
-<ol>
-<li>updateUpperCaseStatus() reset status to 0 on space, breaking the</li>
-</ol>
-<p>   period → space → letter capitalize flow. Now preserves pending</p>
-<p>   status when space is typed.</p>
-<ol>
-<li>handleNormalKey() trigger only checked status == 2 (newline) but</li>
-</ol>
-<p>   never status == 1 (period). Changed to status >= 1 so both "."</p>
-<p>   and "\n" capitalize the next word.</p>
-<ol>
-<li>handleWordBreak() had inline duplicate logic for upperCaseStatus</li>
-</ol>
-<p>   that was practically dead code (EventHandler and XKeyIMController</p>
-<p>   both intercept word breaks first). Replaced with delegation to</p>
-<p>   updateUpperCaseStatus() — single source of truth.</p>
-<ol>
-<li>handleWordBreak() used VietnameseData.char(for: keyCode) which</li>
-</ol>
-<p>   returned nil for KEY<em>ENTER/KEY</em>RETURN, incorrectly resetting</p>
-<p>   status to 0. Pass the already-available character parameter</p>
-<p>   directly ("\n" for Enter, "." for period, etc.).</p>
-<ol>
-<li>processWordBreak() had 3 early-return paths (macro replacement,</li>
-</ol>
-<p>   macro after restore, spell-check restore success) that skipped</p>
-<p>   the updateUpperCaseStatus() call. Typing "gm. b" with a macro</p>
-<p>   "gm → gmail" produced "gmail. b" instead of "gmail. B".</p>
-<p>DRY invariant</p>
-<p>-------------</p>
-<p>Replace 3 scattered updateUpperCaseStatus() calls in processWordBreak</p>
-<p>with a single <code>defer { updateUpperCaseStatus(character: character) }</code></p>
-<p>at function entry. Guarantees the status is always updated regardless</p>
-<p>of which return path is taken, including future paths.</p>
-<p>XKeyIM Input Method (critical bug)</p>
-<p>----------------------------------</p>
-<p>XKeyIMSettings class was missing the upperCaseFirstChar property.</p>
-<p>applySettings() never forwarded it to the engine, so vUpperCaseFirstChar</p>
-<p>stayed 0 in XKeyIM mode even though the toggle saved to plist correctly.</p>
-<p>Users running XKeyIM as their input method never saw the feature work.</p>
+<p>feat: dual event tap for remote desktop Vietnamese input support</p>
 <ul>
-<li>Add upperCaseFirstChar property to XKeyIMSettings</li>
-<li>Read XKey.upperCaseFirstChar from plist in reload()</li>
-<li>Forward to engine in applySettings()</li>
+<li>Add secondary session-level tap to capture remote desktop events</li>
 </ul>
-<p>Also added the missing updateUpperCaseStatus("\n") call in the Enter</p>
-<p>handler before engine.resetWithCursorMoved().</p>
-<p>State hygiene</p>
-<p>-------------</p>
-<p>VNEngineSettings.updateSettings() now clears upperCaseStatus when the</p>
-<p>feature is toggled off, preventing stale pending status from leaking</p>
-<p>into future typing if the user re-enables the feature later.</p>
-<p>Feature scope expanded</p>
-<p>----------------------</p>
-<p>updateUpperCaseStatus() now treats "?" and "!" as sentence-ending</p>
-<p>punctuation in addition to ".". Previously only "." triggered</p>
-<p>capitalize even though "?" and "!" are semantically equivalent.</p>
-<p>Test coverage</p>
-<p>-------------</p>
-<p>New file XKeyTests/VNEngineAutoCapitalizeTests.swift with 15 tests:</p>
+<p>  that bypass HID-level tap (enables Vietnamese typing on Machine B</p>
+<p>  when accessed via RustDesk, TeamViewer, Jump Desktop, etc.)</p>
 <ul>
-<li>Happy paths: . ? ! and \n with/without intervening spaces</li>
-<li>Negative paths: , space alone, feature disabled</li>
-<li>State transitions: reset by non-space, only first char caps</li>
-<li>Regression guards for bugs #5 (macro path) and state-leak</li>
+<li>Add kXKeyHIDSeenMarker for deduplication between HID and session taps</li>
+<li>Restore clean eventSourceUserData before passing to downstream apps</li>
+<li>Add comprehensive passthrough list for remote desktop clients</li>
+<li>Use case-insensitive bundle ID matching for passthrough robustness</li>
+<li>Update build version to 20260519</li>
 </ul>
-<p>  (toggle off then on must not leak pending status)</p>
-<p>All 391 tests in the full suite pass. Both XKey main app and XKeyIM</p>
-<p>targets build successfully.</p>
-<p>Files changed</p>
-<p>-------------</p>
-<p>XKey/Core/Engine/VNEngine.swift</p>
-<p>XKey/Core/Engine/VNEngineSettings.swift</p>
-<p>XKeyIM/XKeyIMController.swift</p>
-<p>XKeyTests/VNEngineAutoCapitalizeTests.swift  (new)</p>
-<p>XKey.xcodeproj/project.pbxproj</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260512">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.21-20260519">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 12 May 2026 07:07:41 +0000</pubDate>
+      <pubDate>Tue, 19 May 2026 14:07:43 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260512/XKey.dmg" sparkle:version="20260512" sparkle:shortVersionString="1.2.21" length="10690406" type="application/octet-stream" sparkle:edSignature="wkQppGemHm5dQZvxLEJB3k4a7nu/Q0hoMeNqUT27p5K+aDH00SUh4792ksYd/ATpyrdoDzG5MR7JmdqLrTiLDw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.21-20260519/XKey.dmg" sparkle:version="20260519" sparkle:shortVersionString="1.2.21" length="10706630" type="application/octet-stream" sparkle:edSignature="ZjTRRHKJ3rf9bHS3h2412SdX72eI1VuVE9BWXw+EivTEYdyaZdk2/QtS0rua8zUEK0SyqT7wZ66Xg83Cefz0Bw==" />
     </item>
   </channel>
 </rss>
