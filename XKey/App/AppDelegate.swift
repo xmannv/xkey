@@ -198,6 +198,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         AppBehaviorDetector.shared.overlayAppNameProvider = {
             return OverlayAppDetector.shared.getVisibleOverlayAppName()
         }
+
+        // Inject remoteDesktopInjectMode preference (Shared module can't see SharedSettings)
+        AppBehaviorDetector.shared.remoteDesktopInjectModeProvider = {
+            return SharedSettings.shared.remoteDesktopInjectMode
+        }
         
         // Connect debug logging from AppBehaviorDetector to Debug Window
         AppBehaviorDetector.shared.debugLogCallback = { [weak self] message in

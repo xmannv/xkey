@@ -80,6 +80,9 @@ enum SharedSettingsKey: String {
     case exclusionRulesEnabled = "XKey.exclusionRulesEnabled"
     case toggleExclusionHotkeyCode = "XKey.toggleExclusionHotkeyCode"
     case toggleExclusionHotkeyModifiers = "XKey.toggleExclusionHotkeyModifiers"
+
+    // Remote desktop injection mode
+    case remoteDesktopInjectMode = "XKey.remoteDesktopInjectMode"
     
     // Window Title Rules toggle
     case windowTitleRulesEnabled = "XKey.windowTitleRulesEnabled"
@@ -754,6 +757,14 @@ class SharedSettings {
         }
     }
 
+    var remoteDesktopInjectMode: Bool {
+        get { readBool(forKey: SharedSettingsKey.remoteDesktopInjectMode.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.remoteDesktopInjectMode.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
     var toggleExclusionHotkeyCode: UInt16 {
         get { UInt16(readInt(forKey: SharedSettingsKey.toggleExclusionHotkeyCode.rawValue)) }
         set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleExclusionHotkeyCode.rawValue) }
@@ -1152,6 +1163,7 @@ class SharedSettings {
             prefs.excludedApps = apps
         }
         prefs.exclusionRulesEnabled = exclusionRulesEnabled
+        prefs.remoteDesktopInjectMode = remoteDesktopInjectMode
         let exclHotkeyCode = toggleExclusionHotkeyCode
         let exclHotkeyModifiers = toggleExclusionHotkeyModifiers
         if exclHotkeyCode != 0 || exclHotkeyModifiers != 0 {
@@ -1308,6 +1320,7 @@ class SharedSettings {
         exclusionRulesEnabled = prefs.exclusionRulesEnabled
         toggleExclusionHotkeyCode = prefs.toggleExclusionHotkey.keyCode
         toggleExclusionHotkeyModifiers = prefs.toggleExclusionHotkey.modifiers.rawValue
+        remoteDesktopInjectMode = prefs.remoteDesktopInjectMode
 
         // Window Title Rules toggle
         windowTitleRulesEnabled = prefs.windowTitleRulesEnabled

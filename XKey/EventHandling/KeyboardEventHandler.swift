@@ -807,34 +807,28 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
     // MARK: - Excluded Apps Check
     
-    /// Apps that should always pass through all keys (remote devices handle input)
-    private static let passthroughApps: Set<String> = [
+    /// Apps that ALWAYS pass through all keys regardless of user setting.
+    /// Currently only iOS Simulator — iOS handles its own input internally.
+    private static let alwaysPassthroughApps: Set<String> = [
         // "com.apple.screencontinuity",  // iPhone Mirroring - iOS device handles text input
         "com.apple.iphonesimulator",   // Simulator - iOS simulator handles text input
-        
-        // Remote Desktop apps - Vietnamese processing should happen on the remote machine
-        // XKey's backspace+inject pattern gets disrupted over network latency
-        // NOTE: All IDs must be lowercase (compared via bundleId.lowercased())
-        "com.p5sys.jump.mac.viewer",   // Jump Desktop
-        "com.microsoft.rdc.macos",     // Microsoft Remote Desktop
-        "com.apple.remotedesktop",     // Apple Remote Desktop
-        "com.carriez.rustdesk",        // RustDesk
-        "com.teamviewer.teamviewer",   // TeamViewer
-        "com.philandro.anydesk",       // AnyDesk
-        "com.parsecgaming.parsec",     // Parsec
-        "com.moonlight-stream.moonlight", // Moonlight
-        "com.zuler.deskin",            // DeskIn
-        "com.youqu.todesk",            // ToDesk
-        "com.oray.sunloginc",          // Sunlogin (向日葵)
-        "com.splashtop.personal",      // Splashtop Personal
-        "com.nomachine.nxplayer",      // NoMachine
-        "com.realvnc.vncviewer",       // RealVNC Viewer
-        "com.edovia.screens5",         // Screens 5
-        "com.citrix.receiver.nomas",   // Citrix Workspace
-        "com.vmware.horizon",          // VMware Horizon
-        "com.vmware.fusion",           // VMware Fusion
-        "com.parallels.desktop.console", // Parallels Desktop
     ]
+
+    /// Check if an app should be in passthrough mode.
+    /// Always passthrough: alwaysPassthroughApps (iOS Simulator).
+    /// Conditionally passthrough: remote desktop clients — when
+    /// `remoteDesktopInjectMode` is OFF (default), remote desktop apps pass through
+    /// so the remote machine handles Vietnamese input. When ON, XKey injects
+    /// Vietnamese via clipboard paste into the remote desktop client.
+    private func isPassthroughApp(bundleId: String) -> Bool {
+        let id = bundleId.lowercased()
+        if Self.alwaysPassthroughApps.contains(id) { return true }
+        if RemoteDesktopBundleIds.all.contains(id) {
+            // Passthrough unless user opted into inject mode
+            return !SharedSettings.shared.remoteDesktopInjectMode
+        }
+        return false
+    }
     
     /// Check if the current frontmost app is in the excluded list
     /// IMPORTANT: Overlay apps (Spotlight, Raycast, Alfred) are NEVER excluded,
@@ -864,9 +858,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return false
         }
         
-        // Always exclude passthrough apps (iPhone Mirroring, etc.)
-        // Case-insensitive: bundle IDs can vary between app versions
-        if Self.passthroughApps.contains(bundleId.lowercased()) {
+        // Exclude passthrough apps (iOS Simulator + remote desktop clients when
+        // remoteDesktopInjectMode is disabled). Case-insensitive bundle ID match.
+        if isPassthroughApp(bundleId: bundleId) {
             return true
         }
         

@@ -89,6 +89,14 @@ struct Preferences: Codable {
     var excludedApps: [ExcludedApp] = []
     var exclusionRulesEnabled: Bool = true          // Master switch for exclusion rules (can be toggled via hotkey)
     var toggleExclusionHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
+
+    // Remote desktop injection mode (experimental)
+    // false (default): remote desktop apps (RustDesk/TeamViewer/etc) are in passthrough —
+    //                  Vietnamese typing handled by IME on remote machine.
+    // true: XKey injects Vietnamese into remote desktop apps via clipboard paste,
+    //       so the remote machine receives final Vietnamese text. Useful when remote
+    //       machine has no Vietnamese IME available.
+    var remoteDesktopInjectMode: Bool = false
     
     // Window Title Rules toggle
     var windowTitleRulesEnabled: Bool = true         // Master switch for Window Title Rules (can be toggled via hotkey)

@@ -15,12 +15,29 @@ class EventTapManager {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var sessionEventTap: CFMachPort?       // Secondary tap for remote desktop input
+    private var sessionEventTap: CFMachPort?       // Secondary tap for remote desktop input (lazy)
     private var sessionRunLoopSource: CFRunLoopSource?
     private var isEnabled = false
     private var isHIDTapActive = false             // True if primary tap is at HID level
     private var isSuspended = false  // Track suspension state for IMKit mode
     private var isHotkeyRecording = false  // Track if hotkey recording is in progress
+
+    // Saved session tap creation parameters — used to lazy-create when a remote
+    // desktop app becomes frontmost. Populated once during start().
+    // All access happens on the main thread (NSWorkspace activation observer
+    // is registered with `queue: .main`, and start()/stop() are invoked on main).
+    private var sessionEventTapCallback: CGEventTapCallBack?
+    private var sessionEventTapUserInfo: UnsafeMutableRawPointer?
+    private var sessionEventTapMask: CGEventMask = 0
+    private var remoteDesktopActivationObserver: NSObjectProtocol?
+
+    /// Token for the block-based hotkey-recording notification observer.
+    /// Stored so deinit can remove it explicitly (block observers ignore
+    /// `removeObserver(self)`).
+    private var hotkeyRecordingObserver: NSObjectProtocol?
+
+    // Bundle IDs of remote desktop apps: see `RemoteDesktopBundleIds.all` in
+    // Shared/AppBehaviorDetector.swift (single source of truth).
     
     // Multi-user session tracking
     // When another macOS user session is active (Fast User Switching),
@@ -106,8 +123,10 @@ class EventTapManager {
     // MARK: - Initialization
     
     init() {
-        // Observe hotkey recording state to suspend hotkey processing
-        NotificationCenter.default.addObserver(
+        // Observe hotkey recording state to suspend hotkey processing.
+        // Block-based observer returns a token that MUST be stored for later removal —
+        // NotificationCenter.removeObserver(self) only removes selector-based observers.
+        hotkeyRecordingObserver = NotificationCenter.default.addObserver(
             forName: .hotkeyRecordingStateChanged,
             object: nil,
             queue: .main
@@ -117,14 +136,16 @@ class EventTapManager {
                 self?.debugLogCallback?("🎹 Hotkey recording: \(isRecording ? "STARTED" : "STOPPED")")
             }
         }
-        
+
         // Setup multi-user session monitoring
         setupSessionMonitoring()
     }
-    
+
     deinit {
         removeSessionMonitoring()
-        NotificationCenter.default.removeObserver(self)
+        if let obs = hotkeyRecordingObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
         stop()
     }
     
@@ -240,30 +261,19 @@ class EventTapManager {
         CGEvent.tapEnable(tap: tap, enable: true)
         debugLogCallback?("Primary event tap enabled")
 
-        // DUAL TAP: Create secondary session-level tap for remote desktop input
-        // Only needed when primary tap is at HID level (session-level primary already sees all events)
-        if isHIDTapActive {
-            let sTap = CGEvent.tapCreate(
-                tap: .cgSessionEventTap,
-                place: .headInsertEventTap,
-                options: .defaultTap,
-                eventsOfInterest: eventMask,
-                callback: sessionCallback,
-                userInfo: userInfo
-            )
-            
-            if let sTap = sTap {
-                sessionEventTap = sTap
-                sessionRunLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, sTap, 0)
-                if let sSource = sessionRunLoopSource {
-                    CFRunLoopAddSource(CFRunLoopGetCurrent(), sSource, .commonModes)
-                    CGEvent.tapEnable(tap: sTap, enable: true)
-                    debugLogCallback?("Session tap created (dual tap for remote desktop support)")
-                }
-            } else {
-                debugLogCallback?("⚠️ Session tap creation failed - remote desktop input won't be processed")
-            }
-        }
+        // DUAL TAP (dynamic): session-level tap is created LAZILY only when a
+        // remote desktop app becomes frontmost (RustDesk/TeamViewer/Jump/etc).
+        // Reason: keeping the session tap always-active interferes with synthetic
+        // event delivery in Chromium-based apps (Notion code block, Kiro CLI).
+        // Even with marker pass-through, the tap's presence at .headInsertEventTap
+        // alters timing/ordering enough to break injection.
+        // See `setupRemoteDesktopActivationHook()` + `updateSessionTapForFrontmostApp()`.
+        sessionEventTapCallback = sessionCallback
+        sessionEventTapUserInfo = userInfo
+        sessionEventTapMask = eventMask
+        setupRemoteDesktopActivationHook()
+        // Check current frontmost app at startup (in case remote desktop is already active)
+        updateSessionTapForFrontmostApp()
 
         isEnabled = true
         debugLogCallback?("Event tap fully started!")
@@ -271,6 +281,9 @@ class EventTapManager {
 
     func stop() {
         guard isEnabled else { return }
+
+        // Remove NSWorkspace observer so we don't create new session taps mid-stop
+        removeRemoteDesktopActivationHook()
 
         // Stop primary tap
         if let tap = eventTap {
@@ -283,22 +296,18 @@ class EventTapManager {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
             runLoopSource = nil
         }
-        
-        // Stop session tap (dual tap)
-        if let sTap = sessionEventTap {
-            CGEvent.tapEnable(tap: sTap, enable: false)
-            CFMachPortInvalidate(sTap)
-            sessionEventTap = nil
-        }
-        
-        if let sSource = sessionRunLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), sSource, .commonModes)
-            sessionRunLoopSource = nil
-        }
-        
+
+        // Stop session tap (dynamic — may not exist if no remote desktop was active)
+        destroySessionTapIfExists()
+
+        // Clear cached session tap creation params
+        sessionEventTapCallback = nil
+        sessionEventTapUserInfo = nil
+        sessionEventTapMask = 0
+
         isHIDTapActive = false
         isEnabled = false
-        
+
         debugLogCallback?("Event tap stopped")
     }
     
@@ -958,6 +967,105 @@ class EventTapManager {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         sessionObservers.removeAll()
+    }
+
+    // MARK: - Dynamic Session Tap (Remote Desktop)
+    //
+    // The session-level event tap is needed for remote desktop apps because their
+    // virtual keyboard events bypass the HID tap and arrive at session level.
+    // Keeping it always-active interferes with synthetic event delivery in
+    // Chromium-based apps (Notion code block, Kiro CLI) — see comment in start().
+    //
+    // Strategy: install the tap ONLY while a remote desktop app is frontmost.
+    // NSWorkspace fires didActivateApplicationNotification on every app switch;
+    // we react by creating or destroying the tap accordingly.
+
+    /// Register NSWorkspace observer for app activation changes.
+    private func setupRemoteDesktopActivationHook() {
+        let center = NSWorkspace.shared.notificationCenter
+        remoteDesktopActivationObserver = center.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateSessionTapForFrontmostApp()
+        }
+    }
+
+    /// Tear down NSWorkspace observer.
+    private func removeRemoteDesktopActivationHook() {
+        if let obs = remoteDesktopActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(obs)
+            remoteDesktopActivationObserver = nil
+        }
+    }
+
+    /// Check current frontmost app and reconcile session tap state.
+    /// Called on app-activation events (NSWorkspace observer, main queue) and
+    /// once at startup. Must be invoked on the main thread because it manipulates
+    /// the main run loop and queries NSWorkspace.
+    private func updateSessionTapForFrontmostApp() {
+        let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier?.lowercased() ?? ""
+        let isRemote = RemoteDesktopBundleIds.all.contains(bundleId)
+
+        if isRemote {
+            createSessionTapIfNeeded()
+        } else {
+            destroySessionTapIfExists()
+        }
+    }
+
+    /// Install the session-level secondary tap (if not already installed).
+    /// Only meaningful when the primary tap is at HID level.
+    /// Must be called on the main thread.
+    private func createSessionTapIfNeeded() {
+        guard isHIDTapActive else { return }
+        guard sessionEventTap == nil else { return }
+        guard let callback = sessionEventTapCallback,
+              let userInfo = sessionEventTapUserInfo else { return }
+
+        guard let sTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: sessionEventTapMask,
+            callback: callback,
+            userInfo: userInfo
+        ) else {
+            debugLogCallback?("⚠️ Session tap creation failed")
+            return
+        }
+
+        guard let runLoop = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, sTap, 0) else {
+            // Run loop source creation failed — invalidate the orphaned tap so it doesn't leak
+            debugLogCallback?("⚠️ Session tap run loop source creation failed")
+            CFMachPortInvalidate(sTap)
+            return
+        }
+
+        sessionEventTap = sTap
+        sessionRunLoopSource = runLoop
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoop, .commonModes)
+        CGEvent.tapEnable(tap: sTap, enable: true)
+        let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+        debugLogCallback?("🌐 Session tap created (remote desktop frontmost: \(bundleId))")
+    }
+
+    /// Tear down the session-level secondary tap if installed.
+    /// Idempotent: safe to call multiple times. Must be invoked on the main thread.
+    private func destroySessionTapIfExists() {
+        guard sessionEventTap != nil || sessionRunLoopSource != nil else { return }
+
+        if let sSource = sessionRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), sSource, .commonModes)
+            sessionRunLoopSource = nil
+        }
+        if let sTap = sessionEventTap {
+            CGEvent.tapEnable(tap: sTap, enable: false)
+            CFMachPortInvalidate(sTap)
+            sessionEventTap = nil
+        }
+        debugLogCallback?("🌐 Session tap destroyed (no remote desktop frontmost)")
     }
     
     /// Check if current session is the active console session

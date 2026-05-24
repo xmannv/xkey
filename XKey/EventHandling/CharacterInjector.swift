@@ -865,33 +865,83 @@ class CharacterInjector {
         sendTextOneByOneInternal(text, delay: delay, proxy: proxy, useDirectPost: false)
     }
     
-    /// Send text via clipboard paste (Cmd+V)
-    /// Used for TUI apps (like Kiro CLI) that drop CGEvent Unicode characters.
-    /// The terminal wraps pasted text in bracketed paste sequences (\e[200~...\e[201~),
-    /// ensuring the TUI receives all text atomically in a single paste event.
+    /// Send text via clipboard paste (Cmd+V).
+    /// Used for TUI apps (like Kiro CLI) and remote desktop clients that need
+    /// clipboard-based input instead of raw Unicode CGEvents.
+    ///
+    /// USES .combinedSessionState EVENT SOURCE: remote desktop clients (RustDesk
+    /// in particular) check the system-wide modifier state in addition to event
+    /// flags. Synthetic events from .privateState don't update session/global
+    /// modifier state, so RustDesk strips the Cmd modifier and forwards just V
+    /// to the remote (e.g. "thuw" → "thv"). Posting from a .combinedSessionState
+    /// source plus explicit Cmd key down → V → Cmd up sequence depresses the
+    /// modifier at session level so RustDesk forwards Cmd+V correctly.
+    /// Only the paste sequence uses this source — all other injection paths
+    /// keep .privateState (avoids cross-app side effects).
     ///
     /// NOTE: Clipboard is NOT restored after paste to avoid race conditions when typing fast.
-    /// (Next user Cmd+C will overwrite naturally)
     private func sendTextViaPaste(_ text: String, proxy: CGEventTapProxy, config: PasteConfig = PasteConfig()) {
         let pasteboard = NSPasteboard.general
-        
+
         // Set clipboard to replacement text
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        
+
         debugCallback?("    → Paste: set clipboard = '\(text)'")
-        
-        // Wait for pasteboard server to commit data
+
+        // Wait for pasteboard server to commit data (and remote desktop clipboard sync)
         usleep(config.prePasteDelay)
-        
-        // Send paste key (Cmd+V or Ctrl+V depending on config)
-        sendKeyPress(CGKeyCode(config.pasteKeyCode), proxy: proxy, useDirectPost: config.useDirectPost, modifiers: config.pasteModifiers)
-        
-        debugCallback?("    → Paste: sent paste key (directPost=\(config.useDirectPost))")
-        
+
+        // Determine modifier key code from config (default Cmd, alt Ctrl)
+        // 0x37 = Left Cmd, 0x3B = Left Ctrl
+        let modifierKeyCode: CGKeyCode = config.pasteModifiers.contains(.maskControl) ? 0x3B : 0x37
+
+        // Use combinedSessionState ONLY for paste — affects session modifier state
+        // so remote desktop clients see the modifier as actually held.
+        guard let pasteSource = CGEventSource(stateID: .combinedSessionState) else {
+            debugCallback?("    → Paste: FAILED to create combinedSessionState event source")
+            usleep(config.postPasteDelay)
+            return
+        }
+
+        let postPaste: (CGEvent) -> Void = { event in
+            event.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
+            if config.useDirectPost {
+                event.post(tap: .cgSessionEventTap)
+            } else {
+                event.tapPostEvent(proxy)
+            }
+        }
+
+        // 1. Modifier key DOWN (e.g. Cmd) — depresses modifier at session level
+        if let modDown = CGEvent(keyboardEventSource: pasteSource, virtualKey: modifierKeyCode, keyDown: true) {
+            modDown.flags = config.pasteModifiers
+            postPaste(modDown)
+        }
+        usleep(2000)  // 2ms — let session modifier state settle
+
+        // 2. Paste key (V) DOWN+UP with modifier flag
+        if let vDown = CGEvent(keyboardEventSource: pasteSource, virtualKey: CGKeyCode(config.pasteKeyCode), keyDown: true) {
+            vDown.flags = config.pasteModifiers
+            postPaste(vDown)
+        }
+        if let vUp = CGEvent(keyboardEventSource: pasteSource, virtualKey: CGKeyCode(config.pasteKeyCode), keyDown: false) {
+            vUp.flags = config.pasteModifiers
+            postPaste(vUp)
+        }
+        usleep(2000)
+
+        // 3. Modifier key UP — release modifier
+        if let modUp = CGEvent(keyboardEventSource: pasteSource, virtualKey: modifierKeyCode, keyDown: false) {
+            modUp.flags = []
+            postPaste(modUp)
+        }
+
+        debugCallback?("    → Paste: sent Cmd+V via combinedSessionState (directPost=\(config.useDirectPost))")
+
         // Wait for app to read clipboard and process paste
         usleep(config.postPasteDelay)
-        
+
         debugCallback?("    → Paste: done")
     }
     
