@@ -14,7 +14,7 @@ class GoogleTranslateProvider: TranslationProvider {
     
     let id = "google_translate"
     let name = "Google Translate"
-    let description = "Dịch bằng Google Translate (miễn phí, có giới hạn)"
+    var description: String { String(localized: "Dịch bằng Google Translate (miễn phí, có giới hạn)") }
     
     var isEnabled: Bool = true
     

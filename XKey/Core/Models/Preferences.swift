@@ -8,6 +8,41 @@
 import Foundation
 import Cocoa
 
+enum AppLanguage: String, Codable, CaseIterable {
+    case system = "system"
+    case vi = "vi"
+    case en = "en"
+    case zhHans = "zh-Hans"
+
+    var displayName: String {
+        switch self {
+        case .system: return String(localized: "Theo hệ thống")
+        case .vi: return "Tiếng Việt"
+        case .en: return "English"
+        case .zhHans: return "简体中文"
+        }
+    }
+
+    var localeIdentifier: String? {
+        switch self {
+        case .system: return nil
+        case .vi: return "vi"
+        case .en: return "en"
+        case .zhHans: return "zh-Hans"
+        }
+    }
+
+    static func applyLanguage() {
+        let saved = UserDefaults.standard.string(forKey: "appLanguage") ?? "system"
+        let lang = AppLanguage(rawValue: saved) ?? .system
+        if let locale = lang.localeIdentifier {
+            UserDefaults.standard.set([locale], forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+    }
+}
+
 enum MenuBarIconStyle: String, Codable, CaseIterable {
     case x = "X"
     case v = "V"
@@ -15,8 +50,8 @@ enum MenuBarIconStyle: String, Codable, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .x: return "Chữ X"
-        case .v: return "Chữ V"
+        case .x: return String(localized: "Chữ X")
+        case .v: return String(localized: "Chữ V")
         case .emoji: return "Emoji 🇻🇳 / 🇬🇧"
         }
     }
@@ -83,6 +118,7 @@ struct Preferences: Codable {
     var showDockIcon: Bool = false               // Show icon in Dock (menu bar always visible)
     var startAtLogin: Bool = false
     var menuBarIconStyle: MenuBarIconStyle = .x  // Icon style for menubar
+    var appLanguage: AppLanguage = .system
     var autoCheckForUpdates: Bool = true
     
     // Excluded apps - apps where Vietnamese input is disabled

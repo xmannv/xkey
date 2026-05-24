@@ -218,8 +218,8 @@ class XKeyIMUpdateManager {
             guard granted else { return }
             
             let content = UNMutableNotificationContent()
-            content.title = "XKeyIM đã được cập nhật"
-            content.body = "Phiên bản \(version) đã được cài đặt.\n\nVui lòng chuyển sang input method khác rồi quay lại XKey để áp dụng."
+            content.title = String(localized: "XKeyIM đã được cập nhật")
+            content.body = String(localized: "Phiên bản \(version) đã được cài đặt.\n\nVui lòng chuyển sang input method khác rồi quay lại XKey để áp dụng.")
             content.sound = .default
             
             let request = UNNotificationRequest(identifier: "xkeyim-update-\(version)", content: content, trigger: nil)

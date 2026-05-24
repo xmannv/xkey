@@ -88,8 +88,8 @@ class IMKitHelper {
         // Get XKeyIM from app bundle Resources
         guard let xkeyIMSource = Bundle.main.path(forResource: "XKeyIM", ofType: "app") else {
             showAlert(
-                title: "Không tìm thấy XKeyIM",
-                message: "XKeyIM.app không có trong bundle. Vui lòng tải phiên bản đầy đủ từ GitHub."
+                title: String(localized: "Không tìm thấy XKeyIM"),
+                message: String(localized: "XKeyIM.app không có trong bundle. Vui lòng tải phiên bản đầy đủ từ GitHub.")
             )
             return
         }
@@ -120,8 +120,8 @@ class IMKitHelper {
             registerInputSource(at: destinationPath)
             
             showAlert(
-                title: "Cài đặt thành công",
-                message: "XKeyIM đã được cài đặt.\n\nVui lòng vào System Settings → Keyboard → Input Sources để bật XKey Vietnamese."
+                title: String(localized: "Cài đặt thành công"),
+                message: String(localized: "XKeyIM đã được cài đặt.\n\nVui lòng vào System Settings → Keyboard → Input Sources để bật XKey Vietnamese.")
             )
             
             // Open Input Sources settings
@@ -140,21 +140,13 @@ class IMKitHelper {
         
         while shouldContinue {
             let alert = NSAlert()
-            alert.messageText = "Cài đặt thủ công XKeyIM"
-            alert.informativeText = """
-            Do giới hạn bảo mật, XKey không thể tự động cài đặt XKeyIM.
-            
-            Vui lòng làm theo các bước sau:
-            1. Nhấn "Mở XKeyIM" để hiển thị XKeyIM.app
-            2. Nhấn "Mở Input Methods" để mở thư mục đích
-            3. Kéo thả XKeyIM.app vào thư mục Input Methods
-            4. Nhấn "Mở Input Sources" để thêm XKey Vietnamese
-            """
+            alert.messageText = String(localized: "Cài đặt thủ công XKeyIM")
+            alert.informativeText = String(localized: "Do giới hạn bảo mật, XKey không thể tự động cài đặt XKeyIM.\n\nVui lòng làm theo các bước sau:\n1. Nhấn \"Mở XKeyIM\" để hiển thị XKeyIM.app\n2. Nhấn \"Mở Input Methods\" để mở thư mục đích\n3. Kéo thả XKeyIM.app vào thư mục Input Methods\n4. Nhấn \"Mở Input Sources\" để thêm XKey Vietnamese")
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Mở XKeyIM")
-            alert.addButton(withTitle: "Mở Input Methods")
-            alert.addButton(withTitle: "Mở Input Sources")
-            alert.addButton(withTitle: "Đóng")
+            alert.addButton(withTitle: String(localized: "Mở XKeyIM"))
+            alert.addButton(withTitle: String(localized: "Mở Input Methods"))
+            alert.addButton(withTitle: String(localized: "Mở Input Sources"))
+            alert.addButton(withTitle: String(localized: "Đóng"))
             
             let response = alert.runModal()
             
@@ -198,13 +190,13 @@ class IMKitHelper {
             try FileManager.default.removeItem(atPath: path)
             
             showAlert(
-                title: "Gỡ cài đặt thành công",
-                message: "XKeyIM đã được gỡ bỏ."
+                title: String(localized: "Gỡ cài đặt thành công"),
+                message: String(localized: "XKeyIM đã được gỡ bỏ.")
             )
         } catch {
             showAlert(
-                title: "Lỗi",
-                message: "Không thể gỡ XKeyIM: \(error.localizedDescription)"
+                title: String(localized: "Lỗi"),
+                message: String(localized: "Không thể gỡ XKeyIM: \(error.localizedDescription)")
             )
         }
     }

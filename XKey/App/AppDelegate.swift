@@ -2586,7 +2586,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get selected text or full value via AX (with source info)
         guard let textResult = service.getSelectedTextWithSource(), !textResult.text.isEmpty else {
             debugWindowController?.logEvent("   No text to translate")
-            showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
+            showTranslationNotification(message: String(localized: "Không có text để dịch. Hãy chọn text hoặc focus vào input."))
             return
         }
         
@@ -2657,7 +2657,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 replaceSucceeded = true
             } else {
                 debugWindowController?.logEvent("   [\(logPrefix)] Could not replace text in this application")
-                showTranslationNotification(message: "Không thể thay thế text trong ứng dụng này")
+                showTranslationNotification(message: String(localized: "Không thể thay thế text trong ứng dụng này"))
             }
         }
         
@@ -2700,24 +2700,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Convert translation error to user-friendly Vietnamese message
     private func translationErrorMessage(for error: Error) -> String {
         guard let translationError = error as? TranslationError else {
-            return "Lỗi dịch: \(error.localizedDescription)"
+            return String(localized: "Lỗi dịch: \(error.localizedDescription)")
         }
-        
+
         switch translationError {
         case .providerDisabled:
-            return "Không có nhà cung cấp dịch nào khả dụng. Vui lòng bật ít nhất một nhà cung cấp trong Thiết lập → Dịch thuật."
+            return String(localized: "Không có nhà cung cấp dịch nào khả dụng. Vui lòng bật ít nhất một nhà cung cấp trong Thiết lập → Dịch thuật.")
         case .networkError:
-            return "Lỗi kết nối mạng. Vui lòng kiểm tra kết nối Internet."
+            return String(localized: "Lỗi kết nối mạng. Vui lòng kiểm tra kết nối Internet.")
         case .rateLimited:
-            return "Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau."
+            return String(localized: "Đã vượt quá giới hạn yêu cầu. Vui lòng thử lại sau.")
         case .invalidResponse:
-            return "Nhà cung cấp dịch trả về kết quả không hợp lệ. Vui lòng thử lại."
+            return String(localized: "Nhà cung cấp dịch trả về kết quả không hợp lệ. Vui lòng thử lại.")
         case .emptyText:
-            return "Không có text để dịch."
+            return String(localized: "Không có text để dịch.")
         case .unsupportedLanguage:
-            return "Ngôn ngữ này chưa được hỗ trợ bởi nhà cung cấp dịch."
+            return String(localized: "Ngôn ngữ này chưa được hỗ trợ bởi nhà cung cấp dịch.")
         case .unknown(let message):
-            return "Lỗi dịch: \(message)"
+            return String(localized: "Lỗi dịch: \(message)")
         }
     }
 
@@ -2764,7 +2764,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get selected text or full value via AX (with source info)
         guard let textResult = service.getSelectedTextWithSource(), !textResult.text.isEmpty else {
             debugWindowController?.logEvent("   No text to translate")
-            showTranslationNotification(message: "Không có text để dịch. Hãy chọn text hoặc focus vào input.")
+            showTranslationNotification(message: String(localized: "Không có text để dịch. Hãy chọn text hoặc focus vào input."))
             return
         }
         
@@ -2913,7 +2913,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DebugLogger.shared.log("Exclusion rules toggled: \(state)")
 
         // Visual HUD feedback
-        ToggleHUDWindow.shared.show(title: "Loại trừ ứng dụng", isEnabled: newValue)
+        ToggleHUDWindow.shared.show(title: String(localized: "Loại trừ ứng dụng"), isEnabled: newValue)
     }
 
     // MARK: - Toggle Window Title Rules Hotkey
@@ -2967,7 +2967,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DebugLogger.shared.log("Window Title Rules toggled: \(state)")
 
         // Visual HUD feedback
-        ToggleHUDWindow.shared.show(title: "Hiệu chỉnh Engine", isEnabled: newValue)
+        ToggleHUDWindow.shared.show(title: String(localized: "Hiệu chỉnh Engine"), isEnabled: newValue)
     }
 }
 

@@ -91,7 +91,7 @@ struct GeneralSection: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(InputMethod.allCases, id: \.self) { method in
                             SettingsRadioButton(
-                                title: method.displayName,
+                                title: LocalizedStringKey(method.displayName),
                                 isSelected: viewModel.preferences.inputMethod == method
                             ) {
                                 viewModel.preferences.inputMethod = method
@@ -110,7 +110,7 @@ struct GeneralSection: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ForEach(supportedCodeTables, id: \.self) { table in
                             SettingsRadioButton(
-                                title: table.displayName,
+                                title: LocalizedStringKey(table.displayName),
                                 isSelected: viewModel.preferences.codeTable == table
                             ) {
                                 viewModel.preferences.codeTable = table

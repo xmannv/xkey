@@ -22,8 +22,8 @@ class SecureInputOverlay {
     func show(appName: String) {
         overlay.show(
             content: AnyView(OverlayWarningView(
-                title: "Secure Input đang bật",
-                subtitle: "\(appName) đang chặn XKey xử lý Tiếng Việt"
+                title: String(localized: "Secure Input đang bật"),
+                subtitle: String(localized: "\(appName) đang chặn XKey xử lý Tiếng Việt")
             )),
             position: .bottomCenter,
             autoHideAfter: 5.0

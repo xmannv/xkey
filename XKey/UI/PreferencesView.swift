@@ -87,7 +87,7 @@ struct PreferencesView: View {
                 VStack(spacing: 2) {
                     ForEach(PreferencesSection.allCases.filter { $0.isAvailable }) { section in
                         SidebarButton(
-                            title: section.rawValue,
+                            title: LocalizedStringKey(section.rawValue),
                             icon: section.icon,
                             isSelected: selectedSection == section
                         ) {
@@ -147,7 +147,7 @@ struct PreferencesView: View {
 
 /// Custom sidebar button compatible with macOS 12+
 private struct SidebarButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let isSelected: Bool
     let action: () -> Void

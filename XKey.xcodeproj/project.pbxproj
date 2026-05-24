@@ -137,6 +137,8 @@
 		TRRESULT001 /* TranslationResultOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRRESULT002 /* TranslationResultOverlay.swift */; };
 		TYPBUF001 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 		TYPBUF003 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
+		L10N00001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = L10N00002 /* Localizable.xcstrings */; };
+		LANG0001 /* AppLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LANG0002 /* AppLanguageTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -261,6 +263,8 @@
 		TRRESULT002 /* TranslationResultOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationResultOverlay.swift; sourceTree = "<group>"; };
 		TYPBUF002 /* TypingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBuffer.swift; sourceTree = "<group>"; };
 		VERSION0001 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		L10N00002 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		LANG0002 /* AppLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguageTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -412,6 +416,7 @@
 			children = (
 				100D2BDE2EF2C21800C26B87 /* XKeyRelease.entitlements */,
 				10133E5B2EF04B0C00BBE6AE /* Assets.xcassets */,
+				L10N00002 /* Localizable.xcstrings */,
 				101A444A2ED419E9003F9D05 /* Utilities */,
 				A5000004 /* App */,
 				A5000005 /* Core */,
@@ -548,6 +553,7 @@
 				TEST00028 /* VNEngineAutoCapitalizeTests.swift */,
 				2259E2E83868C7ADD9DD4FF3 /* SessionMonitoringTests.swift */,
 				82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */,
+				LANG0002 /* AppLanguageTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -644,12 +650,13 @@
 			};
 			buildConfigurationList = A7000002 /* Build configuration list for PBXProject "XKey" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = en;
+			developmentRegion = vi;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 				vi,
+				"zh-Hans",
 			);
 			mainGroup = A5000001;
 			packageReferences = (
@@ -679,6 +686,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				10133E5C2EF04B0C00BBE6AE /* Assets.xcassets in Resources */,
+				L10N00001 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -838,6 +846,7 @@
 				TEST00027 /* VNEngineAutoCapitalizeTests.swift in Sources */,
 				64C427CD211649CE8B7DDCE2 /* SessionMonitoringTests.swift in Sources */,
 				8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */,
+				LANG0001 /* AppLanguageTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

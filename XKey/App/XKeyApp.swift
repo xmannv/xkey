@@ -14,7 +14,7 @@ struct XKeyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
-        // XKeyApp initialized
+        AppLanguage.applyLanguage()
     }
 
     var body: some Scene {

@@ -61,7 +61,11 @@ struct SettingsView: View {
         NavigationSplitView {
             // Sidebar
             List(SettingsSection.allCases, selection: $selectedSection) { section in
-                Label(section.rawValue, systemImage: section.icon)
+                Label {
+                    Text(LocalizedStringKey(section.rawValue))
+                } icon: {
+                    Image(systemName: section.icon)
+                }
                     .tag(section)
             }
             .listStyle(.sidebar)

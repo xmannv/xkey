@@ -14,13 +14,20 @@ class PreferencesViewModel: ObservableObject {
     @Published var preferences: Preferences
 
     init() {
-        // Load from SharedSettings (plist file)
         self.preferences = SharedSettings.shared.loadPreferences()
+        if let savedLang = UserDefaults.standard.string(forKey: "appLanguage"),
+           let lang = AppLanguage(rawValue: savedLang) {
+            self.preferences.appLanguage = lang
+        }
     }
 
     func save() {
         // Save to SharedSettings (plist file)
         SharedSettings.shared.savePreferences(preferences)
+
+        // Sync app language to standalone UserDefaults key (read at launch before Preferences loads)
+        UserDefaults.standard.set(preferences.appLanguage.rawValue, forKey: "appLanguage")
+        AppLanguage.applyLanguage()
 
         // Apply launch at login setting
         setLaunchAtLogin(preferences.startAtLogin)

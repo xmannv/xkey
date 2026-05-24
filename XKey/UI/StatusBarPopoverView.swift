@@ -93,7 +93,7 @@ struct StatusBarPopoverView: View {
                 VStack(spacing: 1) {
                     ForEach(InputMethod.allCases, id: \.self) { method in
                         MenuRow(
-                            title: method.displayName,
+                            title: LocalizedStringKey(method.displayName),
                             isSelected: method == viewModel.currentInputMethod
                         ) {
                             viewModel.selectInputMethod(method)
@@ -137,7 +137,7 @@ struct StatusBarPopoverView: View {
                 VStack(spacing: 1) {
                     ForEach(supportedCodeTables, id: \.self) { table in
                         MenuRow(
-                            title: table.displayName,
+                            title: LocalizedStringKey(table.displayName),
                             isSelected: table == viewModel.currentCodeTable
                         ) {
                             viewModel.selectCodeTable(table)
@@ -225,7 +225,7 @@ private extension View {
 // MARK: - Menu Row (selectable with checkmark, macOS style)
 
 private struct MenuRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
 
@@ -262,7 +262,7 @@ private struct MenuRow: View {
 // MARK: - Action Row (clickable row with icon, macOS style)
 
 private struct ActionRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     var shortcut: String? = nil
     let action: () -> Void

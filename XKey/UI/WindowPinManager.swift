@@ -37,7 +37,7 @@ class WindowPinManager {
         button.contentTintColor = .systemBlue
         button.target = self
         button.action = #selector(togglePin)
-        button.toolTip = "Giữ cửa sổ luôn ở trên cùng"
+        button.toolTip = String(localized: "Giữ cửa sổ luôn ở trên cùng")
         
         // Add to title bar - position at top right
         if let titlebarView = window.standardWindowButton(.closeButton)?.superview {

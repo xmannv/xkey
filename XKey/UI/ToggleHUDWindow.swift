@@ -146,7 +146,7 @@ private struct ToggleHUDView: View {
                 .fixedSize(horizontal: true, vertical: false)
             
             // State
-            Text(viewModel.isEnabled ? "BẬT" : "TẮT")
+            Text(viewModel.isEnabled ? String(localized: "BẬT") : String(localized: "TẮT"))
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(viewModel.isEnabled ? .green : .orange)
         }

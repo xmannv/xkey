@@ -14,7 +14,7 @@ class VolcanoEngineProvider: TranslationProvider {
     
     let id = "volcano_engine"
     let name = "Volcano Engine"
-    let description = "Dịch bằng Volcano Engine - ByteDance (miễn phí, hỗ trợ tốt tiếng Trung)"
+    var description: String { String(localized: "Dịch bằng Volcano Engine - ByteDance (miễn phí, hỗ trợ tốt tiếng Trung)") }
     
     var isEnabled: Bool = true
     

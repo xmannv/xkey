@@ -802,7 +802,7 @@ struct AddRuleSheet: View {
             // Tab Selector
             Picker("", selection: $selectedTab) {
                 ForEach(RuleSheetTab.allCases, id: \.self) { tab in
-                    Text(tab.rawValue).tag(tab)
+                    Text(LocalizedStringKey(tab.rawValue)).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
@@ -1349,21 +1349,21 @@ struct AddRuleSheet: View {
     
     private func matchModeDisplayName(_ mode: WindowTitleMatchMode) -> String {
         switch mode {
-        case .contains: return "Chứa"
-        case .prefix: return "Bắt đầu bằng"
-        case .suffix: return "Kết thúc bằng"
-        case .exact: return "Khớp chính xác"
+        case .contains: return String(localized: "Chứa")
+        case .prefix: return String(localized: "Bắt đầu bằng")
+        case .suffix: return String(localized: "Kết thúc bằng")
+        case .exact: return String(localized: "Khớp chính xác")
         case .regex: return "Regex"
         }
     }
     
     private func matchModeDescription(_ mode: WindowTitleMatchMode) -> String {
         switch mode {
-        case .contains: return "Title cửa sổ chứa pattern (không phân biệt hoa/thường)"
-        case .prefix: return "Title cửa sổ bắt đầu bằng pattern"
-        case .suffix: return "Title cửa sổ kết thúc bằng pattern"
-        case .exact: return "Title cửa sổ khớp chính xác với pattern"
-        case .regex: return "Pattern là biểu thức Regular Expression"
+        case .contains: return String(localized: "Title cửa sổ chứa pattern (không phân biệt hoa/thường)")
+        case .prefix: return String(localized: "Title cửa sổ bắt đầu bằng pattern")
+        case .suffix: return String(localized: "Title cửa sổ kết thúc bằng pattern")
+        case .exact: return String(localized: "Title cửa sổ khớp chính xác với pattern")
+        case .regex: return String(localized: "Pattern là biểu thức Regular Expression")
         }
     }
     

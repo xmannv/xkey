@@ -10,7 +10,7 @@ import SwiftUI
 // MARK: - Settings Group
 
 struct SettingsGroup<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder let content: Content
     
     var body: some View {
@@ -30,7 +30,7 @@ struct SettingsGroup<Content: View>: View {
 // MARK: - Settings Radio Button
 
 struct SettingsRadioButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
     

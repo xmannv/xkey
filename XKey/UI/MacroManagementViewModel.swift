@@ -208,7 +208,7 @@ class MacroManagementViewModel: ObservableObject {
         
         let panel = NSOpenPanel()
         panel.title = "Import Macros"
-        panel.message = "Chọn file macro để import (định dạng: text=content mỗi dòng)"
+        panel.message = String(localized: "Chọn file macro để import (định dạng: text=content mỗi dòng)")
         panel.allowedContentTypes = [.text, .plainText]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -242,12 +242,12 @@ class MacroManagementViewModel: ObservableObject {
                 macros.sort { $0.text < $1.text }
                 saveMacros()
                 NotificationCenter.default.post(name: .macrosDidChange, object: nil)
-                showAlert(title: "Thành công", message: "Đã import \(importedCount) macro mới")
+                showAlert(title: String(localized: "Thành công"), message: String(localized: "Đã import \(importedCount) macro mới"))
             } else {
-                showAlert(title: "Thông báo", message: "Không có macro mới để import")
+                showAlert(title: String(localized: "Thông báo"), message: String(localized: "Không có macro mới để import"))
             }
         } catch {
-            showAlert(title: "Lỗi", message: "Không thể đọc file: \(error.localizedDescription)")
+            showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể đọc file: \(error.localizedDescription)"))
         }
     }
     
@@ -258,7 +258,7 @@ class MacroManagementViewModel: ObservableObject {
         }
         
         guard !macros.isEmpty else {
-            showAlert(title: "Thông báo", message: "Không có macro nào để export")
+            showAlert(title: String(localized: "Thông báo"), message: String(localized: "Không có macro nào để export"))
             return
         }
         
@@ -266,7 +266,7 @@ class MacroManagementViewModel: ObservableObject {
         
         let panel = NSSavePanel()
         panel.title = "Export Macros"
-        panel.message = "Lưu file macro"
+        panel.message = String(localized: "Lưu file macro")
         panel.nameFieldStringValue = "macros.txt"
         panel.allowedContentTypes = [.text, .plainText]
         panel.canCreateDirectories = true
@@ -282,9 +282,9 @@ class MacroManagementViewModel: ObservableObject {
                 return "\($0.text)=\(escapedContent)"
             })
             try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
-            showAlert(title: "Thành công", message: "Đã export \(macros.count) macro")
+            showAlert(title: String(localized: "Thành công"), message: String(localized: "Đã export \(macros.count) macro"))
         } catch {
-            showAlert(title: "Lỗi", message: "Không thể lưu file: \(error.localizedDescription)")
+            showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể lưu file: \(error.localizedDescription)"))
         }
     }
     

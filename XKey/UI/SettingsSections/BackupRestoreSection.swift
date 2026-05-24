@@ -157,13 +157,13 @@ struct BackupRestoreSection: View {
     
     private func exportSettings() {
         guard let data = SharedSettings.shared.exportSettings() else {
-            showAlert(title: "Lỗi", message: "Không thể export thiết lập")
+            showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể export thiết lập"))
             return
         }
-        
+
         let panel = NSSavePanel()
         panel.title = "Export Settings"
-        panel.message = "Lưu file thiết lập XKey"
+        panel.message = String(localized: "Lưu file thiết lập XKey")
         panel.nameFieldStringValue = SharedSettings.shared.getExportFileName()
         panel.allowedContentTypes = [.propertyList]
         panel.canCreateDirectories = true
@@ -171,9 +171,9 @@ struct BackupRestoreSection: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try data.write(to: url)
-                showAlert(title: "Thành công", message: "Đã export thiết lập thành công")
+                showAlert(title: String(localized: "Thành công"), message: String(localized: "Đã export thiết lập thành công"))
             } catch {
-                showAlert(title: "Lỗi", message: "Không thể lưu file: \(error.localizedDescription)")
+                showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể lưu file: \(error.localizedDescription)"))
             }
         }
     }
@@ -181,7 +181,7 @@ struct BackupRestoreSection: View {
     private func importSettings() {
         let panel = NSOpenPanel()
         panel.title = "Import Settings"
-        panel.message = "Chọn file thiết lập XKey để import"
+        panel.message = String(localized: "Chọn file thiết lập XKey để import")
         panel.allowedContentTypes = [.propertyList]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -196,10 +196,10 @@ struct BackupRestoreSection: View {
                     countdownSeconds = 3
                     showCountdownSheet = true
                 } else {
-                    showAlert(title: "Lỗi", message: "File không hợp lệ hoặc không đúng định dạng")
+                    showAlert(title: String(localized: "Lỗi"), message: String(localized: "File không hợp lệ hoặc không đúng định dạng"))
                 }
             } catch {
-                showAlert(title: "Lỗi", message: "Không thể đọc file: \(error.localizedDescription)")
+                showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể đọc file: \(error.localizedDescription)"))
             }
         }
     }
@@ -208,7 +208,7 @@ struct BackupRestoreSection: View {
     
     private func performReset() {
         guard SharedSettings.shared.resetToDefaults() else {
-            showAlert(title: "Lỗi", message: "Không thể khôi phục mặc định. Vui lòng thử lại.")
+            showAlert(title: String(localized: "Lỗi"), message: String(localized: "Không thể khôi phục mặc định. Vui lòng thử lại."))
             return
         }
         
@@ -290,8 +290,8 @@ enum RestartReason {
     
     var title: String {
         switch self {
-        case .importSettings: return "Import thành công!"
-        case .resetToDefault: return "Đã khôi phục mặc định!"
+        case .importSettings: return String(localized: "Import thành công!")
+        case .resetToDefault: return String(localized: "Đã khôi phục mặc định!")
         }
     }
     

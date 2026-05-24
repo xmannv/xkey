@@ -14,7 +14,7 @@ class TencentTransmartProvider: TranslationProvider {
     
     let id = "tencent_transmart"
     let name = "Tencent TranSmart"
-    let description = "Dịch bằng Tencent TranSmart (miễn phí, hỗ trợ tốt tiếng Trung)"
+    var description: String { String(localized: "Dịch bằng Tencent TranSmart (miễn phí, hỗ trợ tốt tiếng Trung)") }
     
     var isEnabled: Bool = true
     

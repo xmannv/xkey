@@ -25,7 +25,7 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
 
-        window.title = "Cài đặt XKey"
+        window.title = String(localized: "Cài đặt XKey")
         window.titlebarAppearsTransparent = false
         // Allow window to be released when closed to free memory
         window.isReleasedWhenClosed = true
