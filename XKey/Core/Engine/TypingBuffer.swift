@@ -15,18 +15,32 @@ struct RawKeystroke: Equatable {
     let keyCode: UInt16
     let isCaps: Bool
 
+    /// Identity link back to the owning `CharacterEntry`. Used by buffer mutation paths
+    /// to correlate sequence entries with their entries (so `removeLast` can pull the
+    /// right keystrokes out of `keystrokeSequence` even when the sequence is in true
+    /// typing order rather than per-entry order). `0` means "unstamped"; the buffer
+    /// stamps it on insert via `recordKeystroke` / `addModifier`.
+    /// Excluded from value equality — it's an identity field, not a value-defining one.
+    var entryId: UInt64
+
     var asUInt32: UInt32 {
         UInt32(keyCode) | (isCaps ? TypingBuffer.CAPS_MASK : 0)
     }
 
-    init(keyCode: UInt16, isCaps: Bool = false) {
+    init(keyCode: UInt16, isCaps: Bool = false, entryId: UInt64 = 0) {
         self.keyCode = keyCode
         self.isCaps = isCaps
+        self.entryId = entryId
     }
 
     init(from data: UInt32) {
         self.keyCode = UInt16(data & TypingBuffer.CHAR_MASK)
         self.isCaps = (data & TypingBuffer.CAPS_MASK) != 0
+        self.entryId = 0
+    }
+
+    static func == (lhs: RawKeystroke, rhs: RawKeystroke) -> Bool {
+        lhs.keyCode == rhs.keyCode && lhs.isCaps == rhs.isCaps
     }
 }
 
@@ -35,6 +49,28 @@ struct RawKeystroke: Equatable {
 /// A single character in the typing buffer
 /// Contains both raw input (for restore) and processed output (for display)
 struct CharacterEntry: Equatable {
+    // MARK: - Identity
+
+    /// Stable identity allocated at creation time. Lets `keystrokeSequence` entries
+    /// reference back to their owning entry even when the sequence is in typing order
+    /// (where the entry's keystrokes are no longer contiguous). Excluded from
+    /// `Equatable` so value-based tests remain unaffected.
+    let id: UInt64
+
+    /// Monotonic counter for entry IDs. Lock-protected because XCTest can run test
+    /// classes in parallel even though production typing is single-threaded; a torn
+    /// `+= 1` would hand the same id to two entries and corrupt sequence filtering.
+    /// Never reset — overflow not a concern at UInt64 scale.
+    private static var nextId: UInt64 = 0
+    private static let nextIdLock = NSLock()
+    static func makeId() -> UInt64 {
+        nextIdLock.lock()
+        nextId += 1
+        let id = nextId
+        nextIdLock.unlock()
+        return id
+    }
+
     // MARK: - Raw Input (for restore/undo)
 
     /// The primary keystroke that created this entry
@@ -49,6 +85,12 @@ struct CharacterEntry: Equatable {
     /// The processed character data with all Vietnamese modifications
     /// Contains: keyCode | CAPS_MASK | TONE_MASK | TONEW_MASK | MARK_MASK | STANDALONE_MASK
     var processedData: UInt32
+
+    static func == (lhs: CharacterEntry, rhs: CharacterEntry) -> Bool {
+        lhs.primaryKeystroke == rhs.primaryKeystroke &&
+        lhs.modifierKeystrokes == rhs.modifierKeystrokes &&
+        lhs.processedData == rhs.processedData
+    }
 
     // MARK: - Computed Properties
 
@@ -132,28 +174,45 @@ struct CharacterEntry: Equatable {
     // MARK: - Initialization
 
     init(keyCode: UInt16, isCaps: Bool) {
-        self.primaryKeystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps)
+        let id = CharacterEntry.makeId()
+        self.id = id
+        self.primaryKeystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps, entryId: id)
         self.processedData = UInt32(keyCode) | (isCaps ? TypingBuffer.CAPS_MASK : 0)
     }
 
     init(primaryKeystroke: RawKeystroke, processedData: UInt32) {
-        self.primaryKeystroke = primaryKeystroke
+        let id = CharacterEntry.makeId()
+        self.id = id
+        // Stamp the supplied keystroke with this entry's id so sequence lookups work.
+        self.primaryKeystroke = RawKeystroke(
+            keyCode: primaryKeystroke.keyCode,
+            isCaps: primaryKeystroke.isCaps,
+            entryId: id
+        )
         self.processedData = processedData
     }
 
     /// Create from legacy typingWord data (for migration)
     init(fromLegacy processedData: UInt32) {
+        let id = CharacterEntry.makeId()
+        self.id = id
         let keyCode = UInt16(processedData & TypingBuffer.CHAR_MASK)
         let isCaps = (processedData & TypingBuffer.CAPS_MASK) != 0
-        self.primaryKeystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps)
+        self.primaryKeystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps, entryId: id)
         self.processedData = processedData
     }
 
     // MARK: - Mutation Methods
 
-    /// Add a modifier keystroke (e.g., second 'a' for â, 'j' for tone mark)
-    mutating func addModifier(_ keystroke: RawKeystroke) {
-        modifierKeystrokes.append(keystroke)
+    /// Add a modifier keystroke (e.g., second 'a' for â, 'j' for tone mark).
+    /// Returns the stamped keystroke (with `entryId` set to this entry's id) so callers
+    /// can hand the same instance to `TypingBuffer.recordKeystroke` and keep
+    /// `keystrokeSequence` correlated with the owning entry.
+    @discardableResult
+    mutating func addModifier(_ keystroke: RawKeystroke) -> RawKeystroke {
+        let stamped = RawKeystroke(keyCode: keystroke.keyCode, isCaps: keystroke.isCaps, entryId: id)
+        modifierKeystrokes.append(stamped)
+        return stamped
     }
 
     /// Remove the last modifier keystroke (for undo)
@@ -288,19 +347,15 @@ final class TypingBuffer {
     // MARK: - Remove Operations
 
     /// Remove and return the last character
-    /// Also removes the corresponding keystrokes from keystrokeSequence
+    /// Also removes the corresponding keystrokes from keystrokeSequence by matching
+    /// `entryId`, so the sequence stays consistent regardless of typing order vs.
+    /// per-entry order.
     @discardableResult
     func removeLast() -> CharacterEntry? {
         guard !entries.isEmpty else { return nil }
 
         let removed = entries.removeLast()
-        
-        // Remove corresponding keystrokes from sequence
-        // The entry had (1 primary + N modifiers) keystrokes
-        let keystrokesToRemove = removed.keystrokeCount
-        for _ in 0..<keystrokesToRemove {
-            _ = keystrokeSequence.popLast()
-        }
+        keystrokeSequence.removeAll { $0.entryId == removed.id }
 
         // If we have overflow, bring one back
         if !overflow.isEmpty {
@@ -310,24 +365,15 @@ final class TypingBuffer {
         return removed
     }
 
-    /// Remove character at specific index
-    /// Note: This is more complex - we need to find and remove the right keystrokes
-    /// For now, we only remove from sequence if removing the LAST entry
-    /// Other cases are rare and the sequence may become inconsistent
+    /// Remove character at specific index. Filters keystrokeSequence by `entryId` so
+    /// middle-entry removals stay consistent (previously this path skipped sequence
+    /// cleanup for non-last indices and let the sequence drift).
     @discardableResult
     func remove(at index: Int) -> CharacterEntry? {
         guard index >= 0 && index < entries.count else { return nil }
 
         let removed = entries.remove(at: index)
-        
-        // If removing the last entry, also remove from sequence
-        // For middle entries, sequence becomes inconsistent but this is rare
-        if index == entries.count {
-            let keystrokesToRemove = removed.keystrokeCount
-            for _ in 0..<keystrokesToRemove {
-                _ = keystrokeSequence.popLast()
-            }
-        }
+        keystrokeSequence.removeAll { $0.entryId == removed.id }
 
         // If we have overflow, bring one back
         if !overflow.isEmpty {
@@ -347,11 +393,29 @@ final class TypingBuffer {
 
     // MARK: - Keystroke Sequence Tracking
     
-    /// Record a keystroke in the actual typing order
-    /// Call this for EVERY keystroke (primary keys and modifiers)
-    /// This maintains the exact order user typed for restore at word break
+    /// Record a keystroke in the actual typing order.
+    /// Call this for EVERY keystroke (primary keys and modifiers).
+    ///
+    /// If the keystroke already carries an `entryId` (because it came back from
+    /// `addModifier` already stamped), it is appended verbatim. Otherwise the buffer
+    /// auto-stamps it with the last entry's id — the common case immediately after
+    /// `append(keyCode:isCaps:)`. Callers that record a modifier on a non-last entry
+    /// must pass the keystroke returned by `addModifier(at:)` so the entryId is right.
     func recordKeystroke(_ keystroke: RawKeystroke) {
-        keystrokeSequence.append(keystroke)
+        if keystroke.entryId != 0 {
+            keystrokeSequence.append(keystroke)
+            return
+        }
+        if let last = entries.last {
+            let stamped = RawKeystroke(
+                keyCode: keystroke.keyCode,
+                isCaps: keystroke.isCaps,
+                entryId: last.id
+            )
+            keystrokeSequence.append(stamped)
+        } else {
+            keystrokeSequence.append(keystroke)
+        }
     }
     
     /// Get keystroke sequence in actual typing order (for restore at word break)
@@ -379,46 +443,69 @@ final class TypingBuffer {
 
     // MARK: - Modifier Operations
 
-    /// Add a modifier keystroke to the last entry
-    /// Used for Telex double keys (aa→â) and tone marks
-    /// NOTE: This does NOT record to keystrokeSequence - caller must call recordKeystroke separately
-    func addModifierToLast(_ keystroke: RawKeystroke) {
-        guard !entries.isEmpty else { return }
-        entries[entries.count - 1].addModifier(keystroke)
+    /// Add a modifier keystroke to the last entry. Returns the stamped keystroke so
+    /// callers can hand the exact same instance (with the correct `entryId`) to
+    /// `recordKeystroke`, keeping `keystrokeSequence` correlated with the entry.
+    ///
+    /// NOTE: This does NOT record to keystrokeSequence — caller must call
+    /// `recordKeystroke` separately, ideally with the returned stamped keystroke.
+    @discardableResult
+    func addModifierToLast(_ keystroke: RawKeystroke) -> RawKeystroke {
+        guard !entries.isEmpty else { return keystroke }
+        return entries[entries.count - 1].addModifier(keystroke)
     }
 
-    /// Add a modifier keystroke to entry at specific index
-    /// NOTE: This does NOT record to keystrokeSequence - caller must call recordKeystroke separately
-    func addModifier(at index: Int, keystroke: RawKeystroke) {
-        guard index >= 0 && index < entries.count else { return }
-        entries[index].addModifier(keystroke)
+    /// Add a modifier keystroke to entry at specific index. Returns the stamped
+    /// keystroke (with the target entry's `entryId`). Critical for non-last entries:
+    /// passing the returned value to `recordKeystroke` is the only way the sequence
+    /// can associate this modifier with the right entry — `recordKeystroke`'s
+    /// auto-stamping uses `entries.last.id` and would otherwise mislabel it.
+    ///
+    /// NOTE: This does NOT record to keystrokeSequence — caller must call
+    /// `recordKeystroke` separately, ideally with the returned stamped keystroke.
+    @discardableResult
+    func addModifier(at index: Int, keystroke: RawKeystroke) -> RawKeystroke {
+        guard index >= 0 && index < entries.count else { return keystroke }
+        return entries[index].addModifier(keystroke)
     }
 
-    /// Remove the last modifier from the last entry
-    /// Also removes the last keystroke from keystrokeSequence (assuming it was the modifier)
+    /// Remove the last modifier from the last entry and pull the matching keystroke
+    /// out of keystrokeSequence by `entryId`. Searches from the tail so that, when an
+    /// entry has multiple identical modifiers, the most-recent one is removed.
     @discardableResult
     func removeLastModifierFromLast() -> RawKeystroke? {
         guard !entries.isEmpty else { return nil }
         let removed = entries[entries.count - 1].removeLastModifier()
-        if removed != nil {
-            _ = keystrokeSequence.popLast()
+        if let removed = removed {
+            removeKeystrokeFromSequence(matching: removed)
         }
         return removed
     }
-    
-    /// Remove the last modifier from entry at specific index
-    /// Also removes from keystrokeSequence if the modifier was recently added
-    /// Note: This may not perfectly track sequence if modifier was added long ago
+
+    /// Remove the last modifier from entry at specific index. Uses `entryId` to find
+    /// and remove the corresponding keystroke from the sequence, so works correctly
+    /// regardless of where the modifier sits in typing order.
     @discardableResult
     func removeLastModifier(at index: Int) -> RawKeystroke? {
         guard index >= 0 && index < entries.count else { return nil }
         let removed = entries[index].removeLastModifier()
-        if removed != nil {
-            // Remove from sequence - this assumes the modifier is still near the end
-            // This is a best-effort approach; in complex undo scenarios, sequence may be imperfect
-            _ = keystrokeSequence.popLast()
+        if let removed = removed {
+            removeKeystrokeFromSequence(matching: removed)
         }
         return removed
+    }
+
+    /// Remove one keystroke from `keystrokeSequence` whose `entryId`, keyCode and caps
+    /// flag all match. Walks from the tail so the most-recent occurrence wins when an
+    /// entry has multiple identical modifiers.
+    private func removeKeystrokeFromSequence(matching target: RawKeystroke) {
+        if let idx = keystrokeSequence.lastIndex(where: {
+            $0.entryId == target.entryId &&
+            $0.keyCode == target.keyCode &&
+            $0.isCaps == target.isCaps
+        }) {
+            keystrokeSequence.remove(at: idx)
+        }
     }
 
 
@@ -572,26 +659,31 @@ final class TypingBuffer {
         )
     }
 
-    /// Restore from a snapshot
-    /// Note: keystrokeSequence is rebuilt from entries (per-entry order) instead of
-    /// restoring from snapshot. This ensures consistency after restore + edit operations.
-    /// The original typing order is lost, but per-entry order produces correct restore output.
+    /// Restore from a snapshot.
+    ///
+    /// `keystrokeSequence` is restored verbatim from the snapshot to preserve the true
+    /// typing order — `undoTyping()` and word-break restore depend on it. Subsequent
+    /// mutations (`removeLast`, `remove(at:)`, `removeLastModifier*`, `addModifier*` +
+    /// `recordKeystroke`) maintain the sequence invariant by correlating keystrokes
+    /// with entries via stable `entryId`, so the previous rebuild-from-entries hack is
+    /// no longer needed.
     func restore(from snapshot: BufferSnapshot) {
         entries = snapshot.entries
         overflow = snapshot.overflow
-        // Rebuild keystrokeSequence from entries to ensure consistency
-        // This allows proper handling of delete operations after restore
-        keystrokeSequence = getAllRawKeystrokes()
+        keystrokeSequence = snapshot.keystrokeSequence
     }
 
 
-    /// Restore from legacy typingWord data
-    /// Note: This loses raw keystroke information
+    /// Restore from legacy typingWord data.
+    /// Note: This loses any non-primary keystroke information (modifiers can't be
+    /// recovered from the processedData alone), but each entry's primary keystroke
+    /// is still pushed into `keystrokeSequence` so the buffer's invariant holds.
     func restoreFromLegacy(_ legacyData: [UInt32]) {
         clear()
         for data in legacyData {
             let entry = CharacterEntry(fromLegacy: data)
             entries.append(entry)
+            keystrokeSequence.append(entry.primaryKeystroke)
         }
     }
 
@@ -721,7 +813,11 @@ final class TypingHistory {
         for _ in 0..<count {
             entries.append(CharacterEntry(keyCode: keyCode, isCaps: false))
         }
-        snapshots.append(BufferSnapshot(entries: entries, overflow: [], keystrokeSequence: []))
+        // Populate keystrokeSequence with each entry's primary keystroke so the
+        // invariant (sequence count == totalKeystrokeCount, each keystroke entryId
+        // matches its entry's id) holds after this snapshot is restored.
+        let sequence = entries.map { $0.primaryKeystroke }
+        snapshots.append(BufferSnapshot(entries: entries, overflow: [], keystrokeSequence: sequence))
         
         // Auto-trim if exceeds limit
         trimIfNeeded()

@@ -39,8 +39,14 @@ extension VNEngine {
         hookState.backspaceCount = 0
         hookState.newCharCount = 1
 
-        // Append the replacement key
-        buffer.append(keyCode: replacementKey, isCaps: isCaps)
+        // Append entry whose primary keystroke records the USER's actual key (e.g. 'c'),
+        // then overwrite processedData with the displayed replacement (e.g. 'h'). This
+        // keeps the per-entry raw input and the typing-order keystrokeSequence aligned
+        // with what the user pressed, so undoTyping() can restore "ccos" (not "cos")
+        // for words like "chó" typed via Quick Telex.
+        buffer.append(keyCode: keyCode, isCaps: isCaps)
+        buffer.recordKeystroke(RawKeystroke(keyCode: keyCode, isCaps: isCaps))
+        buffer[buffer.count - 1].processedData = UInt32(replacementKey) | (isCaps ? VNEngine.CAPS_MASK : 0)
 
         hookState.charData[0] = getCharacterCode(buffer.last!.processedData)
         logCallback?("Quick Telex: \(keyCode)\(keyCode) → \(keyCode)\(replacementKey)")
@@ -77,7 +83,12 @@ extension VNEngine {
                 var entries = buffer.getAllEntries()
                 entries.insert(secondEntry, at: 1)
                 buffer.clear()
-                for entry in entries { buffer.append(entry) }
+                for entry in entries {
+                    buffer.append(entry)
+                    // Rebuild keystrokeSequence too so the buffer invariant
+                    // (sequence count == totalKeystrokeCount) survives this transform.
+                    buffer.recordKeystroke(entry.primaryKeystroke)
+                }
 
                 hookState.code = UInt8(vWillProcess)
                 hookState.backspaceCount = buffer.count
@@ -113,9 +124,11 @@ extension VNEngine {
             if let (first, second) = replacement {
                 let isCaps = buffer[buffer.count - 1].isCaps
 
-                // Replace last and append new
+                // Replace last and append new. Record the new keystroke too so the
+                // sequence stays in lockstep with totalKeystrokeCount.
                 buffer[buffer.count - 1].processedData = UInt32(first) | (isCaps ? VNEngine.CAPS_MASK : 0)
                 buffer.append(keyCode: second, isCaps: isCaps)
+                buffer.recordKeystroke(RawKeystroke(keyCode: second, isCaps: isCaps))
 
                 hookState.code = UInt8(vWillProcess)
                 hookState.backspaceCount = 1

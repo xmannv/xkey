@@ -2569,6 +2569,27 @@ class VNEngineTests: XCTestCase {
         }
     }
 
+    func testUndoTyping_choQuickTelex_restoresFullInput() {
+        engine.reset()
+        engine.vQuickTelex = 1
+        // "chó" typed as c-c-o-s: first 'c' goes through insertKey, second 'c'
+        // triggers Quick Telex (cc→ch), then 'o' and 's' (tone mark). Engine
+        // displays "chó" but the user actually pressed 4 keys, so undo must
+        // restore "ccos" — not "cos" (which would drop the duplicated 'c').
+        _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+        _ = engine.processKey(character: "c", keyCode: VietnameseData.KEY_C, isUppercase: false)
+        _ = engine.processKey(character: "o", keyCode: VietnameseData.KEY_O, isUppercase: false)
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+
+        XCTAssertEqual(engine.getCurrentWord(), "chó")
+        XCTAssertTrue(engine.canUndoTyping())
+        let result = engine.undoTyping()
+        XCTAssertTrue(result.shouldConsume)
+        XCTAssertEqual(result.backspaceCount, 3)
+        XCTAssertEqual(restoredString(result), "ccos",
+            "Quick Telex undo must restore user's actual keystrokes including the duplicate 'c'")
+    }
+
     func testCanUndoTyping_plainEnglish_returnsFalse() {
         engine.reset()
         // "thu" — no diacritics, nothing to undo
@@ -2587,6 +2608,62 @@ class VNEngineTests: XCTestCase {
         engine.resetWithCursorMoved()
 
         XCTAssertFalse(engine.canUndoTyping())
+    }
+
+    func testUndoTyping_afterHistoryRestore_preservesTypingOrder() {
+        engine.reset()
+        // Type "thừa" via Telex (t, h, u, a, w, f). f is a tone modifier on ư typed
+        // AFTER the 'a' was already added — typing order is t, h, u, a, w, f, but
+        // per-entry order groups w and f with their owner u, producing t, h, u, w, f, a.
+        _ = engine.processKey(character: "t", keyCode: VietnameseData.KEY_T, isUppercase: false)
+        _ = engine.processKey(character: "h", keyCode: VietnameseData.KEY_H, isUppercase: false)
+        _ = engine.processKey(character: "u", keyCode: VietnameseData.KEY_U, isUppercase: false)
+        _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        _ = engine.processKey(character: "w", keyCode: VietnameseData.KEY_W, isUppercase: false)
+        _ = engine.processKey(character: "f", keyCode: VietnameseData.KEY_F, isUppercase: false)
+
+        XCTAssertEqual(engine.getCurrentWord(), "thừa")
+
+        // Save current buffer + force a snapshot round-trip so the engine's
+        // `keystrokeSequence` goes through the same restore path that history
+        // navigation would use. Previously this path rebuilt the sequence in per-entry
+        // order, corrupting the undo restoration.
+        let snapshot = engine.buffer.createSnapshot()
+        engine.buffer.clear()
+        engine.buffer.restore(from: snapshot)
+
+        XCTAssertEqual(engine.getCurrentWord(), "thừa")
+        XCTAssertTrue(engine.canUndoTyping())
+
+        let result = engine.undoTyping()
+        XCTAssertTrue(result.shouldConsume)
+        // 4 displayed chars ("thừa"), 6 typed keystrokes ("thuawf").
+        XCTAssertEqual(result.backspaceCount, 4)
+        XCTAssertEqual(restoredString(result), "thuawf",
+            "After history restore, undo must replay keystrokes in original typing order — not per-entry order which would yield 'thuwfa'")
+    }
+
+    func testUndoTyping_bufferOverflow_refusesUndo() {
+        engine.reset()
+        engine.vCheckSpelling = 0
+        // TypingBuffer.MAX_SIZE is 32; pushing 33 distinct entries forces the oldest
+        // into overflow while keystrokeSequence keeps growing. Undo would otherwise
+        // delete 32 displayed chars but inject 34+ keystrokes, corrupting the document.
+        for _ in 0..<33 {
+            _ = engine.processKey(character: "a", keyCode: VietnameseData.KEY_A, isUppercase: false)
+        }
+        // Apply a Telex tone mark so the diacritic gate in canUndoTyping passes;
+        // without this the function would return false for "no Vietnamese modification".
+        _ = engine.processKey(character: "s", keyCode: VietnameseData.KEY_S, isUppercase: false)
+
+        XCTAssertFalse(engine.canUndoTyping(),
+            "Buffer overflow must disable undo to avoid silent document corruption")
+
+        let result = engine.undoTyping()
+        XCTAssertFalse(result.shouldConsume,
+            "undoTyping must return doNothing when buffer has overflow")
+        XCTAssertEqual(result.backspaceCount, 0)
+        XCTAssertTrue(result.newCharacters.isEmpty)
     }
 }
 

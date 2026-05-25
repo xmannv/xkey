@@ -1353,22 +1353,22 @@ class VNEngine {
         buffer[index].processedData = UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0)
     }
 
-    /// Record a raw keystroke as modifier (for Telex sequences like aa→â)
-    /// Adds to the LAST entry in buffer
-    /// Also records to keystrokeSequence for correct restore order
+    /// Record a raw keystroke as modifier (for Telex sequences like aa→â).
+    /// Adds to the LAST entry in buffer and records the *stamped* keystroke into
+    /// `keystrokeSequence` so the sequence can be correlated back to its entry by id.
     func insertState(keyCode: UInt16, isCaps: Bool) {
-        let keystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps)
-        buffer.addModifierToLast(keystroke)
-        buffer.recordKeystroke(keystroke)  // Record in actual typing order
+        let stamped = buffer.addModifierToLast(RawKeystroke(keyCode: keyCode, isCaps: isCaps))
+        buffer.recordKeystroke(stamped)
     }
-    
-    /// Record a raw keystroke as modifier at a specific buffer index
-    /// Use this when the modified entry is NOT the last one (e.g., mark on first vowel of "ưa")
-    /// Also records to keystrokeSequence for correct restore order
+
+    /// Record a raw keystroke as modifier at a specific buffer index.
+    /// Use this when the modified entry is NOT the last one (e.g., mark on first vowel
+    /// of "ưa"). Records the stamped keystroke so removal by `entryId` works even
+    /// though `recordKeystroke`'s auto-stamping would otherwise pin this to the last
+    /// entry, not entries[index].
     func insertStateAt(index: Int, keyCode: UInt16, isCaps: Bool) {
-        let keystroke = RawKeystroke(keyCode: keyCode, isCaps: isCaps)
-        buffer.addModifier(at: index, keystroke: keystroke)
-        buffer.recordKeystroke(keystroke)  // Record in actual typing order
+        let stamped = buffer.addModifier(at: index, keystroke: RawKeystroke(keyCode: keyCode, isCaps: isCaps))
+        buffer.recordKeystroke(stamped)
     }
 
     
@@ -2862,7 +2862,11 @@ class VNEngine {
         for data in specialChar {
             entries.append(CharacterEntry(fromLegacy: data))
         }
-        let snapshot = BufferSnapshot(entries: entries, overflow: [], keystrokeSequence: [])
+        // Populate keystrokeSequence with each entry's primary keystroke so restoring
+        // this snapshot keeps the buffer invariant intact (sequence in typing order,
+        // every keystroke carries its owning entry's id).
+        let sequence = entries.map { $0.primaryKeystroke }
+        let snapshot = BufferSnapshot(entries: entries, overflow: [], keystrokeSequence: sequence)
         history.save(snapshot)
         specialChar.removeAll()
     }
@@ -3173,7 +3177,17 @@ extension VNEngine {
         guard index > 0 && stateIndex > 0 else {
             return false
         }
-        
+
+        // Refuse undo when the buffer has overflowed: `backspaceCount` would only
+        // cover the displayed entries (capped at MAX_SIZE), but `keystrokeSequence`
+        // contains every keystroke ever recorded. Restoring would leave overflowed
+        // characters on screen and inject extra keystrokes, corrupting the document.
+        // Words long enough to overflow (>32 chars without a word break) are
+        // extremely rare in Vietnamese, so a clean pass-through is the safer choice.
+        guard !buffer.hasOverflow else {
+            return false
+        }
+
         // Check if any character has Vietnamese modification (mark, tone, or horn/breve)
         for i in 0..<Int(index) {
             let charData = typingWord[i]
@@ -3198,6 +3212,14 @@ extension VNEngine {
 
         guard index > 0 && stateIndex > 0 else {
             logCallback?("  → Nothing to undo (index=\(index), stateIndex=\(stateIndex))")
+            return ProcessResult.doNothing
+        }
+
+        // Refuse undo when the buffer has overflowed (mirrors canUndoTyping guard).
+        // backspaceCount would only delete the displayed entries while keystrokeSequence
+        // injects every recorded keystroke, leaving the document in a corrupted state.
+        guard !buffer.hasOverflow else {
+            logCallback?("  → Refusing undo: buffer has overflow, restoration would corrupt document")
             return ProcessResult.doNothing
         }
 
@@ -3410,12 +3432,17 @@ extension VNEngine {
                             }
                             
                             if stateIndex > 0 {
-                                // Create a snapshot from keyStates (the restored characters)
+                                // Create a snapshot from keyStates (the restored characters).
+                                // Also record each keystroke so the snapshot carries a
+                                // populated keystrokeSequence — otherwise the snapshot would
+                                // restore non-empty entries with an empty sequence, breaking
+                                // downstream consumers (repeated-vowel check, undoTyping).
                                 let restoredBuffer = TypingBuffer()
                                 for i in 0..<Int(stateIndex) {
                                     let keyCode = UInt16(keyStates[i] & 0xFF)
                                     let isCaps = (keyStates[i] & VNEngine.CAPS_MASK) != 0
                                     _ = restoredBuffer.append(keyCode: keyCode, isCaps: isCaps)
+                                    restoredBuffer.recordKeystroke(RawKeystroke(keyCode: keyCode, isCaps: isCaps))
                                 }
                                 let snapshot = restoredBuffer.createSnapshot()
                                 history.save(snapshot)

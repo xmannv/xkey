@@ -618,33 +618,38 @@ class KeystrokeSequenceTests: XCTestCase {
     
     /// Test critical case: "thưef" where f modifies ư but typed after e
     /// keystrokeSequence should maintain typing order: t, h, u, w, e, f
-    /// Even though f is a modifier for ư (entry at index 2)
+    /// Even though f is a modifier for ư (entry at index 2). Uses the stamped pattern
+    /// for non-last-entry modifiers so each keystroke's entryId points to its real
+    /// owning entry — required for `removeLast` filtering to behave correctly.
     func testModifierAtOldEntryMaintainsTypingOrder() {
         // Simulate typing "thưef" where f modifies ư
-        
+
         // t
         buffer.append(keyCode: 0x11, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x11, isCaps: false))
-        
+
         // h
         buffer.append(keyCode: 0x04, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x04, isCaps: false))
-        
+
         // u
         buffer.append(keyCode: 0x20, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x20, isCaps: false))
-        
-        // w (modifier to u → ư)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x0D, isCaps: false))
-        
+
+        // w (modifier to u → ư) — entries.last is still u, so auto-stamping happens
+        // to land on the right entry; using the stamped result is harmless here.
+        let stampedW = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
+        buffer.recordKeystroke(stampedW)
+
         // e (new entry)
         buffer.append(keyCode: 0x0E, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x0E, isCaps: false))
-        
-        // f (modifier to ư at index 2, typed AFTER e)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x03, isCaps: false))
+
+        // f (modifier to ư at index 2, typed AFTER e). Now entries.last is e, so
+        // recordKeystroke's auto-stamping would wrongly tag f with e's id; pass the
+        // stamped value from `addModifier(at:)` instead so f stays correlated with u.
+        let stampedF = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
+        buffer.recordKeystroke(stampedF)
         
         // Verify keystrokeSequence maintains typing order
         let sequence = buffer.getKeystrokeSequence()
@@ -844,15 +849,17 @@ class RestoreEditTests: XCTestCase {
     
     /// Test that createSnapshot includes keystrokeSequence
     func testCreateSnapshotIncludesKeystrokeSequence() {
-        // Simulate typing "ua" with w modifier on u (ưa)
+        // Simulate typing "ua" with w modifier on u (ưa). w is a modifier on a
+        // non-last entry, so pass the stamped result of `addModifier(at:)` to
+        // `recordKeystroke` to keep entryIds correct.
         buffer.append(keyCode: 0x20, isCaps: false)  // u
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x20, isCaps: false))
-        
+
         buffer.append(keyCode: 0x00, isCaps: false)  // a
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x00, isCaps: false))
-        
-        buffer.addModifier(at: 0, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))  // w
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x0D, isCaps: false))
+
+        let stampedW = buffer.addModifier(at: 0, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
+        buffer.recordKeystroke(stampedW)
         
         let snapshot = buffer.createSnapshot()
         
@@ -863,87 +870,93 @@ class RestoreEditTests: XCTestCase {
         XCTAssertEqual(snapshot.keystrokeSequence[2].keyCode, 0x0D)  // w
     }
     
-    /// Test that restore rebuilds keystrokeSequence from entries (per-entry order)
-    func testRestoreRebuildsKeystrokeSequenceFromEntries() {
-        // Create a snapshot with specific keystrokeSequence
-        let entry1 = CharacterEntry(keyCode: 0x20, isCaps: false)  // u
-        var entry1WithMod = entry1
-        entry1WithMod.addModifier(RawKeystroke(keyCode: 0x0D, isCaps: false))  // w
-        
-        let entry2 = CharacterEntry(keyCode: 0x00, isCaps: false)  // a
-        
-        // Original typing order: u, a, w (w typed after a)
+    /// Restore must preserve the snapshot's `keystrokeSequence` verbatim (typing order).
+    /// Stable entry IDs let subsequent mutations stay consistent without needing the
+    /// per-entry rebuild that previously discarded typing order.
+    func testRestorePreservesSnapshotTypingOrder() {
+        // Build entry "ư" (u with w modifier) — w was actually typed AFTER a in user's
+        // real sequence, so typing order is u, a, w.
+        let entryU = CharacterEntry(keyCode: 0x20, isCaps: false)  // u
+        var entryUWithMod = entryU
+        entryUWithMod.addModifier(RawKeystroke(keyCode: 0x0D, isCaps: false))  // w stamped with u's id
+
+        let entryA = CharacterEntry(keyCode: 0x00, isCaps: false)  // a
+
+        // Build sequence in typing order with proper entryIds so restore + later edits
+        // can still correlate keystrokes back to entries.
         let originalSequence = [
-            RawKeystroke(keyCode: 0x20, isCaps: false),  // u
-            RawKeystroke(keyCode: 0x00, isCaps: false),  // a
-            RawKeystroke(keyCode: 0x0D, isCaps: false)   // w
+            entryUWithMod.primaryKeystroke,        // u
+            entryA.primaryKeystroke,               // a
+            entryUWithMod.modifierKeystrokes[0]    // w (stamped with u's id)
         ]
-        
+
         let snapshot = BufferSnapshot(
-            entries: [entry1WithMod, entry2],
+            entries: [entryUWithMod, entryA],
             overflow: [],
             keystrokeSequence: originalSequence
         )
-        
-        // Restore
+
         buffer.restore(from: snapshot)
-        
-        // keystrokeSequence should be rebuilt from entries (per-entry order)
-        // Entry order: u (with w), a → getAllRawKeystrokes = [u, w, a]
+
+        // After restore, sequence stays in typing order: u, a, w (not per-entry [u, w, a]).
         let restoredSequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(restoredSequence.count, 3)
         XCTAssertEqual(restoredSequence[0].keyCode, 0x20)  // u
-        XCTAssertEqual(restoredSequence[1].keyCode, 0x0D)  // w (modifier of u)
-        XCTAssertEqual(restoredSequence[2].keyCode, 0x00)  // a
+        XCTAssertEqual(restoredSequence[1].keyCode, 0x00)  // a (typed before the w modifier)
+        XCTAssertEqual(restoredSequence[2].keyCode, 0x0D)  // w (modifier on u, typed last)
     }
     
-    /// Critical test: "thừa" → restore → delete 'a' → type 'e' → keystrokeSequence should be [t, h, u, w, f, e]
+    /// Critical test: "thừa" → restore → delete 'a' → type 'e'. With stable entry IDs,
+    /// restore preserves typing order (not per-entry order). Subsequent `removeLast`
+    /// filters the sequence by the removed entry's id so the deleted entry's keystroke
+    /// is pulled from its true position in typing order, not blindly from the tail.
     func testRestoreDeleteTypeProducesCorrectSequence() {
-        // Build "thừa" entries
-        // t
-        let entryT = CharacterEntry(keyCode: 0x11, isCaps: false)
-        // h
-        let entryH = CharacterEntry(keyCode: 0x04, isCaps: false)
-        // ừ (u + w modifier + f modifier)
-        var entryU = CharacterEntry(keyCode: 0x20, isCaps: false)
-        entryU.addModifier(RawKeystroke(keyCode: 0x0D, isCaps: false))  // w
-        entryU.addModifier(RawKeystroke(keyCode: 0x03, isCaps: false))  // f
-        // a
-        let entryA = CharacterEntry(keyCode: 0x00, isCaps: false)
-        
-        // Original typing sequence: t, h, u, a, w, f (w and f typed after a)
+        // Build "thừa" entries. Modifiers are stamped with the owning entry's id by
+        // CharacterEntry.addModifier — capture the resulting keystrokes so the snapshot
+        // sequence holds the same entryIds.
+        let entryT = CharacterEntry(keyCode: 0x11, isCaps: false)  // t
+        let entryH = CharacterEntry(keyCode: 0x04, isCaps: false)  // h
+        var entryU = CharacterEntry(keyCode: 0x20, isCaps: false)  // u → ư → ừ
+        let wMod = entryU.addModifier(RawKeystroke(keyCode: 0x0D, isCaps: false))
+        let fMod = entryU.addModifier(RawKeystroke(keyCode: 0x03, isCaps: false))
+        let entryA = CharacterEntry(keyCode: 0x00, isCaps: false)  // a
+
+        // Typing order: t, h, u, a, w, f. Both w and f were typed after a, but they
+        // belong to u (they're modifiers on it). The snapshot sequence records the
+        // true typing order while each keystroke's entryId still points back to its
+        // owning entry.
         let originalSequence = [
-            RawKeystroke(keyCode: 0x11, isCaps: false),  // t
-            RawKeystroke(keyCode: 0x04, isCaps: false),  // h
-            RawKeystroke(keyCode: 0x20, isCaps: false),  // u
-            RawKeystroke(keyCode: 0x00, isCaps: false),  // a
-            RawKeystroke(keyCode: 0x0D, isCaps: false),  // w
-            RawKeystroke(keyCode: 0x03, isCaps: false)   // f
+            entryT.primaryKeystroke,
+            entryH.primaryKeystroke,
+            entryU.primaryKeystroke,
+            entryA.primaryKeystroke,
+            wMod,
+            fMod
         ]
-        
+
         let snapshot = BufferSnapshot(
             entries: [entryT, entryH, entryU, entryA],
             overflow: [],
             keystrokeSequence: originalSequence
         )
-        
-        // Step 1: Restore from snapshot
+
+        // Step 1: Restore from snapshot — sequence preserved in typing order.
         buffer.restore(from: snapshot)
-        
-        // After restore, keystrokeSequence should be per-entry order: [t, h, u, w, f, a]
+
         var sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 6)
         XCTAssertEqual(sequence[0].keyCode, 0x11)  // t
         XCTAssertEqual(sequence[1].keyCode, 0x04)  // h
         XCTAssertEqual(sequence[2].keyCode, 0x20)  // u
-        XCTAssertEqual(sequence[3].keyCode, 0x0D)  // w
-        XCTAssertEqual(sequence[4].keyCode, 0x03)  // f
-        XCTAssertEqual(sequence[5].keyCode, 0x00)  // a (now at end!)
-        
-        // Step 2: Delete 'a' (last entry)
+        XCTAssertEqual(sequence[3].keyCode, 0x00)  // a — typed before the w/f modifiers
+        XCTAssertEqual(sequence[4].keyCode, 0x0D)  // w
+        XCTAssertEqual(sequence[5].keyCode, 0x03)  // f
+
+        // Step 2: Delete 'a' — `removeLast` filters sequence by entryA.id, removing
+        // the 'a' keystroke from its true position (index 3) without disturbing the
+        // w/f modifiers that belong to u.
         buffer.removeLast()
-        
-        // After delete, keystrokeSequence should be: [t, h, u, w, f]
+
         sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 5)
         XCTAssertEqual(sequence[0].keyCode, 0x11)  // t
@@ -951,12 +964,11 @@ class RestoreEditTests: XCTestCase {
         XCTAssertEqual(sequence[2].keyCode, 0x20)  // u
         XCTAssertEqual(sequence[3].keyCode, 0x0D)  // w
         XCTAssertEqual(sequence[4].keyCode, 0x03)  // f
-        
-        // Step 3: Type 'e'
+
+        // Step 3: Type 'e'.
         buffer.append(keyCode: 0x0E, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x0E, isCaps: false))
-        
-        // After type 'e', keystrokeSequence should be: [t, h, u, w, f, e]
+
         sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 6)
         XCTAssertEqual(sequence[0].keyCode, 0x11)  // t
@@ -965,8 +977,8 @@ class RestoreEditTests: XCTestCase {
         XCTAssertEqual(sequence[3].keyCode, 0x0D)  // w
         XCTAssertEqual(sequence[4].keyCode, 0x03)  // f
         XCTAssertEqual(sequence[5].keyCode, 0x0E)  // e
-        
-        // This sequence when restored produces: "thuwfe" ✓
+
+        // Replaying this sequence produces: "thuwfe" ✓
     }
     
     /// Test delete entry with modifiers removes all keystrokes correctly
@@ -1005,24 +1017,27 @@ class RestoreEditTests: XCTestCase {
     
     /// Test multiple restore operations
     func testMultipleRestoreOperations() {
-        // Create first snapshot: "ab"
+        // Build snapshots with proper sequences so the buffer's invariant
+        // (sequence count == totalKeystrokeCount, every keystroke carries its entry's
+        // id) is satisfied after each restore.
+        let entriesAB: [CharacterEntry] = [
+            CharacterEntry(keyCode: 0x00, isCaps: false),  // a
+            CharacterEntry(keyCode: 0x0B, isCaps: false)   // b
+        ]
         let snapshot1 = BufferSnapshot(
-            entries: [
-                CharacterEntry(keyCode: 0x00, isCaps: false),  // a
-                CharacterEntry(keyCode: 0x0B, isCaps: false)   // b
-            ],
+            entries: entriesAB,
             overflow: [],
-            keystrokeSequence: []
+            keystrokeSequence: entriesAB.map { $0.primaryKeystroke }
         )
-        
-        // Create second snapshot: "xy"
+
+        let entriesXY: [CharacterEntry] = [
+            CharacterEntry(keyCode: 0x07, isCaps: false),  // x
+            CharacterEntry(keyCode: 0x10, isCaps: false)   // y
+        ]
         let snapshot2 = BufferSnapshot(
-            entries: [
-                CharacterEntry(keyCode: 0x07, isCaps: false),  // x
-                CharacterEntry(keyCode: 0x10, isCaps: false)   // y
-            ],
+            entries: entriesXY,
             overflow: [],
-            keystrokeSequence: []
+            keystrokeSequence: entriesXY.map { $0.primaryKeystroke }
         )
         
         // Restore first
@@ -1087,34 +1102,35 @@ class RestoreWrongSpellingIntegrationTests: XCTestCase {
     }
     
     /// Simulate typing "thưef" where f is modifier for ư typed AFTER e
-    /// Original bug: restore produced "thuwfe" instead of "thuwef"
+    /// Original bug: restore produced "thuwfe" instead of "thuwef".
+    /// Uses the stamped pattern for non-last-entry modifiers so f's entryId points
+    /// at u, not e (would otherwise corrupt sequence if removeLast were called).
     func testTypingWithLateModifierProducesCorrectRestoreOrder() {
-        // Simulate typing: t, h, u, w, e, f
-        // Note: f is modifier for ư but typed after e
-        
+        // Simulate typing: t, h, u, w, e, f. f is modifier for ư but typed after e.
+
         // t
         buffer.append(keyCode: 0x11, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x11, isCaps: false))
-        
+
         // h
         buffer.append(keyCode: 0x04, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x04, isCaps: false))
-        
+
         // u
         buffer.append(keyCode: 0x20, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x20, isCaps: false))
-        
+
         // w (modifier to u → ư)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x0D, isCaps: false))
-        
+        let stampedW = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
+        buffer.recordKeystroke(stampedW)
+
         // e (new entry, typed BEFORE f)
         buffer.append(keyCode: 0x0E, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x0E, isCaps: false))
-        
-        // f (modifier to ư, typed AFTER e)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x03, isCaps: false))
+
+        // f (modifier to ư at index 2, typed AFTER e)
+        let stampedF = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
+        buffer.recordKeystroke(stampedF)
         
         // keystrokeSequence should maintain typing order: t, h, u, w, e, f
         let sequence = buffer.getKeystrokeSequence()
@@ -1130,63 +1146,65 @@ class RestoreWrongSpellingIntegrationTests: XCTestCase {
     }
     
     /// Simulate the problematic scenario from log:
-    /// Type "thừa" → save → restore → delete 'a' → type 'e' → restore should produce "thuwfe"
+    /// Type "thừa" → save → restore → delete 'a' → type 'e' → restore should produce
+    /// "thuwfe". With stable entry IDs, restore preserves typing order and removeLast
+    /// filters by entryId, so both the immediate restore state and the post-edit state
+    /// reflect what the user actually typed.
     func testHistoryRestoreThenEditProducesCorrectRestore() {
-        // Step 1: Type "thừa" (simulated by building entries directly)
-        // In real typing: t, h, u, a, w, f
-        // Entry order: t, h, ừ (u+w+f), a
-        
-        // t
+        // Step 1: Type "thừa" — typing order is t, h, u, a, w, f. Use the stamped
+        // keystroke returned by `addModifier(at:)` so non-last-entry modifiers get the
+        // right entryId in the sequence (auto-stamping inside `recordKeystroke` uses
+        // entries.last.id, which would mis-label these).
         buffer.append(keyCode: 0x11, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x11, isCaps: false))
-        
-        // h  
+
         buffer.append(keyCode: 0x04, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x04, isCaps: false))
-        
-        // u
+
         buffer.append(keyCode: 0x20, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x20, isCaps: false))
-        
-        // a
+
         buffer.append(keyCode: 0x00, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x00, isCaps: false))
-        
-        // w (modifier to u → ư)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x0D, isCaps: false))
-        
-        // f (modifier to ư → ừ)
-        buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
-        buffer.recordKeystroke(RawKeystroke(keyCode: 0x03, isCaps: false))
-        
-        // Step 2: Save to history (simulate)
+
+        // w (modifier on u at index 2) — pass the stamped result to recordKeystroke.
+        let stampedW = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x0D, isCaps: false))
+        buffer.recordKeystroke(stampedW)
+
+        // f (modifier on u at index 2)
+        let stampedF = buffer.addModifier(at: 2, keystroke: RawKeystroke(keyCode: 0x03, isCaps: false))
+        buffer.recordKeystroke(stampedF)
+
+        // Step 2: Save snapshot.
         let snapshot = buffer.createSnapshot()
-        
-        // Step 3: Clear (simulate word break)
+
+        // Step 3: Clear (simulate word break).
         buffer.clear()
-        
-        // Step 4: Restore from history
+
+        // Step 4: Restore from snapshot. Sequence stays in typing order.
         buffer.restore(from: snapshot)
-        
-        // After restore, keystrokeSequence is per-entry order: [t, h, u, w, f, a]
+
         var sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 6)
-        XCTAssertEqual(sequence[5].keyCode, 0x00)  // 'a' at end
-        
-        // Step 5: Delete 'a'
+        XCTAssertEqual(sequence[3].keyCode, 0x00, "After restore, 'a' sits at typing-order position 3 (typed before w and f)")
+        XCTAssertEqual(sequence[5].keyCode, 0x03, "Tail keystroke is 'f' — last key the user pressed")
+
+        // Step 5: Delete 'a'. removeLast filters by entryId so the 'a' keystroke is
+        // removed from its true position (index 3), leaving the w/f modifiers intact.
         buffer.removeLast()
-        
-        // After delete: [t, h, u, w, f]
+
         sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 5)
-        XCTAssertEqual(sequence[4].keyCode, 0x03)  // 'f' now at end
-        
-        // Step 6: Type 'e'
+        XCTAssertEqual(sequence[0].keyCode, 0x11)  // t
+        XCTAssertEqual(sequence[1].keyCode, 0x04)  // h
+        XCTAssertEqual(sequence[2].keyCode, 0x20)  // u
+        XCTAssertEqual(sequence[3].keyCode, 0x0D)  // w
+        XCTAssertEqual(sequence[4].keyCode, 0x03)  // f
+
+        // Step 6: Type 'e'.
         buffer.append(keyCode: 0x0E, isCaps: false)
         buffer.recordKeystroke(RawKeystroke(keyCode: 0x0E, isCaps: false))
-        
-        // After type 'e': [t, h, u, w, f, e]
+
         sequence = buffer.getKeystrokeSequence()
         XCTAssertEqual(sequence.count, 6)
         XCTAssertEqual(sequence[0].keyCode, 0x11)  // t
@@ -1195,7 +1213,7 @@ class RestoreWrongSpellingIntegrationTests: XCTestCase {
         XCTAssertEqual(sequence[3].keyCode, 0x0D)  // w
         XCTAssertEqual(sequence[4].keyCode, 0x03)  // f
         XCTAssertEqual(sequence[5].keyCode, 0x0E)  // e
-        
-        // Restore using this sequence produces: "thuwfe" ✓
+
+        // Replaying this sequence produces: "thuwfe" ✓
     }
 }
