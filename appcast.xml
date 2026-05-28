@@ -6,50 +6,34 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.22 (Build 20260527)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260527</link>
-      <sparkle:version>20260527</sparkle:version>
+      <title>Version 1.2.22 (Build 20260528)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260528</link>
+      <sparkle:version>20260528</sparkle:version>
       <sparkle:shortVersionString>1.2.22</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(remote-desktop): machine B always-on session tap + dynamic status bar toggle</p>
-<p>Problem: regression introduced in af43119 changed session tap to lazy</p>
-<p>(frontmost-based), breaking Vietnamese input on machine B when machine A</p>
-<p>disables XKey. Remote desktop server daemons inject events at session level,</p>
-<p>bypassing HID tap — lazy tap never fires on B since the daemon is never frontmost.</p>
-<p>Solution: isRemoteDesktopTarget preference (default false) lets machine B opt in</p>
-<p>to an always-on tailAppendEventTap at cgSessionEventTap. Machine A retains the</p>
-<p>lazy strategy (session tap only while RD client is frontmost) to avoid timing</p>
-<p>interference with Notion/Kiro CLI.</p>
+<p>fix(settings): live section switch (no recreate)</p>
+<p>Replace the @State-driven section in SettingsView/PreferencesView with a</p>
+<p>shared ObservableObject navigator owned by the window controller. The</p>
+<p>controller exposes reveal(section:) / reveal(tabIndex:) which mutates</p>
+<p>the navigator, deminiaturizes the window if needed, then brings it</p>
+<p>forward - no close+recreate flicker, no lost viewModel state, no stale</p>
+<p>'selectedSection' field that ignores the user's internal navigation.</p>
+<p>Stacks on top of #281 which routed Cmd+, through openPreferences().</p>
 <ul>
-<li>Preferences: add isRemoteDesktopTarget (bool, default false)</li>
-<li>SharedSettings: add XKey.isRemoteDesktopTarget key + computed property;</li>
+<li>SettingsView/PreferencesView: @State -> @ObservedObject navigator</li>
+<li>Window controllers hold the navigator and expose reveal(...)</li>
+<li>AppDelegate.openSettings/openLegacyPreferences: bring-front instead</li>
 </ul>
-<p>  exclude from iCloud sync scalars (device-specific — B != A)</p>
+<p>  of close+recreate when the window already exists</p>
 <ul>
-<li>EventTapManager: dual-mode session tap strategy controlled by isRemoteDesktopTarget;</li>
+<li>Bump CURRENT<em>PROJECT</em>VERSION to 20260528</li>
 </ul>
-<p>  tailAppendEventTap always-on for machine B, lazy frontmost-based for machine A</p>
-<ul>
-<li>AppDelegate.applyPreferences: restart event tap when isRemoteDesktopTarget changes</li>
-<li>AdvancedSection: toggle + description in Remote Desktop settings group</li>
-<li>StatusBarViewModel: detect running RD apps via NSWorkspace notifications;</li>
-</ul>
-<p>  expose isRemoteDesktopRunning + isRemoteDesktopTarget published vars;</p>
-<p>  setRemoteDesktopTarget() writes SharedSettings + restarts EventTapManager;</p>
-<p>  observe sharedSettingsDidChange to stay in sync with Settings panel changes</p>
-<ul>
-<li>StatusBarPopoverView: show "Remote Session Tap" toggle below "Gõ Tiếng Việt"</li>
-</ul>
-<p>  only when a remote desktop app is running; multiline subtitle with fixedSize</p>
-<ul>
-<li>Localizable.xcstrings: add en/zh-Hans for 3 new UI strings</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260527">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260528">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 27 May 2026 01:17:36 +0000</pubDate>
+      <pubDate>Thu, 28 May 2026 02:31:08 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.22-20260527/XKey.dmg" sparkle:version="20260527" sparkle:shortVersionString="1.2.22" length="11379225" type="application/octet-stream" sparkle:edSignature="X8q098SLF/wNFZ/57FNit9gKltfvkYFxBRgl2RM2LCwGPlbAPAlqKNID0HLj4VQtZEF5gl1Vtm0wGI/Rv65MAA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.22-20260528/XKey.dmg" sparkle:version="20260528" sparkle:shortVersionString="1.2.22" length="11396729" type="application/octet-stream" sparkle:edSignature="0TJZCd9LJUsSTMzrNnBy/2B6+6VOdPfk8p+N4Gky3GkL0x5XIXTs19zKGIZnhKwkQzI0iapt1uSNSL14dPmcCQ==" />
     </item>
   </channel>
 </rss>
