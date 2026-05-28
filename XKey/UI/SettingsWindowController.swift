@@ -12,9 +12,12 @@ import SwiftUI
 class SettingsWindowController: NSWindowController, NSWindowDelegate {
     
     private var pinManager: WindowPinManager?
-    
+
     /// Callback when window is closed - used to nil out reference in AppDelegate
     var onWindowClosed: (() -> Void)?
+
+    /// Drives the active section; shared with SettingsView so it can be switched live
+    private let navigator = SettingsNavigator()
 
     convenience init(selectedSection: SettingsSection = .general, onSave: @escaping (Preferences) -> Void) {
         // Create window with modern style
@@ -33,13 +36,15 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.center()
 
         self.init(window: window)
-        
+
+        navigator.selectedSection = selectedSection
+
         // Set window delegate to handle close
         window.delegate = self
 
         // Create SwiftUI view with auto-save callback
         let settingsView = SettingsView(
-            selectedSection: selectedSection,
+            navigator: navigator,
             onSave: onSave
         )
 
@@ -51,7 +56,17 @@ class SettingsWindowController: NSWindowController, NSWindowDelegate {
         pinManager = WindowPinManager(window: window)
         pinManager?.setupPinButton()
     }
-    
+
+    /// Switch to a section live and bring the window forward (restoring it from the Dock if minimized).
+    func reveal(section: SettingsSection) {
+        navigator.selectedSection = section
+        if let window = window, window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     // MARK: - NSWindowDelegate
     
     func windowWillClose(_ notification: Notification) {

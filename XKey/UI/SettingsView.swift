@@ -43,24 +43,36 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Settings Navigator
+
+/// Single source of truth for the active section, shared between the window
+/// controller and the view so sections can be switched live without recreating the window.
+final class SettingsNavigator: ObservableObject {
+    @Published var selectedSection: SettingsSection
+
+    init(_ selectedSection: SettingsSection = .general) {
+        self.selectedSection = selectedSection
+    }
+}
+
 // MARK: - Main Settings View
 
 @available(macOS 13.0, *)
 struct SettingsView: View {
     @StateObject private var viewModel = PreferencesViewModel()
-    @State private var selectedSection: SettingsSection
+    @ObservedObject var navigator: SettingsNavigator
 
     var onSave: ((Preferences) -> Void)?
 
-    init(selectedSection: SettingsSection = .general, onSave: ((Preferences) -> Void)? = nil) {
-        self._selectedSection = State(initialValue: selectedSection)
+    init(navigator: SettingsNavigator, onSave: ((Preferences) -> Void)? = nil) {
+        self.navigator = navigator
         self.onSave = onSave
     }
 
     var body: some View {
         NavigationSplitView {
             // Sidebar
-            List(SettingsSection.allCases, selection: $selectedSection) { section in
+            List(SettingsSection.allCases, selection: $navigator.selectedSection) { section in
                 Label {
                     Text(LocalizedStringKey(section.rawValue))
                 } icon: {
@@ -73,7 +85,7 @@ struct SettingsView: View {
         } detail: {
             // Content - Using shared components
             Group {
-                switch selectedSection {
+                switch navigator.selectedSection {
                 case .general:
                     GeneralSection(viewModel: viewModel)
                 case .quickTyping:
@@ -115,5 +127,5 @@ struct SettingsView: View {
 
 @available(macOS 13.0, *)
 #Preview {
-    SettingsView()
+    SettingsView(navigator: SettingsNavigator())
 }

@@ -66,16 +66,28 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Preferences Navigator
+
+/// Single source of truth for the active section, shared between the window
+/// controller and the view so sections can be switched live without recreating the window.
+final class PreferencesNavigator: ObservableObject {
+    @Published var selectedSection: PreferencesSection
+
+    init(_ selectedSection: PreferencesSection = .general) {
+        self.selectedSection = selectedSection
+    }
+}
+
 // MARK: - Preferences View
 
 struct PreferencesView: View {
     @StateObject private var viewModel = PreferencesViewModel()
-    @State private var selectedSection: PreferencesSection
+    @ObservedObject var navigator: PreferencesNavigator
 
     var onSave: ((Preferences) -> Void)?
 
-    init(selectedTab: Int = 0, onSave: ((Preferences) -> Void)? = nil) {
-        self._selectedSection = State(initialValue: PreferencesSection.from(tabIndex: selectedTab))
+    init(navigator: PreferencesNavigator, onSave: ((Preferences) -> Void)? = nil) {
+        self.navigator = navigator
         self.onSave = onSave
     }
 
@@ -89,9 +101,9 @@ struct PreferencesView: View {
                         SidebarButton(
                             title: LocalizedStringKey(section.rawValue),
                             icon: section.icon,
-                            isSelected: selectedSection == section
+                            isSelected: navigator.selectedSection == section
                         ) {
-                            selectedSection = section
+                            navigator.selectedSection = section
                         }
                     }
                 }
@@ -105,7 +117,7 @@ struct PreferencesView: View {
 
             // Content area
             Group {
-                switch selectedSection {
+                switch navigator.selectedSection {
                 case .about:
                     AboutSection()
                 case .general:
@@ -180,5 +192,5 @@ private struct SidebarButton: View {
 // MARK: - Preview
 
 #Preview {
-    PreferencesView()
+    PreferencesView(navigator: PreferencesNavigator())
 }

@@ -531,12 +531,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @available(macOS 13.0, *)
     func openSettings(selectedSection: SettingsSection = .general) {
-        // Close existing window if section is different
         if let existingController = settingsWindowController {
-            existingController.close()
-            settingsWindowController = nil
+            // Switch sections live and bring the window forward - no recreate, viewModel state preserved
+            existingController.reveal(section: selectedSection)
+            return
         }
-        
+
         let controller = SettingsWindowController(selectedSection: selectedSection) { [weak self] preferences in
             self?.applyPreferences(preferences)
         }
@@ -552,12 +552,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func openLegacyPreferences(selectedTab: Int = 0) {
-        // Close existing window if tab is different
         if let existingController = preferencesWindowController {
-            existingController.close()
-            preferencesWindowController = nil
+            // Switch tabs live and bring the window forward - no recreate, viewModel state preserved
+            existingController.reveal(tabIndex: selectedTab)
+            return
         }
-        
+
         let controller = PreferencesWindowController(selectedTab: selectedTab) { [weak self] preferences in
             self?.applyPreferences(preferences)
         }
