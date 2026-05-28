@@ -21,6 +21,14 @@ struct XKeyApp: App {
         Settings {
             EmptyView()
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Bảng điều khiển...") {
+                    AppDelegate.shared?.openPreferences()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }
 
