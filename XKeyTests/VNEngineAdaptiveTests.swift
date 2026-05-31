@@ -130,7 +130,7 @@ class VNEngineAdaptiveTests: XCTestCase {
         let word = typeAdaptive([
             ("m", VietnameseData.KEY_M), ("p", VietnameseData.KEY_P), ("3", VietnameseData.KEY_3)
         ])
-        XCTAssertEqual(word, "mp3")
+        XCTAssertEqual(word, "mp3", "all-consonant + digit token must not be modified")
     }
 
     func testAdaptive_ValidVietnameseDigitStillWorks() {
@@ -186,7 +186,7 @@ class VNEngineAdaptiveTests: XCTestCase {
         XCTAssertEqual(engine.getCurrentWord(), "ô")
     }
 
-    func testAdaptive_BackspaceRevertsTone() {
+    func testAdaptive_BackspaceClearsComposedChar() {
         engine.reset()
         engine.vAdaptiveEnabled = true
         engine.vInputType = 0

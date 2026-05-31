@@ -1280,6 +1280,7 @@ class VNEngine {
     /// - VNI: 0-9
     /// - Simple Telex 1: w, a, e, o, s, f, r, x, j, z, d (NO [ ])
     /// - Simple Telex 2: w, a, e, o, s, f, r, x, j, z, d (NO [ ])
+    /// - Adaptive: Telex keys ∪ VNI keys (letters s/f/r/x/j/w/z, [, ], double letters, and 0-9)
     static func isVietnameseSpecialKey(character: Character, inputMethod: InputMethod) -> Bool {
         // Letters are always processed (Vietnamese engine handles them)
         if character.isLetter {
@@ -1307,7 +1308,7 @@ class VNEngine {
     ///   - inputMethod: The current input method
     /// - Returns: true if this character is a word break
     ///
-    /// Note: In Telex mode, [ and ] are NOT word breaks (they produce ơ and ư)
+    /// Note: In Telex and Adaptive modes, [ and ] are NOT word breaks (they produce ơ and ư)
     static func isWordBreak(character: Character, inputMethod: InputMethod) -> Bool {
         // Whitespace and common punctuation
         let baseWordBreaks: Set<Character> = [
