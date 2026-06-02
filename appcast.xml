@@ -6,28 +6,33 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.22 (Build 20260601)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260601</link>
-      <sparkle:version>20260601</sparkle:version>
+      <title>Version 1.2.22 (Build 20260602)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260602</link>
+      <sparkle:version>20260602</sparkle:version>
       <sparkle:shortVersionString>1.2.22</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(engine): correct adaptive English-detection + add adaptive tests</p>
-<p>Adaptive mode flips vInputType per keystroke (digit -> VNI, else -> Telex), so</p>
-<p>it reflects only the last key. The whole-buffer English-detection validated the</p>
-<p>mixed Telex+VNI raw buffer against that single type, which could misjudge VNI</p>
-<p>sequences when a trailing letter flipped the type back to Telex. Flag a buffer</p>
-<p>as English only when it is impossible under BOTH Telex and VNI.</p>
-<p>Also fix the (currently unreachable) InputProcessor.adaptive routing to send</p>
-<p>digits through VNI instead of Telex-only, so it stays correct if revived.</p>
-<p>Tests: VNI-typed multi-syllable word not disabled as English, English word stays</p>
-<p>literal under the both-tables check, and VNI remove-tone (0) works in adaptive</p>
-<p>across both conventions.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260601">Xem chi tiết trên GitHub</a></p>
+<p>fix(injection): prevent diacritic loss in Office for the web</p>
+<p>Word/Excel/PowerPoint Online (WAC editing surface) holds characters</p>
+<p>injected via the default .fast synthetic key events in a provisional</p>
+<p>state and discards them when the surface loses focus (clicking a blank</p>
+<p>area) or autosave normalizes the DOM, deleting the just-typed Vietnamese</p>
+<p>text.</p>
+<p>Add a built-in Window Title Rule matched by DOM class (WACEditing /</p>
+<p>EditingSurfaceBody) that switches Office for the web to slow + one-by-one</p>
+<p>injection (same strategy as Google Docs), giving the editor time to</p>
+<p>commit each character.</p>
+<p>Also disambiguate the three rule badges that all read "AX":</p>
+<ul>
+<li>matching-condition badge -> "AX Detection"</li>
+<li>force-accessibility badge -> "Force AX"</li>
+<li>axDirect injection method -> "AXDirect"</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.22-20260602">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 31 May 2026 23:38:57 +0000</pubDate>
+      <pubDate>Tue, 02 Jun 2026 02:03:03 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.22-20260601/XKey.dmg" sparkle:version="20260601" sparkle:shortVersionString="1.2.22" length="11399537" type="application/octet-stream" sparkle:edSignature="42TCpnCGHaxp8h4R/UqeeR6/GUDy8NC0rlN+CwE+aGzSVAX9wFh+gckaiWL/CD4dZaheJO+w0fqRXmkEVByqDg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.22-20260602/XKey.dmg" sparkle:version="20260602" sparkle:shortVersionString="1.2.22" length="11399445" type="application/octet-stream" sparkle:edSignature="JJ+JyCgwio9+u6xfQTyyD1Uchzb300S37htXUIjR5xXzDXNEv5j2AZEpWjXqKXoc8XS/OMp1GRKcjrpkiqwMDA==" />
     </item>
   </channel>
 </rss>
