@@ -6,38 +6,22 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.23 (Build 20260606)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.23-20260606</link>
-      <sparkle:version>20260606</sparkle:version>
+      <title>Version 1.2.23 (Build 20260606.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.23-20260606.1</link>
+      <sparkle:version>20260606.1</sparkle:version>
       <sparkle:shortVersionString>1.2.23</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(sync): re-enable iCloud KVS on Developer ID + refine sync UI</p>
-<p>Root cause of the launch SIGKILL was a code-signing mismatch, not a macOS</p>
-<p>platform ban: the app was signed with a Developer ID cert absent from the</p>
-<p>embedded provisioning profile's DeveloperCertificates, so amfid rejected the</p>
-<p>restricted ubiquity-kvstore-identifier entitlement with -413 "No matching</p>
-<p>profile found".</p>
-<ul>
-<li>build_release.sh: pin signing identity by SHA-1 (self-healing resolution:</li>
-</ul>
-<p>  env override -> cert derived from embedded profile -> known-good fallback),</p>
-<p>  ad-hoc build then re-sign with the authorized Developer ID profile, and</p>
-<p>  PlistBuddy-based entitlement stripping for the sync-disabled control build.</p>
-<ul>
-<li>XKeyRelease.entitlements: re-add com.apple.developer.ubiquity-kvstore-identifier.</li>
-<li>iCloudSyncManager: correct the misleading comment to reflect the true cause.</li>
-<li>BackupRestoreSection: move the cloud icon to the trailing side of the toggle</li>
-</ul>
-<p>  and shrink the 'Sync now' / 'Export from iCloud' button icons for balance.</p>
-<ul>
-<li>Version.xcconfig: bump to 1.2.23 (build 20260606).</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.23-20260606">Xem chi tiết trên GitHub</a></p>
+<p>fix(sync): auto-trigger iCloud sync for macros and window title rules</p>
+<p>Macro changes (add/edit/delete) now notify observers so iCloudSyncManager schedules a push; previously setMacrosData wrote silently and edits never synced. Macro sync identity migrated from per-device UUID to the stable 'text' business key so a delete on one Mac matches the same macro on another and merges collapse duplicates.</p>
+<p>Window Title Rules: setWindowTitleRulesData now notifies (push trigger); editing a rule preserves its original UUID instead of minting a new one (avoids delete+add duplication on peers and keeps list position); applyRulesFromSync posts windowTitleRulesDidChange so the engine (AppBehaviorDetector.customRules) and the open Settings tab reload instead of staying stale until restart.</p>
+<p>iCloudSyncManager.applyEnvelope pull-merge now includes local tombstones in the local payload, so a fresh local delete is preserved by last-write-wins rather than being resurrected by a stale remote live entry (affected all per-entry-merge categories).</p>
+<p>SyncCollectionPayload.merged preserves deterministic insertion order (local first, new remote appended) instead of Array(map.values), which scrambled Window Title Rule cascade priority on every merge.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.23-20260606.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 05 Jun 2026 17:15:45 +0000</pubDate>
+      <pubDate>Sat, 06 Jun 2026 02:10:29 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.23-20260606/XKey.dmg" sparkle:version="20260606" sparkle:shortVersionString="1.2.23" length="11521550" type="application/octet-stream" sparkle:edSignature="n3KV2R3spAb3RzQ3+rNn9WEzYpGEWt4B5JzK+47xv7Iolns+oWTLwwibG4a5n6Y3f7IqCQN8ECPARzzVKfEWAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.23-20260606.1/XKey.dmg" sparkle:version="20260606.1" sparkle:shortVersionString="1.2.23" length="11508020" type="application/octet-stream" sparkle:edSignature="Na4a5atkXJH69NHpLQa7X76a+0eV6rdYYckRHbY9DMM5lfv5ojPeJurlO5sGOCiTGTHfac9nxmQqupeLikiBCA==" />
     </item>
   </channel>
 </rss>
