@@ -2228,15 +2228,37 @@ class AppBehaviorDetector {
             || Self.axAttributeDetectForBrowsers.contains(bundleId)
         
         if isBrowserApp {
-            // Safari address bar
-            if (bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview")
-                && isSafariAddressBar(info: focusedInfo) {
-                return InjectionMethodInfo(
-                    method: .selection,
-                    delays: InjectionMethod.selection.defaultDelays,
-                    textSendingMethod: .chunked,
-                    description: "Safari Address Bar"
-                )
+            // Safari address bar (+ Safari "type-ahead")
+            if bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview" {
+                // Two ways the address bar receives keystrokes:
+                // 1. Explicit focus: user clicked the URL field →
+                //    AX identifier == WEB_BROWSER_ADDRESS_AND_SEARCH_FIELD.
+                // 2. Type-ahead: on the Start Page / when no editable field is focused,
+                //    Safari routes keystrokes to the address bar WITHOUT moving AX focus
+                //    to the URL field (focus stays AXWindow / Start Page AXList). The
+                //    focused element therefore never reports as the address bar, so we
+                //    infer it from the absence of an editable field.
+                //
+                // Either way the address bar shows an autocomplete suggestion. We use the
+                // empty-char-prefix technique (.fast + U+202F) — same as Chromium/Firefox via
+                // makeAddressBarInjection(). The invisible U+202F replaces the highlighted
+                // autocomplete suggestion, then the extra backspace removes it, so the typed
+                // char is deleted correctly (fixes "caau" → "caâu"). Avoids the Shift+Left
+                // (.selection) race conditions that browser autocomplete is prone to.
+                let isExplicitAddressBar = isSafariAddressBar(info: focusedInfo)
+                let role = focusedInfo.role
+                let isTypeAheadContext = role == nil
+                    || role == "AXWindow"
+                    || role == "AXList"
+                    || role == "AXCollectionList"
+                if isExplicitAddressBar || isTypeAheadContext {
+                    let browserType = isExplicitAddressBar ? "Safari" : "Safari (type-ahead)"
+                    // makeAddressBarInjection sets .fast + needsEmptyCharPrefix and caches
+                    // the result so the method persists through transient focus changes
+                    // (AXTextField → AXWindow etc.). Cache self-corrects: focusing a real
+                    // web text field re-detects as standard and clears this.
+                    return makeAddressBarInjection(browserType: browserType, bundleId: bundleId)
+                }
             }
             
             // Chromium address bar (Chrome, Edge, Brave, etc.)
