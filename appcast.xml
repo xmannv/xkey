@@ -6,42 +6,39 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.24 (Build 20260611)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260611</link>
-      <sparkle:version>20260611</sparkle:version>
+      <title>Version 1.2.24 (Build 20260611.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260611.1</link>
+      <sparkle:version>20260611.1</sparkle:version>
       <sparkle:shortVersionString>1.2.24</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(macro): add option to yield conflicting macros to macOS Text Replacement</p>
-<p>XKey's event tap wins the race against macOS Text Replacement: macro</p>
-<p>expansion deletes the shortcut before the system can match it, even in</p>
-<p>fields that already showed the replacement preview bubble. This is</p>
-<p>confusing when the same shortcut exists on both sides.</p>
-<p>Add a global toggle that skips XKey macros whose shortcut (case-</p>
-<p>insensitive) also exists in macOS Text Replacements, letting the system</p>
-<p>replacement apply instead:</p>
-<ul>
-<li>MacroManager reads NSUserDictionaryReplacementItems from the global</li>
-</ul>
-<p>  defaults domain into a lock-guarded lowercase shortcut set, refreshed</p>
-<p>  asynchronously with a 60s TTL only on macro hits; disabled toggle adds</p>
-<p>  zero typing overhead</p>
-<ul>
-<li>Skip check covers both findMacro match paths (exact and auto-caps)</li>
-<li>Plumb the setting through Preferences, SharedSettings</li>
-</ul>
-<p>  (XKey.yieldMacroToSystemReplacement), KeyboardEventHandler and</p>
-<p>  AppDelegate, mirroring addSpaceAfterMacro</p>
-<ul>
-<li>Add the toggle to Macro settings with en/zh-Hans localization</li>
-<li>Add MacroManager yield tests with an injectable shortcut set</li>
-</ul>
-<p>Bump version to 1.2.24 (20260611).</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260611">Xem chi tiết trên GitHub</a></p>
+<p>fix(injection): re-detect method on first keystroke after focus-moving Cmd-chord in browsers</p>
+<p>Cmd+L/Cmd+T move focus into the browser address bar (Cmd+F/Cmd+K into</p>
+<p>the find/search field), but the injection method is re-detected</p>
+<p>asynchronously (AXObserver with a 100ms throttle, mouse-click retries),</p>
+<p>so characters typed immediately after the chord could still use the</p>
+<p>previous context's method and race the omnibox autocomplete (e.g.</p>
+<p>'caau' → 'caâu').</p>
+<p>Reuse the one-shot probe pattern from the overlay fix at the injection-</p>
+<p>method level: EventTapManager arms a reprobe on focus-moving Cmd-chords</p>
+<p>(L/T/N/F/K only — broader chords like Cmd+C/V/W/R don't move focus into</p>
+<p>chrome UI and would only add AX cost and sample transitional AX states),</p>
+<p>and the next plain keyDown consumes it in shouldProcessEvent,</p>
+<p>synchronously re-detecting and confirming the method before the first</p>
+<p>character is processed. A keystroke landing within 30ms of the chord</p>
+<p>keeps the probe armed instead of consuming it — the browser hasn't</p>
+<p>moved focus yet, and re-detecting that early would pin the OLD context's</p>
+<p>method. There is deliberately no 'a newer confirmation already landed'</p>
+<p>shortcut: async confirmations can carry a pre-chord focus snapshot with</p>
+<p>a post-chord timestamp, so timestamps cannot prove freshness.</p>
+<p>The reprobe is restricted to browser bundle IDs; other apps keep the</p>
+<p>existing event-driven detection. Cost: at most one detectInjectionMethod()</p>
+<p>per focus-moving chord; plain typing pays a single comparison.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260611.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 10 Jun 2026 23:19:49 +0000</pubDate>
+      <pubDate>Thu, 11 Jun 2026 05:29:50 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260611/XKey.dmg" sparkle:version="20260611" sparkle:shortVersionString="1.2.24" length="11554233" type="application/octet-stream" sparkle:edSignature="y8NZH62/tD2I8G5dxNUmKtHKHXNoOA5PikpKoKRXmMgvQ1qBba1ij3uyB7yOfINiFrUSGibUNcCqPFEKMbNNCw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260611.1/XKey.dmg" sparkle:version="20260611.1" sparkle:shortVersionString="1.2.24" length="11559962" type="application/octet-stream" sparkle:edSignature="utz08CfkUwhKvuIM5qP4IhoFI23C/MT34eJPABMWc3zKnZcaWBYEOBq9okEfRgEZwMeHmlZwqqxNFi329r/5DA==" />
     </item>
   </channel>
 </rss>
