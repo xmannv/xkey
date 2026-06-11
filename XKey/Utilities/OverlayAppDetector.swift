@@ -52,7 +52,11 @@ class OverlayAppDetector {
     /// Deadline after which the probe auto-disarms (safety net)
     private var probeDeadline: CFAbsoluteTime = 0
     
-    /// Duration to keep a probe armed before auto-disarming (seconds)
+    /// Window during which an armed probe runs a full AX check on every
+    /// consumer call (and may dismiss on a nil read). Past the deadline the
+    /// probe degrades to a single find-only last-chance check, then disarms —
+    /// it does NOT silently disarm, or an overlay opened right before a pause
+    /// would stay undetected (see isOverlayAppVisible).
     private static let probeTimeout: CFAbsoluteTime = 0.8
 
     private init() {
@@ -126,47 +130,68 @@ class OverlayAppDetector {
     /// that indicate overlay state MAY have just changed.
     func isOverlayAppVisible() -> Bool {
         if probeNeeded {
-            let now = CFAbsoluteTimeGetCurrent()
-            if now > probeDeadline {
-                // Probe expired — safety net, disarm
+            let expired = CFAbsoluteTimeGetCurrent() > probeDeadline
+            if expired {
+                // Probe outlived its window — disarm, then run ONE last-chance
+                // find-only check below. Covers "Cmd+Space → pause > timeout →
+                // first keystroke": without it the overlay stays undetected
+                // (stuck on the previous injection method) until the next arm
+                // signal.
                 probeNeeded = false
-            } else {
-                // Execute AX probe
-                if let overlayName = detectOverlayViaAXAttributes() {
-                    // Overlay found — update cache, disarm
-                    lastDetectedOverlay = overlayName
-                    cachedOverlayVisible = true
-                    cachedOverlayName = overlayName
-                    probeNeeded = false
-                    logDebug("found (probe): '\(overlayName)'")
-                    
-                    if !wasOverlayVisible {
-                        wasOverlayVisible = true
-                        onOverlayVisibilityChanged?(true, overlayName)
-                    }
-                    return true
-                } else if cachedOverlayVisible {
-                    // Was visible, now gone — clear cache, disarm
-                    // Fixes stale-positive: no more waiting for timer poll
-                    let closingOverlayName = cachedOverlayName  // Capture before clearing
-                    cachedOverlayVisible = false
-                    cachedOverlayName = nil
-                    lastDetectedOverlay = nil
-                    probeNeeded = false
-                    logDebug("Overlay dismissed (probe)")
-                    
-                    if wasOverlayVisible {
-                        wasOverlayVisible = false
-                        onOverlayVisibilityChanged?(false, closingOverlayName)
-                    }
-                    return false
+                // Skip the AX query when the cache is already positive: the
+                // expired path never dismisses (see below), so the query could
+                // not change any state — it would be pure keystroke latency.
+                if cachedOverlayVisible { return true }
+            }
+            if let overlayName = detectOverlayViaAXAttributes() {
+                return handleOverlayFound(overlayName, finalCheck: expired)
+            }
+            if expired {
+                // Nil read at expiry: keep cached state untouched. Dismissal of
+                // a visible overlay is the monitor timer's job (0.5s poll) —
+                // acting on a stale-probe nil could false-dismiss on a transient
+                // AX failure. (The fresh path below MAY dismiss: it runs right
+                // after an explicit close signal — Esc/Return/click — where a
+                // nil read is expected and meaningful.)
+                return cachedOverlayVisible
+            }
+            // Probe armed and fresh — nil read may mean a real dismissal
+            if cachedOverlayVisible {
+                // Was visible, now gone — clear cache, disarm
+                // Fixes stale-positive: no more waiting for timer poll
+                let closingOverlayName = cachedOverlayName  // Capture before clearing
+                cachedOverlayVisible = false
+                cachedOverlayName = nil
+                lastDetectedOverlay = nil
+                probeNeeded = false
+                logDebug("Overlay dismissed (probe)")
+
+                if wasOverlayVisible {
+                    wasOverlayVisible = false
+                    onOverlayVisibilityChanged?(false, closingOverlayName)
                 }
-                // cache=false + AX nil → overlay hasn't appeared yet
-                // Keep probe armed — it might appear on next keyDown
                 return false
             }
+            // cache=false + AX nil → overlay hasn't appeared yet
+            // Keep probe armed — it might appear on next keyDown
+            return false
         }
         return cachedOverlayVisible
+    }
+
+    /// Handle a positive overlay detection from a probe: update cache, disarm, notify.
+    private func handleOverlayFound(_ overlayName: String, finalCheck: Bool) -> Bool {
+        lastDetectedOverlay = overlayName
+        cachedOverlayVisible = true
+        cachedOverlayName = overlayName
+        probeNeeded = false
+        logDebug("found (probe\(finalCheck ? ", final check" : "")): '\(overlayName)'")
+
+        if !wasOverlayVisible {
+            wasOverlayVisible = true
+            onOverlayVisibilityChanged?(true, overlayName)
+        }
+        return true
     }
     
     /// Get the name of the currently visible overlay app, if any
