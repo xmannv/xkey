@@ -6,20 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.24 (Build 20260629)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260629</link>
-      <sparkle:version>20260629</sparkle:version>
+      <title>Version 1.2.24 (Build 20260701)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260701</link>
+      <sparkle:version>20260701</sparkle:version>
       <sparkle:shortVersionString>1.2.24</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat: add per-window Vietnamese on/off override to window title rules</p>
-<p>Add InputMethodPolicy (enable/disable) to WindowTitleRule so a matched window or app can force Vietnamese input on or off, independent of the injection method (which controls how text is injected). Wire it through the merged-rule cascade, Codable, the rule editor UI (toggle + IME On/Off badge), and the keyboard event gate.</p>
-<p>The matched policy is cached in AppBehaviorDetector and refreshed inside detectInjectionMethod() (focus/title/app/mouse/exclusion/rules changes), so the typing hot path reads it in O(1) without a per-keystroke window-title AX query. engine.vLanguage is synced to the effective state each keystroke so the engine's macro decision (shouldUseMacro) matches the override.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260629">Xem chi tiết trên GitHub</a></p>
+<p>feat: add empty char prefix rule overrides</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260701">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 29 Jun 2026 10:16:32 +0000</pubDate>
+      <pubDate>Wed, 01 Jul 2026 07:53:35 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260629/XKey.dmg" sparkle:version="20260629" sparkle:shortVersionString="1.2.24" length="11638864" type="application/octet-stream" sparkle:edSignature="CQj9d5l51I86Z0uW5iV8kQf6oL/+4MKWk2MHsdS3rHTQXHD63yupJ164dqagPlcbZ3Kf2hbHk0Hnt2EmRksDAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260701/XKey.dmg" sparkle:version="20260701" sparkle:shortVersionString="1.2.24" length="11646255" type="application/octet-stream" sparkle:edSignature="C3S4HSLjMH/Sl9wScICUjU12jjJnnt73Wfsx0HAnOgp8/djsMcEOMPXXe+Lq/qwbjlMQrLYYN18VYn2Q1iirDw==" />
     </item>
   </channel>
 </rss>
