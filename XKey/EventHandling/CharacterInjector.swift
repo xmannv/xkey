@@ -101,13 +101,22 @@ class CharacterInjector {
     /// may use `CGEventTapProxy` remains synchronous and unchanged.
     func inject(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
         let methodInfo = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
+        // needsForwardDeleteWithAXCheck resolves the frontmost bundle id and scans the
+        // confirmed method description, so keep it behind the backspace check: injectSync
+        // only consults it when backspaceCount > 0, and most keystrokes insert without one.
         let canRunSlowDirectAsync = methodInfo.method == .slow
             && !methodInfo.needsEmptyCharPrefix
             && methodInfo.textSendingMethod != .paste
-            && !AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck
+            && (backspaceCount == 0 || !AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck)
 
         guard canRunSlowDirectAsync else {
-            injectSync(backspaceCount: backspaceCount, characters: characters, codeTable: codeTable, proxy: proxy)
+            injectSync(
+                backspaceCount: backspaceCount,
+                characters: characters,
+                codeTable: codeTable,
+                proxy: proxy,
+                precomputedMethod: methodInfo
+            )
             return
         }
 
@@ -131,16 +140,18 @@ class CharacterInjector {
     
     /// Inject text replacement synchronously - backspaces + new text in one atomic operation
     /// This prevents race conditions where next keystroke arrives between backspace and text injection
-    func injectSync(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
+    /// `precomputedMethod` lets `inject(...)` hand over the method it already resolved for
+    /// routing, so a synchronous injection does not detect it a second time per keystroke.
+    func injectSync(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy, precomputedMethod: InjectionMethodInfo? = nil) {
         // Acquire semaphore for entire injection operation
         injectionSemaphore.wait()
         defer { injectionSemaphore.signal() }
-        
+
         // Create NEW event source for each injection
         // This ensures each injection has independent state, avoiding potential race conditions
         eventSource = CGEventSource(stateID: .privateState)
-        
-        let methodInfo = detectInjectionMethod()
+
+        let methodInfo = precomputedMethod ?? detectInjectionMethod()
         let method = methodInfo.method
         let delays = methodInfo.delays
         let textSendingMethod = methodInfo.textSendingMethod
