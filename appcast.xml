@@ -6,29 +6,19 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.24 (Build 20260713.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260713.1</link>
-      <sparkle:version>20260713.1</sparkle:version>
+      <title>Version 1.2.24 (Build 20260715)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260715</link>
+      <sparkle:version>20260715</sparkle:version>
       <sparkle:shortVersionString>1.2.24</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix: allow uppercase Đ abbreviations at any position (HĐ, PGĐ, HĐQT)</p>
-<p>The d-stroke abbreviation whitelist only accepted two-letter words with</p>
-<p>a leading Đ (ĐN, ĐL), so common all-caps abbreviations with Đ elsewhere</p>
-<p>(HĐ, GĐ, PGĐ, BLĐ, LĐBĐ, HĐQT) or longer than two letters (ĐHQG) were</p>
-<p>auto-restored to raw input (HDD, GDD, ...) by the wrong-spelling restore</p>
-<p>path.</p>
-<p>Generalize the whitelist to any all-uppercase word of two or more</p>
-<p>letters containing Đ at any position. Vietnamese-first trade-off: caps</p>
-<p>English words containing DD (ADD, ODD, HDD) now compose Đ; the raw form</p>
-<p>stays reachable with an extra D (HDDD → HDD), consistent with the</p>
-<p>existing DDR/DDT behavior.</p>
-<p>Includes build number bump to 20260713.1.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260713.1">Xem chi tiết trên GitHub</a></p>
+<p>Merge pull request #307 from longdoanz/perf/async-injection-and-log-opts</p>
+<p>perf: optimize debug logging, cache excluded apps, and implement asyn…</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260715">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 13 Jul 2026 07:13:42 +0000</pubDate>
+      <pubDate>Wed, 15 Jul 2026 14:22:06 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260713.1/XKey.dmg" sparkle:version="20260713.1" sparkle:shortVersionString="1.2.24" length="11672301" type="application/octet-stream" sparkle:edSignature="G+xe209nZtgfbMJrwOKeJcu6/MZvVmMPdhGfP0/7/9Bmono8hHp/yr3xRKT/D4bqGesQ+5rgC/vIF3M5KBoDCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260715/XKey.dmg" sparkle:version="20260715" sparkle:shortVersionString="1.2.24" length="11695146" type="application/octet-stream" sparkle:edSignature="ijTIxtfWks8qcmfnT0sbVFvIX1NEIgl5dYeJzCFxWTr7q6CEYTDhIhL0OJSWQe9iXDI0nJaZuiCMSb98EnfJCg==" />
     </item>
   </channel>
 </rss>
