@@ -27,6 +27,9 @@ class CharacterInjector {
     /// Semaphore to ensure injection completes before next keystroke is processed
     /// This prevents race conditions where backspace arrives before previous injection is rendered
     private let injectionSemaphore = DispatchSemaphore(value: 1)
+    /// Serial queue used only for slow injection paths that already post directly to
+    /// `.cgSessionEventTap`; proxy-based paths remain synchronous on the tap callback.
+    private let slowInjectionQueue = DispatchQueue(label: "com.codetay.XKey.slow-injection", qos: .userInteractive)
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
@@ -61,6 +64,14 @@ class CharacterInjector {
     /// Wait for previous injection to complete (call BEFORE processing next keystroke)
     /// Uses semaphore to ensure 100% synchronization (better than cooldown timer)
     func waitForInjectionComplete() {
+        // Timing is only useful for verbose diagnostics. In normal operation this runs
+        // at the event-tap boundary for every physical event, so avoid two clock reads.
+        guard debugCallback != nil else {
+            injectionSemaphore.wait()
+            injectionSemaphore.signal()
+            return
+        }
+
         let startTime = CFAbsoluteTimeGetCurrent()
         injectionSemaphore.wait()
         injectionSemaphore.signal()
@@ -81,6 +92,42 @@ class CharacterInjector {
     }
     
     // MARK: - Synchronized Injection
+
+    /// Route injection through the smallest safe non-blocking path.
+    ///
+    /// Only plain `.slow` one-by-one/chunked injections run on the serial queue. Those
+    /// paths already post every event directly to `.cgSessionEventTap`, so moving them
+    /// off the event-tap callback does not change their posting behavior. Any path that
+    /// may use `CGEventTapProxy` remains synchronous and unchanged.
+    func inject(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
+        let methodInfo = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
+        let canRunSlowDirectAsync = methodInfo.method == .slow
+            && !methodInfo.needsEmptyCharPrefix
+            && methodInfo.textSendingMethod != .paste
+            && !AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck
+
+        guard canRunSlowDirectAsync else {
+            injectSync(backspaceCount: backspaceCount, characters: characters, codeTable: codeTable, proxy: proxy)
+            return
+        }
+
+        // Acquire before dispatch so waitForInjectionComplete() cannot slip through the
+        // enqueue→execute gap and let the next physical key overtake this injection.
+        injectionSemaphore.wait()
+        let semaphore = injectionSemaphore
+        let delays = methodInfo.delays
+        let textSendingMethod = methodInfo.textSendingMethod
+        slowInjectionQueue.async { [weak self] in
+            defer { semaphore.signal() }
+            self?.performSlowDirectInjection(
+                backspaceCount: backspaceCount,
+                characters: characters,
+                codeTable: codeTable,
+                delays: delays,
+                textSendingMethod: textSendingMethod
+            )
+        }
+    }
     
     /// Inject text replacement synchronously - backspaces + new text in one atomic operation
     /// This prevents race conditions where next keystroke arrives between backspace and text injection
@@ -234,26 +281,26 @@ class CharacterInjector {
             }
         }
         
-        // Step 2: Send new characters
+        // Step 2: Send new characters. Reuse the string already built above instead
+        // of converting every VNCharacter to Unicode a second time.
         if !characters.isEmpty {
-            var fullString = ""
-            for (index, character) in characters.enumerated() {
-                let unicodeString = character.unicode(codeTable: codeTable)
-                fullString += unicodeString
-                debugCallback?("  [\(index)]: '\(unicodeString)'")
+            if let debugCallback {
+                for (index, character) in characters.enumerated() {
+                    debugCallback("  [\(index)]: '\(character.unicode(codeTable: codeTable))'")
+                }
             }
-            
+
             // Use text sending method from rule/detection
             switch textSendingMethod {
             case .oneByOne:
                 debugCallback?("    → Text mode: one-by-one, directPost=\(useDirectPost)")
-                sendTextOneByOneInternal(fullString, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
+                sendTextOneByOneInternal(charPreview, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
             case .chunked:
                 debugCallback?("    → Text mode: chunked, directPost=\(useDirectPost)")
-                sendTextChunkedInternal(fullString, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
+                sendTextChunkedInternal(charPreview, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
             case .paste:
                 debugCallback?("    → Text mode: paste (clipboard + Cmd+V)")
-                sendTextViaPaste(fullString, proxy: proxy, config: methodInfo.pasteConfig)
+                sendTextViaPaste(charPreview, proxy: proxy, config: methodInfo.pasteConfig)
             }
         }
         
@@ -266,9 +313,49 @@ class CharacterInjector {
         
         debugCallback?("injectSync: complete")
     }
+
+    /// Performs the subset of `.slow` injection that is guaranteed to use direct session
+    /// posting. The caller owns `injectionSemaphore`; this method must not wait or signal it.
+    private func performSlowDirectInjection(
+        backspaceCount: Int,
+        characters: [VNCharacter],
+        codeTable: CodeTable,
+        delays: InjectionDelays,
+        textSendingMethod: TextSendingMethod
+    ) {
+        eventSource = CGEventSource(stateID: .privateState)
+
+        let text = characters.map { $0.unicode(codeTable: codeTable) }.joined()
+        debugCallback?("Inject async slow-direct: bs=\(backspaceCount), chars=\(characters.count), text=\"\(text)\", textMode=\(textSendingMethod)")
+
+        for index in 0..<backspaceCount {
+            sendBackspaceKey(codeTable: codeTable, proxy: nil, useDirectPost: true)
+            usleep(delays.backspace)
+            debugCallback?("    → Backspace \(index + 1)/\(backspaceCount)")
+        }
+        if backspaceCount > 0 {
+            usleep(delays.wait)
+        }
+
+        if !text.isEmpty {
+            switch textSendingMethod {
+            case .oneByOne:
+                sendTextOneByOneInternal(text, delay: delays.text, proxy: nil, useDirectPost: true)
+            case .chunked:
+                sendTextChunkedInternal(text, delay: delays.text, proxy: nil, useDirectPost: true)
+            case .paste:
+                // Excluded by inject(); keep this exhaustive and fail closed if routing changes.
+                assertionFailure("Paste injection must remain on the synchronous proxy-aware path")
+                return
+            }
+        }
+
+        usleep(20000) // Preserve the existing `.slow` settle time.
+        debugCallback?("Inject async slow-direct: complete")
+    }
     
     /// Internal: Send backspace key (no semaphore)
-    private func sendBackspaceKey(codeTable: CodeTable, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendBackspaceKey(codeTable: CodeTable, proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         let deleteKeyCode: CGKeyCode = VietnameseData.KEY_DELETE
         let backspaceCount = codeTable.requiresDoubleBackspace ? 2 : 1
         for _ in 0..<backspaceCount {
@@ -354,7 +441,7 @@ class CharacterInjector {
     
     /// Internal: Send text chunked (no semaphore)
     /// Special handling for newline/tab: splits text and sends as key events
-    private func sendTextChunkedInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendTextChunkedInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
         
         debugCallback?("    → Sending text chunked: '\(text)' (handling special chars), direct=\(useDirectPost)")
@@ -422,9 +509,12 @@ class CharacterInjector {
                     if useDirectPost {
                         keyDown.post(tap: .cgSessionEventTap)
                         keyUp.post(tap: .cgSessionEventTap)
-                    } else {
+                    } else if let proxy {
                         keyDown.tapPostEvent(proxy)
                         keyUp.tapPostEvent(proxy)
+                    } else {
+                        assertionFailure("A tap proxy is required when direct posting is disabled")
+                        return
                     }
                     
                     debugCallback?("    → Sent chunk [\(offset)..<\(end)]: \(chunk.count) chars")
@@ -454,7 +544,7 @@ class CharacterInjector {
     /// Internal: Send text one character at a time (for Safari/Google Docs compatibility)
     /// Some apps don't handle multiple Unicode characters in a single CGEvent properly
     /// Special handling for newline: sends Return key (0x24) instead of Unicode \n
-    private func sendTextOneByOneInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendTextOneByOneInternal(_ text: String, delay: UInt32, proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
         
         debugCallback?("    → Sending text one-by-one: '\(text)' (\(text.count) chars), direct=\(useDirectPost)")
@@ -498,9 +588,12 @@ class CharacterInjector {
             if useDirectPost {
                 keyDown.post(tap: .cgSessionEventTap)
                 keyUp.post(tap: .cgSessionEventTap)
-            } else {
+            } else if let proxy {
                 keyDown.tapPostEvent(proxy)
                 keyUp.tapPostEvent(proxy)
+            } else {
+                assertionFailure("A tap proxy is required when direct posting is disabled")
+                return
             }
             
             debugCallback?("    → Sent char [\(index)]: '\(char)'")
@@ -513,12 +606,12 @@ class CharacterInjector {
     }
     
     /// Internal: Send Return key (for newline in macros)
-    private func sendReturnKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendReturnKeyInternal(proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         sendKeyPress(0x24, proxy: proxy, useDirectPost: useDirectPost)  // Return key
     }
     
     /// Internal: Send Tab key (for tab in macros)
-    private func sendTabKeyInternal(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendTabKeyInternal(proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         sendKeyPress(0x30, proxy: proxy, useDirectPost: useDirectPost)  // Tab key
     }
     
@@ -797,7 +890,7 @@ class CharacterInjector {
 
     /// Unified method for sending a single key press (key down + key up) with optional modifiers.
     /// All other send key methods delegate to this to avoid duplicated CGEvent creation/posting logic.
-    private func sendKeyPress(_ keyCode: CGKeyCode, proxy: CGEventTapProxy, useDirectPost: Bool = false, modifiers: CGEventFlags? = nil) {
+    private func sendKeyPress(_ keyCode: CGKeyCode, proxy: CGEventTapProxy?, useDirectPost: Bool = false, modifiers: CGEventFlags? = nil) {
         guard let source = eventSource else { return }
 
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
@@ -820,9 +913,11 @@ class CharacterInjector {
         if useDirectPost {
             keyDown.post(tap: .cgSessionEventTap)
             keyUp.post(tap: .cgSessionEventTap)
-        } else {
+        } else if let proxy {
             keyDown.tapPostEvent(proxy)
             keyUp.tapPostEvent(proxy)
+        } else {
+            assertionFailure("A tap proxy is required when direct posting is disabled")
         }
     }
     

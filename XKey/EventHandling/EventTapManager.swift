@@ -108,6 +108,9 @@ class EventTapManager {
     // MARK: - Delegate Protocol
 
     protocol EventTapDelegate: AnyObject {
+        /// Blocks only while a previously queued direct-post injection is still running.
+        /// Called at the tap boundary before physical keyDown/flagsChanged events can pass through.
+        func waitForPendingInjection()
         func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool
         func processKeyEvent(_ event: CGEvent, type: CGEventType, proxy: CGEventTapProxy) -> CGEvent?
         
@@ -390,6 +393,13 @@ class EventTapManager {
         // Only mark when dual tap is active (HID primary + session secondary)
         if isHIDTapActive {
             event.setIntegerValueField(.eventSourceUserData, value: kXKeyHIDSeenMarker)
+        }
+
+        // Preserve ordering with queued slow direct-post injection before any physical
+        // keyDown/modifier event can trigger a shortcut, change focus, or insert text.
+        // Keep keyUp on its existing zero-delay path for spring-loaded Adobe tools.
+        if type != .keyUp {
+            delegate?.waitForPendingInjection()
         }
 
         // CRITICAL FIX: Pass through keyUp events IMMEDIATELY with zero delay
@@ -758,6 +768,12 @@ class EventTapManager {
             event.setIntegerValueField(.eventSourceUserData, value: 0)
             return Unmanaged.passUnretained(event)
         }
+
+        // Remote physical input bypasses the HID tap, so apply the same ordering barrier
+        // here. XKey-injected events were filtered above and cannot wait on themselves.
+        if type != .keyUp {
+            delegate?.waitForPendingInjection()
+        }
         
         // --- From here, we're processing a remote desktop event ---
         debugLogCallback?("[SessionTap] Processing remote desktop event: type=\(type.rawValue), keyCode=\(event.getIntegerValueField(.keyboardEventKeycode))")
@@ -1099,6 +1115,9 @@ class EventTapManager {
 // MARK: - Default Delegate Implementations
 
 extension EventTapManager.EventTapDelegate {
+    /// Default no-op for delegates without asynchronous injection.
+    func waitForPendingInjection() {}
+
     /// Default no-op: conformers only override if they need session-aware reset
     func sessionDidBecomeActive() {}
 }

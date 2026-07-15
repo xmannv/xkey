@@ -121,29 +121,36 @@ class DebugLogger {
 
     /// Log an info message
     func info(_ message: @autoclosure () -> String, source: String = "") {
+        // Short-circuit before evaluating the autoclosure so the interpolation is skipped
+        // entirely when logging is off (this runs on the keystroke hot path).
+        guard isLoggingEnabled else { return }
         log(message(), source: source, level: .info)
     }
 
     /// Log a warning message
     func warning(_ message: @autoclosure () -> String, source: String = "") {
+        guard isLoggingEnabled else { return }
         log(message(), source: source, level: .warning)
     }
 
     /// Log an error message
     func error(_ message: @autoclosure () -> String, source: String = "") {
+        guard isLoggingEnabled else { return }
         log(message(), source: source, level: .error)
     }
 
     /// Log a success message
     func success(_ message: @autoclosure () -> String, source: String = "") {
+        guard isLoggingEnabled else { return }
         log(message(), source: source, level: .success)
     }
 
     /// Log a debug message (only if verbose logging is enabled)
-    func debug(_ message: String, source: String = "") {
+    func debug(_ message: @autoclosure () -> String, source: String = "") {
+        guard isLoggingEnabled else { return }
         let verbose = debugWindowController?.isVerboseLogging ?? isVerboseLogging
         guard verbose else { return }
-        log(message, source: source, level: .debug)
+        log(message(), source: source, level: .debug)
     }
 }
 

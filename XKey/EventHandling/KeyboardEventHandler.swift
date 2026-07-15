@@ -120,7 +120,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     // Excluded apps
-    @Published var excludedApps: [ExcludedApp] = []
+    @Published var excludedApps: [ExcludedApp] = [] {
+        didSet {
+            excludedBundleIds = Set(excludedApps.map(\.bundleIdentifier))
+        }
+    }
+    /// Membership cache for the per-keystroke exclusion check. The published array remains
+    /// the source of truth for UI/persistence and its observer covers assignment and mutation.
+    private var excludedBundleIds: Set<String> = []
     @Published var exclusionRulesEnabled: Bool = true  // Master switch for user-defined exclusion rules
 
     // Undo typing with Esc key
@@ -321,6 +328,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     // MARK: - EventTapDelegate
+
+    func waitForPendingInjection() {
+        injector.waitForInjectionComplete()
+    }
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
         // Check if current app is in excluded list
@@ -565,10 +576,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         let isEnglishModeWithMacro = !vietnameseEnabledForContext && macroEnabled && macroInEnglishMode
 
         if isWordBreakKey(character) {
-            // Wait for any pending injection to complete before processing word break
-            // This prevents race conditions where injection operations overlap.
-            injector.waitForInjectionComplete()
-            
+            // Pending injection was already synchronized at the HID/session tap boundary.
+            // Keeping the barrier there covers pass-through shortcuts and avoids a second
+            // semaphore round-trip on this handler path.
+
             // Log word break key
             let keyName: String
             switch character {
@@ -615,7 +626,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                     //
                     // newCharacters already includes the trailing space/newline for
                     // restore/macro, so we consume the original event to avoid a double space.
-                    injector.injectSync(
+                    injector.inject(
                         backspaceCount: result.backspaceCount,
                         characters: result.newCharacters,
                         codeTable: codeTable,
@@ -659,14 +670,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return event  // Pass through without Vietnamese processing
         }
 
-        // Wait for any pending injection to complete before processing next keystroke
-        // Uses semaphore synchronization to prevent race conditions
-        let waitStart = CFAbsoluteTimeGetCurrent()
-        injector.waitForInjectionComplete()
-        let waitTime = (CFAbsoluteTimeGetCurrent() - waitStart) * 1000
-        if waitTime > 1.0 {
-            debugLogCallback?("[\(getTimestamp())] ⏱ Waited \(String(format: "%.1f", waitTime))ms for previous injection")
-        }
+        // Pending injection was already synchronized at the HID/session tap boundary.
 
         // Process through engine (Vietnamese mode)
         let result = engine.processKey(
@@ -676,10 +680,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         )
 
         if result.shouldConsume {
-            // Use synchronized injection (backspace + text in one atomic operation)
-            // This prevents race conditions in terminals where next keystroke arrives
-            // between backspace and text injection
-            injector.injectSync(
+            // Route injection through the minimal async optimization. Proxy-based methods
+            // remain synchronized; only plain slow direct-post methods run on the queue.
+            injector.inject(
                 backspaceCount: result.backspaceCount,
                 characters: result.newCharacters,
                 codeTable: codeTable,
@@ -709,20 +712,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return event  // Pass through
         }
 
-        // Wait for injection before processing backspace
-        let waitStart = CFAbsoluteTimeGetCurrent()
-        injector.waitForInjectionComplete()
-        let waitTime = (CFAbsoluteTimeGetCurrent() - waitStart) * 1000
-        if waitTime > 1.0 {
-            debugLogCallback?("[\(getTimestamp())] ⏱ Backspace waited \(String(format: "%.1f", waitTime))ms for injection")
-        }
-        
+        // Pending injection was already synchronized at the HID/session tap boundary.
+
         debugLogCallback?("[\(getTimestamp())] ⌫ Processing backspace (index=\(engine.index), spaceCount=\(engine.spaceCount))")
         let result = engine.processBackspace()
 
         if result.shouldConsume {
-            // Use synchronized injection
-            injector.injectSync(
+            // Route through the same proxy-preserving injection policy.
+            injector.inject(
                 backspaceCount: result.backspaceCount,
                 characters: result.newCharacters,
                 codeTable: codeTable,
@@ -956,13 +953,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         }
         
         // Check user-defined excluded apps (respects master switch)
-        guard exclusionRulesEnabled, !excludedApps.isEmpty else { return false }
-        return excludedApps.contains { $0.bundleIdentifier == bundleId }
+        guard exclusionRulesEnabled, !excludedBundleIds.isEmpty else { return false }
+        return excludedBundleIds.contains(bundleId)
     }
     
     /// Check if a specific bundle identifier is excluded
     func isAppExcluded(bundleIdentifier: String) -> Bool {
-        return excludedApps.contains { $0.bundleIdentifier == bundleIdentifier }
+        return excludedBundleIds.contains(bundleIdentifier)
     }
 }
 
