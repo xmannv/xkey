@@ -6,19 +6,18 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.24 (Build 20260715)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260715</link>
-      <sparkle:version>20260715</sparkle:version>
+      <title>Version 1.2.24 (Build 20260717)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260717</link>
+      <sparkle:version>20260717</sparkle:version>
       <sparkle:shortVersionString>1.2.24</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>Merge pull request #307 from longdoanz/perf/async-injection-and-log-opts</p>
-<p>perf: optimize debug logging, cache excluded apps, and implement asyn…</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260715">Xem chi tiết trên GitHub</a></p>
+<p>fix(rules): exclude LibreOffice from web docx matching</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260717">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 15 Jul 2026 14:22:06 +0000</pubDate>
+      <pubDate>Fri, 17 Jul 2026 02:04:01 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260715/XKey.dmg" sparkle:version="20260715" sparkle:shortVersionString="1.2.24" length="11695146" type="application/octet-stream" sparkle:edSignature="ijTIxtfWks8qcmfnT0sbVFvIX1NEIgl5dYeJzCFxWTr7q6CEYTDhIhL0OJSWQe9iXDI0nJaZuiCMSb98EnfJCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260717/XKey.dmg" sparkle:version="20260717" sparkle:shortVersionString="1.2.24" length="11697613" type="application/octet-stream" sparkle:edSignature="lEePLsNIpC0iWveFWmoJLMyd7oLjEPvm1u/lT08PJH/D2OR9mzERf2hr+RDe+HsiDuTBXTZQQ9URSAqz85wqCg==" />
     </item>
   </channel>
 </rss>
