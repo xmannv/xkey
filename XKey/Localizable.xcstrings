@@ -5030,6 +5030,38 @@
         }
       }
     },
+    "Khi bật, nhấp trái vào icon trên thanh menu sẽ chuyển nhanh Việt/Anh. Nhấp phải để mở menu.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When enabled, left-click the menu bar icon to quickly switch Vietnamese/English. Right-click to open the menu."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用后，左键点击菜单栏图标可快速切换越南语/英语。右键点击打开菜单。"
+          }
+        }
+      }
+    },
+    "Nhấp icon để bật/tắt bộ gõ nhanh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click icon to quickly toggle input"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击图标快速切换输入法"
+          }
+        }
+      }
+    },
     "Phát âm thanh khi bật/tắt": {
       "localizations": {
         "en": {

@@ -76,6 +76,7 @@ enum SharedSettingsKey: String {
     case showDockIcon = "XKey.showDockIcon"
     case startAtLogin = "XKey.startAtLogin"
     case menuBarIconStyle = "XKey.menuBarIconStyle"
+    case statusBarClickToToggle = "XKey.statusBarClickToToggle"
     case appLanguage = "XKey.appLanguage"
     case autoCheckForUpdates = "XKey.autoCheckForUpdates"
 
@@ -694,6 +695,11 @@ class SharedSettings {
     var menuBarIconStyle: String {
         get { readString(forKey: SharedSettingsKey.menuBarIconStyle.rawValue) ?? "X" }
         set { writeString(newValue, forKey: SharedSettingsKey.menuBarIconStyle.rawValue) }
+    }
+
+    var statusBarClickToToggle: Bool {
+        get { readBool(forKey: SharedSettingsKey.statusBarClickToToggle.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.statusBarClickToToggle.rawValue) }
     }
 
     var appLanguage: String {
@@ -1493,6 +1499,7 @@ class SharedSettings {
         if let style = MenuBarIconStyle(rawValue: menuBarIconStyle) {
             prefs.menuBarIconStyle = style
         }
+        prefs.statusBarClickToToggle = statusBarClickToToggle
         if let lang = AppLanguage(rawValue: appLanguage) {
             prefs.appLanguage = lang
         }
@@ -1656,6 +1663,7 @@ class SharedSettings {
         showDockIcon = prefs.showDockIcon
         startAtLogin = prefs.startAtLogin
         menuBarIconStyle = prefs.menuBarIconStyle.rawValue
+        statusBarClickToToggle = prefs.statusBarClickToToggle
         appLanguage = prefs.appLanguage.rawValue
         autoCheckForUpdates = prefs.autoCheckForUpdates
 

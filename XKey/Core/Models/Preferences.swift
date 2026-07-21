@@ -133,6 +133,7 @@ struct Preferences: Codable {
     var showDockIcon: Bool = false               // Show icon in Dock (menu bar always visible)
     var startAtLogin: Bool = false
     var menuBarIconStyle: MenuBarIconStyle = .x  // Icon style for menubar
+    var statusBarClickToToggle: Bool = false     // Left-click menubar icon toggles input instead of opening menu (right-click opens menu)
     var appLanguage: AppLanguage = .vi
     var autoCheckForUpdates: Bool = true
     

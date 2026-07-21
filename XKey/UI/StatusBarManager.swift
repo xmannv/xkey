@@ -48,9 +48,10 @@ class StatusBarManager: ObservableObject {
         // Set initial icon
         updateStatusIcon()
         
-        // Handle click to toggle popover (no NSMenu)
-        button.action = #selector(togglePopover)
+        // Handle click: left/right may behave differently depending on preference
+        button.action = #selector(statusItemClicked)
         button.target = self
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         
         // Create popover with glass design
         setupPopover()
@@ -114,6 +115,30 @@ class StatusBarManager: ObservableObject {
         popover.contentViewController?.view.wantsLayer = true
         
         self.popover = popover
+    }
+    
+    // MARK: - Click Handling
+    
+    /// Routes a status bar click. When `statusBarClickToToggle` is enabled, a plain
+    /// left-click toggles the input method directly, while a right-click or Control-click
+    /// (the macOS secondary-click convention) opens the menu. When disabled, any click
+    /// opens the menu (legacy behavior).
+    @objc private func statusItemClicked() {
+        guard SharedSettings.shared.statusBarClickToToggle else {
+            togglePopover()
+            return
+        }
+        
+        let event = NSApp.currentEvent
+        let isRightClick = event?.type == .rightMouseUp
+        let isControlClick = event?.type == .leftMouseUp
+            && event?.modifierFlags.contains(.control) == true
+        
+        if isRightClick || isControlClick {
+            togglePopover()
+        } else {
+            viewModel.toggleVietnamese()
+        }
     }
     
     // MARK: - Popover Toggle

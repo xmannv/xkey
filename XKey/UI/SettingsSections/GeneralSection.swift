@@ -46,6 +46,13 @@ struct GeneralSection: View {
                         
                         Toggle("Phát âm thanh khi bật/tắt", isOn: $viewModel.preferences.beepOnToggle)
                         
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Nhấp icon để bật/tắt bộ gõ nhanh", isOn: $viewModel.preferences.statusBarClickToToggle)
+                            Text("Khi bật, nhấp trái vào icon trên thanh menu sẽ chuyển nhanh Việt/Anh. Nhấp phải để mở menu.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
                         Divider()
                         
                         VStack(alignment: .leading, spacing: 8) {
