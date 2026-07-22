@@ -3,9 +3,9 @@
 <div align="center">
   <img src="xkey.png" alt="XKey Logo" width="128" height="128">
 
-  **Bộ gõ tiếng Việt hiện đại cho macOS · Modern Vietnamese input method for macOS**
+  **Bộ gõ tiếng Việt hiện đại cho macOS**
 
-  [![Version](https://img.shields.io/badge/version-1.2.24-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fxmannv%2Fxkey%2Frefs%2Fheads%2Fmain%2FVersion.xcconfig&search=MARKETING_VERSION%5Cs%2A%3D%5Cs%2A%28%5B0-9.%5D%2B%29&replace=%241&label=version)](https://github.com/xmannv/xkey/releases)
   [![Homebrew Cask](https://img.shields.io/homebrew/cask/v/xkey?label=homebrew%20cask)](https://formulae.brew.sh/cask/xkey)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,16 +13,17 @@
 
 ---
 
-> Tài liệu này song ngữ. Mỗi phần trình bày tiếng Việt trước, tiếng Anh sau.
-> This document is bilingual. Each section is written in Vietnamese first, then English.
+#### (Chọn ngôn ngữ dưới đây / Choose your language below)
+[![Tiếng Việt](https://img.shields.io/badge/Language-Ti%E1%BA%BFng_Vi%E1%BB%87t-red)](README.md)
+[![English](https://img.shields.io/badge/Language-English-green)](README.en.md)
 
 ---
 
-## Giới thiệu · Introduction
+## Giới thiệu
 
-### Tại sao XKey ra đời? · Why XKey?
+### Tại sao XKey ra đời?
 
-**Tiếng Việt.** Các bộ gõ tiếng Việt hiện có trên macOS thường gặp một số vấn đề:
+Các bộ gõ tiếng Việt hiện có trên macOS thường gặp một số vấn đề:
 
 - Không tương thích với các phiên bản macOS mới nhất
 - Còn nhiều lỗi chưa được sửa, ít được cập nhật và bảo trì
@@ -30,17 +31,7 @@
 
 XKey được xây dựng để giải quyết những vấn đề này.
 
-**English.** Existing Vietnamese input methods on macOS often suffer from:
-
-- Poor compatibility with the latest macOS releases
-- Unfixed bugs and infrequent maintenance
-- Missing modern features, and being hard to debug or customize
-
-XKey is built to address these problems.
-
-### Điểm nổi bật · Highlights
-
-**Tiếng Việt.**
+### Điểm nổi bật
 
 - Hiệu suất cao: viết hoàn toàn bằng Swift native, tối ưu cho macOS
 - Tương thích tốt với các phiên bản macOS mới (12.0+)
@@ -52,45 +43,22 @@ XKey is built to address these problems.
 - Chạy hoàn toàn cục bộ, không thu thập dữ liệu người dùng
 - Hai chế độ hoạt động: CGEvent và Input Method Kit (XKeyIM)
 
-**English.**
-
-- High performance: written entirely in native Swift, optimized for macOS
-- Good compatibility with recent macOS versions (12.0+)
-- Stable, frequently updated, with built-in auto-update
-- A Debug Window to observe the engine's behavior in real time
-- Smart features: Smart Switch, Macro, Quick Typing, spell checking, personal dictionary
-- Fast translation via hotkeys, supporting 30+ languages across multiple providers (Google, Tencent, Volcano)
-- A modern SwiftUI interface
-- Runs fully locally, with no user data collection
-- Dual operating modes: CGEvent and Input Method Kit (XKeyIM)
-
 ---
 
-## Tính năng chính · Core Features
+## Tính năng chính
 
 <div align="center">
   <img src="xkey-panel.png" alt="XKey Settings Panel" width="800">
 </div>
 
-### 1. Hai chế độ hoạt động · Two operating modes
-
-**Tiếng Việt.**
+### 1. Hai chế độ hoạt động
 
 | Chế độ | Mô tả | Ưu điểm |
 |--------|-------|---------|
 | **CGEvent** (mặc định) | Dùng CGEvent injection | Không cần cấu hình, hoạt động ngay với mọi app |
 | **XKeyIM** (thử nghiệm) | Dùng Input Method Kit | Mượt hơn trong Terminal, Spotlight, Address Bar |
 
-**English.**
-
-| Mode | Description | Advantage |
-|------|-------------|-----------|
-| **CGEvent** (default) | Uses CGEvent injection | No configuration needed, works with every app |
-| **XKeyIM** (experimental) | Uses Input Method Kit | Smoother in Terminal, Spotlight, Address Bar |
-
-### 2. Hỗ trợ đa kiểu gõ · Multiple typing methods
-
-**Tiếng Việt.**
+### 2. Hỗ trợ đa kiểu gõ
 
 | Kiểu gõ | Mô tả | Ví dụ |
 |---------|-------|-------|
@@ -100,33 +68,15 @@ XKey is built to address these problems.
 | **Simple Telex 1** | Telex đơn giản (w không biến đổi) | `tieengs` → tiếng |
 | **Simple Telex 2** | Telex + w cho ư/ơ | `tuaw` → tưa |
 
-**English.**
-
-| Method | Description | Example |
-|--------|-------------|---------|
-| **Auto-detect** | Automatically detects Telex or VNI while typing | — |
-| **Telex** | The most common method | `tieengs` → tiếng |
-| **VNI** | Traditional number-based method | `tie61ng` → tiếng |
-| **Simple Telex 1** | Simplified Telex (w unchanged) | `tieengs` → tiếng |
-| **Simple Telex 2** | Telex + w for ư/ơ | `tuaw` → tưa |
-
-### 3. Bảng mã · Character encodings
-
-**Tiếng Việt.**
+### 3. Bảng mã
 
 - **Unicode (UTF-8)** — khuyến nghị, mặc định
 - **TCVN3 (ABC)** — tương thích phần mềm cũ
 - **VNI Windows** — tương thích font VNI
 
-**English.**
+### 4. Gõ nhanh
 
-- **Unicode (UTF-8)** — recommended, default
-- **TCVN3 (ABC)** — compatible with legacy software
-- **VNI Windows** — compatible with VNI fonts
-
-### 4. Gõ nhanh · Quick Typing
-
-**Tiếng Việt.** Tăng tốc độ gõ bằng các phím tắt thông minh.
+Tăng tốc độ gõ bằng các phím tắt thông minh.
 
 | Tính năng | Chức năng |
 |-----------|-----------|
@@ -134,17 +84,9 @@ XKey is built to address these problems.
 | **Quick Start Consonant** | `f`→`ph`, `j`→`gi`, `w`→`qu` (đầu từ) |
 | **Quick End Consonant** | `g`→`ng`, `h`→`nh`, `k`→`ch` (cuối từ) |
 
-**English.** Speed up typing with smart shortcuts.
+### 5. Macro (thay thế văn bản)
 
-| Feature | Behavior |
-|---------|----------|
-| **Quick Telex** | `cc`→`ch`, `gg`→`gi`, `kk`→`kh`, `nn`→`ng`, `pp`→`ph`, `qq`→`qu`, `tt`→`th` |
-| **Quick Start Consonant** | `f`→`ph`, `j`→`gi`, `w`→`qu` (word start) |
-| **Quick End Consonant** | `g`→`ng`, `h`→`nh`, `k`→`ch` (word end) |
-
-### 5. Macro (thay thế văn bản) · Macro (text shortcuts)
-
-**Tiếng Việt.** Tự động thay thế văn bản bằng Macro:
+Tự động thay thế văn bản bằng Macro:
 
 - Tạo các từ viết tắt tùy chỉnh
 - Import/export danh sách macro (.txt)
@@ -152,17 +94,9 @@ XKey is built to address these problems.
 - Tùy chọn thêm khoảng trắng sau macro
 - Dùng được cả trong chế độ tiếng Anh
 
-**English.** Automatically expand text with Macros:
+### 6. Công cụ chuyển đổi văn bản
 
-- Create custom abbreviations
-- Import/export macro lists (.txt)
-- Optional auto-capitalization for macros
-- Optional trailing space after a macro
-- Works even in English mode
-
-### 6. Công cụ chuyển đổi văn bản · Text conversion tools
-
-**Tiếng Việt.** Truy cập nhanh bằng phím tắt tùy chỉnh.
+Truy cập nhanh bằng phím tắt tùy chỉnh.
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -170,17 +104,7 @@ XKey is built to address these problems.
 | **Bảng mã** | Chuyển đổi Unicode ↔ TCVN3 ↔ VNI |
 | **Xóa dấu** | Chuyển từ có dấu sang không dấu |
 
-**English.** Accessible via custom hotkeys.
-
-| Feature | Description |
-|---------|-------------|
-| **Letter case** | UPPERCASE, lowercase, Capitalize first letter, Capitalize Each Word |
-| **Encoding** | Convert between Unicode ↔ TCVN3 ↔ VNI |
-| **Remove diacritics** | Convert accented text to plain text |
-
-### 7. Kiểm tra chính tả (thử nghiệm) · Spell checking (experimental)
-
-**Tiếng Việt.**
+### 7. Kiểm tra chính tả (thử nghiệm)
 
 - Dùng từ điển tiếng Việt (~200KB, giấy phép GPL)
 - Tự động khôi phục khi gõ sai chính tả
@@ -188,37 +112,19 @@ XKey is built to address these problems.
 - Từ điển cá nhân: thêm từ riêng để bỏ qua kiểm tra
 - Import/export từ điển cá nhân
 
-**English.**
-
-- Uses a Vietnamese dictionary (~200KB, GPL license)
-- Automatic recovery from misspellings
-- Supports both new (xoà) and old (xóa) diacritic styles
-- Personal dictionary: add your own words to skip checking
-- Import/export the personal dictionary
-
 ### 8. Smart Switch
-
-**Tiếng Việt.**
 
 - Nhớ ngôn ngữ theo từng ứng dụng
 - Hỗ trợ phát hiện các app overlay như Spotlight/Raycast/Alfred
 - Tự động chuyển ngôn ngữ khi chuyển app
 
-**English.**
+### 9. Dịch thuật nhanh
 
-- Remembers the language per application
-- Detects overlay apps such as Spotlight/Raycast/Alfred
-- Automatically switches language when changing apps
+Dịch văn bản ngay trong mọi ứng dụng bằng phím tắt tùy chỉnh. XKey cung cấp hai hướng dịch, mỗi hướng có phím tắt riêng và các tùy chọn hoạt động độc lập.
 
-### 9. Dịch thuật nhanh · Fast translation
+#### Dịch sang ngôn ngữ đích
 
-**Tiếng Việt.** Dịch văn bản ngay trong mọi ứng dụng bằng phím tắt tùy chỉnh. XKey cung cấp hai hướng dịch, mỗi hướng có phím tắt riêng và các tùy chọn hoạt động độc lập.
-
-**English.** Translate text inside any application via custom hotkeys. XKey offers two translation directions, each with its own hotkey and independently toggled options.
-
-#### Dịch sang ngôn ngữ đích · Translate to target language
-
-**Tiếng Việt.** Dịch văn bản đang chọn (hoặc toàn bộ nội dung) từ ngôn ngữ nguồn sang ngôn ngữ đích.
+Dịch văn bản đang chọn (hoặc toàn bộ nội dung) từ ngôn ngữ nguồn sang ngôn ngữ đích.
 
 Cách dùng:
 1. Chọn (bôi đen) text cần dịch trong bất kỳ ứng dụng nào
@@ -234,25 +140,9 @@ Nếu không chọn text, XKey sẽ dịch toàn bộ nội dung trong ô nhập
 | **Hiển thị popup** | Tắt | Hiển thị bản dịch trong overlay popup |
 | **Tự ẩn popup** | 4 giây | Thời gian tự ẩn (0 = không tự ẩn) |
 
-**English.** Translate the selected text (or the whole field) from the source language to the target language.
+#### Dịch ngược về ngôn ngữ nguồn
 
-Usage:
-1. Select the text you want to translate in any app
-2. Press the hotkey (default: `⌘ + ⇧ + T`)
-3. The result is processed according to the enabled options
-
-If no text is selected, XKey translates the entire content of the input field.
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| **Replace original text** | On | Replace the selected text with the translation |
-| **Copy to clipboard** | On | Copy the translation to the clipboard |
-| **Show popup** | Off | Display the translation in an overlay popup |
-| **Auto-hide popup** | 4 seconds | Auto-hide delay (0 = never) |
-
-#### Dịch ngược về ngôn ngữ nguồn · Translate back to source language
-
-**Tiếng Việt.** Dịch ngược văn bản từ ngôn ngữ đích về ngôn ngữ nguồn — hữu ích để xem nghĩa hoặc kiểm tra bản dịch.
+Dịch ngược văn bản từ ngôn ngữ đích về ngôn ngữ nguồn — hữu ích để xem nghĩa hoặc kiểm tra bản dịch.
 
 Cách dùng:
 1. Chọn text cần dịch ngược
@@ -266,26 +156,9 @@ Cách dùng:
 | **Hiển thị popup** | Bật | Hiển thị bản dịch trong overlay popup |
 | **Tự ẩn popup** | 4 giây | Thời gian tự ẩn (0 = không tự ẩn) |
 
-**English.** Translate text back from the target language to the source language — useful for checking meaning or verifying a translation.
-
-Usage:
-1. Select the text to translate back
-2. Press the hotkey (configure it in Settings)
-3. The result is processed according to the enabled options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| **Replace original text** | Off | Replace the selected text with the reverse translation |
-| **Copy to clipboard** | Off | Copy the translation to the clipboard |
-| **Show popup** | On | Display the translation in an overlay popup |
-| **Auto-hide popup** | 4 seconds | Auto-hide delay (0 = never) |
-
 Mỗi tùy chọn hoạt động hoàn toàn độc lập — có thể bật đồng thời thay thế text, copy clipboard và hiển thị popup.
-Each option is fully independent — you may enable replacing text, copying to clipboard, and showing the popup at the same time.
 
 #### Overlay popup
-
-**Tiếng Việt.**
 
 - Giao diện glassmorphism, tự động theo Light/Dark mode
 - Nút copy nhanh bản dịch vào clipboard
@@ -294,18 +167,7 @@ Each option is fully independent — you may enable replacing text, copying to c
 - Thời gian tự ẩn tùy chỉnh riêng cho mỗi hướng dịch
 - Thanh countdown hiển thị thời gian còn lại
 
-**English.**
-
-- Glassmorphism UI that follows Light/Dark mode automatically
-- A button to quickly copy the translation to the clipboard
-- Buttons to increase/decrease font size (+/−)
-- Drag the header to move it, drag edges to resize
-- Independent auto-hide delay per translation direction
-- A countdown bar showing the remaining time
-
-#### Ngôn ngữ hỗ trợ · Supported languages
-
-**Tiếng Việt.**
+#### Ngôn ngữ hỗ trợ
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -313,17 +175,7 @@ Each option is fully independent — you may enable replacing text, copying to c
 | **Đa ngôn ngữ** | Hơn 30 ngôn ngữ phổ biến (Anh, Việt, Trung, Nhật, Hàn, Pháp, Đức...) |
 | **Ngôn ngữ tùy chỉnh** | Nhập mã ISO 639-1 để dùng bất kỳ ngôn ngữ nào |
 
-**English.**
-
-| Feature | Description |
-|---------|-------------|
-| **Auto-detection** | Detects the source language automatically |
-| **Multilingual** | 30+ common languages (English, Vietnamese, Chinese, Japanese, Korean, French, German...) |
-| **Custom language** | Enter an ISO 639-1 code to use any language |
-
-#### Nhà cung cấp dịch thuật · Translation providers
-
-**Tiếng Việt.**
+#### Nhà cung cấp dịch thuật
 
 | Nhà cung cấp | Mô tả |
 |--------------|-------|
@@ -333,19 +185,7 @@ Each option is fully independent — you may enable replacing text, copying to c
 
 Bạn có thể bật/tắt từng nhà cung cấp và thay đổi thứ tự ưu tiên trong **Thiết lập → Dịch thuật**.
 
-**English.**
-
-| Provider | Description |
-|----------|-------------|
-| **Google Translate** | Free, multilingual, good quality |
-| **Tencent Transmart** | Free, optimized for Asian languages |
-| **Volcano Engine** | Free, high quality for Chinese ↔ Vietnamese |
-
-You can enable/disable each provider and change their priority under **Settings → Translation**.
-
-#### Tính năng nâng cao · Advanced behavior
-
-**Tiếng Việt.**
+#### Tính năng nâng cao
 
 - Fallback tự động: nếu nhà cung cấp ưu tiên lỗi hoặc trả kết quả rỗng, tự động thử nhà cung cấp tiếp theo
 - Thông báo lỗi rõ ràng cho từng loại lỗi (mạng, giới hạn tần suất, kết quả không hợp lệ...)
@@ -353,35 +193,18 @@ You can enable/disable each provider and change their priority under **Settings 
 - Overlay loading hiển thị trạng thái đang dịch tại vị trí con trỏ
 - Lấy văn bản thông minh: Accessibility API, fallback sang Clipboard
 
-**English.**
+Cấu hình
 
-- Automatic fallback: if the preferred provider fails or returns empty, the next provider is tried automatically
-- Clear error messages for each error type (network, rate limit, invalid result...)
-- Preserves letter case (ALL CAPS, Capitalize, lowercase)
-- A loading overlay showing translation progress at the cursor
-- Smart text retrieval: Accessibility API with a Clipboard fallback
-
-Cấu hình · Configuration: **Settings → Translation**
-
-### 10. Quản lý Input Sources · Input source management
-
-**Tiếng Việt.**
+### 10. Quản lý Input Sources
 
 - Xem danh sách tất cả Input Sources
 - Bật/tắt XKey cho từng Input Source cụ thể
 - Phím tắt chuyển nhanh sang XKey/ABC
 - Tự động phát hiện các Input Source tiếng Việt khác
 
-**English.**
+### 11. Hiệu chỉnh engine theo ứng dụng (Window Title Rules)
 
-- View the list of all input sources
-- Enable/disable XKey for specific input sources
-- A hotkey to quickly switch between XKey/ABC
-- Automatic detection of other Vietnamese input sources
-
-### 11. Hiệu chỉnh engine theo ứng dụng · Per-app engine tuning (Window Title Rules)
-
-**Tiếng Việt.** Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, giải quyết vấn đề gõ tiếng Việt trong các web app.
+Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, giải quyết vấn đề gõ tiếng Việt trong các web app.
 
 | Web App | Xử lý đặc biệt |
 |---------|----------------|
@@ -398,26 +221,7 @@ Tính năng Window Title Rules:
 
 Cấu hình: **Settings → Nâng cao → Hiệu chỉnh XKey Engine theo ứng dụng**
 
-**English.** Detects special contexts based on window titles, solving Vietnamese typing issues in web apps.
-
-| Web App | Special handling |
-|---------|------------------|
-| Google Docs/Sheets/Slides | Disable marked text, slow injection |
-| Notion, Figma | Adjusted delays |
-| And many other apps | Customizable as needed |
-
-Window Title Rules features:
-- Automatically recognizes web apps in any browser
-- Applies the right handling per context
-- Overrides injection method, delay, and text-sending method
-- Automatically switches input source when a rule matches
-- Supports Regex matching
-
-Configuration: **Settings → Advanced → Per-app engine tuning**
-
-#### Thêm quy tắc mới · Adding a new rule
-
-**Tiếng Việt.**
+#### Thêm quy tắc mới
 
 1. Mở **Settings → Nâng cao → Hiệu chỉnh XKey Engine theo ứng dụng**
 2. Nhấn **"Thêm quy tắc"**
@@ -436,28 +240,7 @@ Configuration: **Settings → Advanced → Per-app engine tuning**
 
 Lưu ý: Nếu dùng Google Docs/Sheets/Slides với giao diện tiếng Việt, tiêu đề cửa sổ sẽ là "Google Tài liệu", "Google Trang tính", "Google Trang trình bày". Cần tạo thêm quy tắc với Title Pattern tương ứng.
 
-**English.**
-
-1. Open **Settings → Advanced → Per-app engine tuning**
-2. Click **"Add rule"**
-3. Fill in the details:
-   - **Name**: the display name of the rule
-   - **Bundle ID**: `*` to apply to all apps, or pick a specific app
-   - **Title Pattern**: a keyword to match in the window title
-   - **Match mode**: Contains, Starts with, Ends with, Exact match, or Regex
-4. Configure behavior (optional):
-   - **Override Marked Text**: enable/disable underline while typing
-   - **Override Injection Method**: Fast, Slow, Selection, Autocomplete, AX Direct, or Passthrough
-   - **Custom Injection Delays**: delays (µs) for Backspace, Wait, Text
-   - **Text sending method**: Chunked or One-by-One
-   - **Switch Input Source**: automatically switch to a specific input source
-5. Click **"Add"** to save
-
-Note: If you use Google Docs/Sheets/Slides with a Vietnamese UI, the window titles appear as "Google Tài liệu", "Google Trang tính", "Google Trang trình bày". Add matching rules with the corresponding Title Pattern.
-
-### 12. Tính năng khác · Other features
-
-**Tiếng Việt.**
+### 12. Tính năng khác
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -471,79 +254,45 @@ Note: If you use Google Docs/Sheets/Slides with a Vietnamese UI, the window titl
 | **Backup/Restore** | Sao lưu và khôi phục toàn bộ cài đặt |
 | **Debug Window** | Theo dõi hoạt động của bộ gõ theo thời gian thực |
 
-**English.**
-
-| Feature | Description |
-|---------|-------------|
-| **Undo typing** | A hotkey to undo diacritic placement (`tiếng` → `tieesng`) |
-| **Free Mark** | Place diacritics anywhere in the word |
-| **Modern diacritics** | Supports both new (oà/uý) and old (òa/úy) styles |
-| **Smart temporary off** | Ctrl disables spell check, Option temporarily disables the engine |
-| **Floating toolbar** | Quick XKey controls at the cursor position |
-| **App exclusion** | Disable XKey for specific apps |
-| **Auto-update** | Automatic updates via Sparkle |
-| **Backup/Restore** | Back up and restore all settings |
-| **Debug Window** | Observe the engine's activity in real time |
-
 ---
 
-## Cài đặt · Installation
+## Cài đặt
 
-### Yêu cầu hệ thống · System requirements
-
-**Tiếng Việt.**
+### Yêu cầu hệ thống
 
 - macOS 12.0 (Monterey) trở lên
 - Quyền truy cập Accessibility
 
-**English.**
+### Cài qua Homebrew (khuyến nghị)
 
-- macOS 12.0 (Monterey) or later
-- Accessibility permission
-
-### Cài qua Homebrew (khuyến nghị) · Install via Homebrew (recommended)
-
-**Tiếng Việt.** XKey có mặt trên [Homebrew Cask](https://formulae.brew.sh/cask/xkey). Chỉ cần một lệnh:
-
-**English.** XKey is available on [Homebrew Cask](https://formulae.brew.sh/cask/xkey). A single command:
+XKey có mặt trên [Homebrew Cask](https://formulae.brew.sh/cask/xkey). Chỉ cần một lệnh:
 
 ```bash
 brew install --cask xkey
 ```
 
-Cập nhật · Upgrade:
+Cập nhật:
 
 ```bash
 brew upgrade --cask xkey
 ```
 
-Gỡ cài đặt · Uninstall:
+Gỡ cài đặt:
 
 ```bash
 brew uninstall --cask xkey
 ```
 
-**Tiếng Việt.** Sau khi cài, vẫn cần cấp quyền Accessibility: **System Settings → Privacy & Security → Accessibility** → bật quyền cho XKey.
+Sau khi cài, vẫn cần cấp quyền Accessibility: **System Settings → Privacy & Security → Accessibility** → bật quyền cho XKey.
 
-**English.** After installing, you still need to grant Accessibility permission: **System Settings → Privacy & Security → Accessibility** → enable XKey.
-
-### Cài từ Release · Install from a release
-
-**Tiếng Việt.**
+### Cài từ Release
 
 1. Tải file `XKey.dmg` mới nhất từ [Releases](https://github.com/xmannv/xkey/releases)
 2. Mở DMG và kéo XKey.app vào thư mục Applications
 3. Mở XKey từ Applications
 4. Cấp quyền Accessibility: **System Settings → Privacy & Security → Accessibility** → bật quyền cho XKey
 
-**English.**
-
-1. Download the latest `XKey.dmg` from [Releases](https://github.com/xmannv/xkey/releases)
-2. Open the DMG and drag XKey.app into the Applications folder
-3. Launch XKey from Applications
-4. Grant Accessibility permission: **System Settings → Privacy & Security → Accessibility** → enable XKey
-
-### Build từ mã nguồn · Build from source
+### Build từ mã nguồn
 
 ```bash
 # Clone repository
@@ -560,9 +309,7 @@ cd xkey/XKey
 
 ## XKeyIM — Input Method Kit Mode
 
-**Tiếng Việt.** XKeyIM là input method dùng IMKit của Apple, cung cấp trải nghiệm gõ mượt hơn trong các ứng dụng có độ trễ phản hồi thấp hoặc có cơ chế autocomplete như Terminal, Spotlight, Address Bar.
-
-**English.** XKeyIM is an input method built on Apple's IMKit, offering a smoother typing experience in apps with low response latency or autocomplete behavior such as Terminal, Spotlight, and the Address Bar.
+XKeyIM là input method dùng IMKit của Apple, cung cấp trải nghiệm gõ mượt hơn trong các ứng dụng có độ trễ phản hồi thấp hoặc có cơ chế autocomplete như Terminal, Spotlight, Address Bar.
 
 ### Bundle Identifiers
 
@@ -572,9 +319,7 @@ cd xkey/XKey
 | XKeyIM (input method) | `com.codetay.inputmethod.XKey` |
 | App Group | `group.com.codetay.xkey` |
 
-### Tính năng XKeyIM · XKeyIM features
-
-**Tiếng Việt.**
+### Tính năng XKeyIM
 
 | Tính năng | Mô tả |
 |-----------|-------|
@@ -583,18 +328,7 @@ cd xkey/XKey
 | **Phím hoàn tác** | ESC để hoàn tác (ví dụ: "thử" → "thur") |
 | **Phím tắt chuyển nhanh** | Tùy chỉnh phím tắt toggle giữa XKey và ABC |
 
-**English.**
-
-| Feature | Description |
-|---------|-------------|
-| **Marked Text Mode** | Shows an underline while typing — stable and compatible (recommended) |
-| **Direct Mode** | No underline — may misbehave in some apps |
-| **Undo key** | ESC to undo (e.g., "thử" → "thur") |
-| **Quick toggle hotkey** | Customizable hotkey to toggle between XKey and ABC |
-
-### Cài đặt XKeyIM · Installing XKeyIM
-
-**Tiếng Việt.**
+### Cài đặt XKeyIM
 
 1. Mở XKey Settings → **Input Sources**
 2. Nhấn **"Cài đặt XKeyIM..."**
@@ -603,18 +337,9 @@ cd xkey/XKey
 5. Mở **System Settings → Keyboard → Input Sources**
 6. Nhấn **"+"** và thêm **"XKey Vietnamese"**
 
-**English.**
+### Quyền truy cập cho XKeyIM
 
-1. Open XKey Settings → **Input Sources**
-2. Click **"Install XKeyIM..."**
-3. Copy `XKeyIM.app` into `~/Library/Input Methods/`
-4. Log out and log back in
-5. Open **System Settings → Keyboard → Input Sources**
-6. Click **"+"** and add **"XKey Vietnamese"**
-
-### Quyền truy cập cho XKeyIM · Permissions for XKeyIM
-
-**Tiếng Việt.** XKeyIM cần quyền **Accessibility** để xử lý một số tổ hợp phím đặc biệt (như Ctrl+C trong Terminal):
+XKeyIM cần quyền **Accessibility** để xử lý một số tổ hợp phím đặc biệt (như Ctrl+C trong Terminal):
 
 1. Mở **System Settings → Privacy & Security → Accessibility**
 2. Nhấn **"+"** và thêm `XKeyIM.app` từ `~/Library/Input Methods/`
@@ -624,25 +349,15 @@ Nếu không cấp quyền Accessibility, XKeyIM vẫn gõ tiếng Việt bình 
 
 Phím hoàn tác: XKeyIM dùng ESC làm phím hoàn tác mặc định (không thể tùy chỉnh do hạn chế của Input Method Kit). Bấm ESC khi đang gõ từ có dấu sẽ hoàn tác về dạng không dấu.
 
-**English.** XKeyIM needs **Accessibility** permission to handle certain special key combinations (such as Ctrl+C in Terminal):
+### Build XKeyIM từ mã nguồn
 
-1. Open **System Settings → Privacy & Security → Accessibility**
-2. Click **"+"** and add `XKeyIM.app` from `~/Library/Input Methods/`
-3. Enable XKeyIM
-
-Without Accessibility permission, XKeyIM still types Vietnamese normally. The permission is only needed so shortcuts like Ctrl+C behave correctly while marked text is present.
-
-Undo key: XKeyIM uses ESC as the default undo key (not customizable due to Input Method Kit limitations). Pressing ESC while typing an accented word reverts it to its plain form.
-
-### Build XKeyIM từ mã nguồn · Build XKeyIM from source
-
-Xem hướng dẫn chi tiết · See detailed instructions: [XKeyIM/README.md](XKeyIM/README.md)
+Xem hướng dẫn chi tiết
 
 ---
 
-## Phát triển · Development
+## Phát triển
 
-### Cấu trúc dự án · Project structure
+### Cấu trúc dự án
 
 ```
 XKey/
@@ -672,30 +387,28 @@ XKey/
 
 ### Build script
 
-**Tiếng Việt.** Script `build_release.sh` hỗ trợ nhiều tùy chọn để tùy biến quá trình build:
-
-**English.** The `build_release.sh` script supports several options to customize the build process:
+Script `build_release.sh` hỗ trợ nhiều tùy chọn để tùy biến quá trình build:
 
 ```bash
-# Build với code signing + DMG (mặc định) · with code signing + DMG (default)
+# Build với code signing + DMG (mặc định)
 ./build_release.sh
 
-# Build không code signing · without code signing
+# Build không code signing
 ENABLE_CODESIGN=false ./build_release.sh
 
-# Build không XKeyIM · without XKeyIM
+# Build không XKeyIM
 ENABLE_XKEYIM=false ./build_release.sh
 
 # Full release: Notarization + Auto GitHub Release
 ENABLE_NOTARIZE=true ./build_release.sh
 
-# Tạo GitHub Release tự động · create a GitHub Release automatically
+# Tạo GitHub Release tự động
 ENABLE_GITHUB_RELEASE=true ./build_release.sh
 ```
 
-#### Tự động tạo GitHub Release · Automatic GitHub Release
+#### Tự động tạo GitHub Release
 
-**Tiếng Việt.** Script hỗ trợ tự động tạo GitHub Release khi build hoàn thành.
+Script hỗ trợ tự động tạo GitHub Release khi build hoàn thành.
 
 Yêu cầu:
 - Đã cài GitHub CLI (`gh`): `brew install gh`
@@ -710,43 +423,28 @@ Tính năng:
 
 Custom release notes: tạo file `.release_notes.md` ở thư mục gốc để dùng release notes tùy chỉnh thay vì auto-generate.
 
-**English.** The script can create a GitHub Release automatically after a build finishes.
-
-Requirements:
-- GitHub CLI (`gh`) installed: `brew install gh`
-- Logged in: `gh auth login`
-
-Features:
-- Reads the version from `Info.plist`
-- Creates a `v{version}` tag and a GitHub release
-- Uploads `XKey.dmg` and `signature.txt` (for Sparkle auto-update)
-- Auto-generates release notes from git commits
-- Triggers GitHub Actions to generate the appcast
-
-Custom release notes: create a `.release_notes.md` file at the project root to use custom notes instead of auto-generation.
-
 ```bash
-# Cách 1: Bật thủ công · Option 1: enable manually
+# Cách 1: Bật thủ công
 ENABLE_GITHUB_RELEASE=true ./build_release.sh
 
-# Cách 2: Tự động khi notarize · Option 2: automatic on notarize (full release)
+# Cách 2: Tự động khi notarize
 ENABLE_NOTARIZE=true ./build_release.sh
 ```
 
-### Công nghệ sử dụng · Technology stack
+### Công nghệ sử dụng
 
-| Công nghệ · Technology | Mục đích · Purpose |
-|------------------------|--------------------|
-| **Swift Native** | 100% Swift, tối ưu cho macOS · optimized for macOS |
-| **SwiftUI** | Giao diện hiện đại · modern user interface |
+| Công nghệ | Mục đích |
+|-----------|----------|
+| **Swift Native** | 100% Swift, tối ưu cho macOS |
+| **SwiftUI** | Giao diện hiện đại |
 | **Input Method Kit** | Input method native (XKeyIM) |
-| **Core Graphics Events** | Xử lý và injection sự kiện bàn phím · keyboard event handling and injection |
-| **Accessibility API** | Phát hiện focus với AXObserver · focus detection with AXObserver |
-| **Sparkle** | Framework auto-update · auto-update framework |
+| **Core Graphics Events** | Xử lý và injection sự kiện bàn phím |
+| **Accessibility API** | Phát hiện focus với AXObserver |
+| **Sparkle** | Framework auto-update |
 
-### Lưu trữ cài đặt · Settings persistence
+### Lưu trữ cài đặt
 
-**Tiếng Việt.** XKey dùng hệ thống lưu trữ kép để cài đặt không bị mất:
+XKey dùng hệ thống lưu trữ kép để cài đặt không bị mất:
 
 1. **Primary Storage**: App Group UserDefaults (`group.com.codetay.inputmethod.XKey`)
    - Chia sẻ settings giữa XKey và XKeyIM
@@ -761,46 +459,24 @@ Lợi ích:
 - Backup an toàn
 - Đồng bộ giữa XKey và XKeyIM
 
-**English.** XKey uses a dual storage system so settings are never lost:
-
-1. **Primary Storage**: App Group UserDefaults (`group.com.codetay.inputmethod.XKey`)
-   - Shares settings between XKey and XKeyIM
-   - Lets both apps sync settings in real time
-2. **Backup Storage**: UserDefaults.standard
-   - Automatically backs up whenever settings change
-   - Automatically restores if the App Group container is reset
-
-Benefits:
-- Settings persist across version updates
-- Automatic migration from older versions
-- Safe backups
-- Synchronization between XKey and XKeyIM
-
 ---
 
-## Cảm ơn · Acknowledgements
+## Cảm ơn
 
-**Tiếng Việt.** XKey được phát triển dựa trên:
+XKey được phát triển dựa trên:
 
 - **OpenKey**: bộ gõ tiếng Việt mã nguồn mở
 - **Unikey**: bộ gõ tiếng Việt phổ biến
 
-**English.** XKey is built upon:
+---
 
-- **OpenKey**: an open-source Vietnamese input method
-- **Unikey**: a popular Vietnamese input method
+## Giấy phép
+
+Dự án được phát hành dưới giấy phép MIT. Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ---
 
-## Giấy phép · License
-
-**Tiếng Việt.** Dự án được phát hành dưới giấy phép MIT. Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
-
-**English.** This project is released under the MIT license. See the [LICENSE](LICENSE) file for details.
-
----
-
-## Liên hệ · Contact
+## Liên hệ
 
 - **Issues**: [GitHub Issues](https://github.com/xmannv/xkey/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/xmannv/xkey/discussions)
@@ -810,5 +486,5 @@ Benefits:
 <div align="center">
   Made by XKey Contributors
 
-  Nếu thấy hữu ích, hãy cho dự án một star. · If you find it useful, please give the project a star.
+  Nếu thấy hữu ích, hãy cho dự án một star.
 </div>
