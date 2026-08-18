@@ -903,9 +903,18 @@ class AppBehaviorDetector {
         if let confirmed = confirmedInjectionMethod {
             return confirmed
         }
-        
-        // Priority 2: Fallback to live detection
-        return detectInjectionMethod()
+
+        // Priority 2: Fallback to live detection.
+        // Store the result as confirmed: after clearConfirmedInjectionMethod()
+        // (mouse click, arrow keys, app switch) EVERY keystroke lands here until
+        // an async re-prime (handleFocusCheck +0.1s, AXObserver). Without storing,
+        // each of those keystrokes pays a full AX snapshot on the tap thread —
+        // when the focused app is busy (Chrome/Gmail) this stalls the event tap.
+        // The async paths still overwrite via setConfirmedInjectionMethod, same
+        // as the reprobe path (consumePendingMethodReprobe) already does.
+        let detected = detectInjectionMethod()
+        setConfirmedInjectionMethod(detected)
+        return detected
     }
     
     /// Clear confirmed injection method (call when context changes significantly)
@@ -1322,9 +1331,41 @@ class AppBehaviorDetector {
         let subrole: String?
         let description: String?
         let identifier: String?        // AXIdentifier
-        let domIdentifier: String?     // AXDOMIdentifier (used by Firefox, Chromium for DOM element ID)
-        let domClasses: [String]?      // AXDOMClassList
         let roleDescription: String?   // For isTextInput contenteditable check
+
+        // MARK: - Lazy DOM attributes (web-content AX queries)
+
+        /// AXDOMIdentifier (Firefox/Chromium DOM element ID) — lazy-loaded because
+        /// DOM attributes are served by the browser's web renderer: querying them
+        /// forces Chromium to keep web accessibility enabled for the page, which
+        /// janks heavy pages (Gmail). Only consumers that genuinely need it pay
+        /// the cost (Firefox-style address bar, rules with AX patterns, debug).
+        private let _domIdentifierProvider: (() -> String?)?
+        private var _domIdentifierCached: String??
+        var domIdentifier: String? {
+            if let cached = _domIdentifierCached {
+                return cached
+            }
+            let value = _domIdentifierProvider?()
+            _domIdentifierCached = .some(value)
+            return value
+        }
+
+        /// AXDOMIdentifier only if already queried — for `signature`, which must
+        /// never fire the lazy renderer query on the hot path.
+        var domIdentifierIfLoaded: String? { _domIdentifierCached ?? nil }
+
+        /// AXDOMClassList — lazy for the same renderer-cost reason as domIdentifier.
+        private let _domClassesProvider: (() -> [String]?)?
+        private var _domClassesCached: [String]??
+        var domClasses: [String]? {
+            if let cached = _domClassesCached {
+                return cached
+            }
+            let value = _domClassesProvider?()
+            _domClassesCached = .some(value)
+            return value
+        }
         
         // MARK: - Lazy-loaded properties (avoid expensive AX calls on hot path)
         
@@ -1380,28 +1421,36 @@ class AppBehaviorDetector {
         
         init(element: AXUIElement?,
              role: String?, subrole: String?, description: String?,
-             identifier: String?, domIdentifier: String?, domClasses: [String]?,
+             identifier: String?, domIdentifier: String? = nil, domClasses: [String]? = nil,
              roleDescription: String?,
              textValueProvider: (() -> String?)? = nil,
              windowTitleProvider: (() -> String?)? = nil,
              textValue: String? = nil,
-             windowTitle: String? = nil) {
+             windowTitle: String? = nil,
+             domIdentifierProvider: (() -> String?)? = nil,
+             domClassesProvider: (() -> [String]?)? = nil) {
             self.element = element
             self.role = role
             self.subrole = subrole
             self.description = description
             self.identifier = identifier
-            self.domIdentifier = domIdentifier
-            self.domClasses = domClasses
             self.roleDescription = roleDescription
             self._textValueProvider = textValueProvider
             self._windowTitleProvider = windowTitleProvider
+            self._domIdentifierProvider = domIdentifierProvider
+            self._domClassesProvider = domClassesProvider
             // Allow direct values for backward compatibility (empty, tests)
             if textValue != nil || textValueProvider == nil {
                 self._textValueCached = .some(textValue)
             }
             if windowTitle != nil || windowTitleProvider == nil {
                 self._windowTitleCached = .some(windowTitle)
+            }
+            if domIdentifier != nil || domIdentifierProvider == nil {
+                self._domIdentifierCached = .some(domIdentifier)
+            }
+            if domClasses != nil || domClassesProvider == nil {
+                self._domClassesCached = .some(domClasses)
             }
         }
         
@@ -1412,8 +1461,12 @@ class AppBehaviorDetector {
         }
         
         /// Unique signature for detecting focus changes
-        /// Uses only eagerly-loaded attributes (role, subrole, description, DOM ID)
-        /// to avoid triggering lazy windowTitle AX cascade on the hot path.
+        /// Uses only eagerly-loaded attributes (role, subrole, description) plus
+        /// the DOM ID when some consumer already paid for it — never fires the
+        /// lazy domIdentifier/windowTitle AX queries on the hot path.
+        /// ponytail: two web fields with identical role+subrole+desc and an
+        /// unloaded DOM ID collide; worst case is one redundant re-detect on the
+        /// next focus event, never a wrong injection into a detected context.
         /// Window title changes are captured by AX focus observer (always re-detects)
         /// and app activation notifications, which both call detectInjectionMethod.
         var signature: String {
@@ -1428,7 +1481,7 @@ class AppBehaviorDetector {
                 let truncated = String(desc.prefix(50))
                 parts.append("desc:\(truncated)")
             }
-            if let domId = domIdentifier, !domId.isEmpty {
+            if let domId = domIdentifierIfLoaded, !domId.isEmpty {
                 parts.append("dom:\(domId)")
             }
             return parts.joined(separator: "|")
@@ -1468,32 +1521,33 @@ class AppBehaviorDetector {
         }
         
         /// Create from AXUIElement by querying all needed attributes once
-        /// OPTIMIZED: textValue and windowTitle are lazy-loaded — only queried when accessed
-        /// This reduces AX calls from ~10 to ~6 per snapshot on the hot path
+        /// OPTIMIZED: textValue, windowTitle, domIdentifier and domClasses are
+        /// lazy-loaded — only queried when accessed. The DOM attributes in
+        /// particular are answered by the browser's web renderer; keeping them
+        /// lazy avoids forcing Chromium to hold web accessibility on for heavy
+        /// pages (Gmail jank). Snapshot cost drops to 5 eager AX calls.
         static func from(_ element: AXUIElement) -> FocusedElementInfo {
             let role = AXHelper.getString(element, attribute: kAXRoleAttribute)
             let subrole = AXHelper.getString(element, attribute: kAXSubroleAttribute)
             let description = AXHelper.getString(element, attribute: kAXDescriptionAttribute)
             let identifier = AXHelper.getString(element, attribute: kAXIdentifierAttribute)
-            let domIdentifier = AXHelper.getString(element, attribute: "AXDOMIdentifier")
-            let domClasses = AXHelper.getStringArray(element, attribute: "AXDOMClassList")
             let roleDescription = AXHelper.getString(element, attribute: kAXRoleDescriptionAttribute)
-            
+
             return FocusedElementInfo(
                 element: element,
                 role: role,
                 subrole: subrole,
                 description: description,
                 identifier: identifier,
-                domIdentifier: domIdentifier,
-                domClasses: domClasses,
                 roleDescription: roleDescription,
                 textValueProvider: { AXHelper.getString(element, attribute: kAXValueAttribute) },
                 windowTitleProvider: {
                     guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
                     let appElement = AXUIElementCreateApplication(app.processIdentifier)
                     return AXHelper.getWindowTitle(for: appElement)
-                }
+                },
+                domIdentifierProvider: { AXHelper.getString(element, attribute: "AXDOMIdentifier") },
+                domClassesProvider: { AXHelper.getStringArray(element, attribute: "AXDOMClassList") }
             )
         }
         
@@ -1524,22 +1578,29 @@ class AppBehaviorDetector {
     /// - Returns: true if focused element is a Zen-style address bar
     func isFirefoxStyleAddressBar(info: FocusedElementInfo) -> Bool {
         
-        // Check DOM ID first (most reliable for Firefox-based browsers)
-        // Firefox stores DOM element ID in AXDOMIdentifier, not AXIdentifier
-        if let domId = info.domIdentifier, domId == "urlbar-input" {
-            return true
-        }
-        
-        // Also check AXIdentifier as fallback (for compatibility)
+        // Check eager attributes first — AXDOMIdentifier is a lazy renderer query now,
+        // so the free checks must run before it.
+        // AXIdentifier (for compatibility)
         if let identifier = info.identifier, identifier == "urlbar-input" {
             return true
         }
-        
-        // Fallback: Check AX Description pattern
-        guard let desc = info.description else { return false }
-        // Regex: "Search with <anything> or enter address"
-        let pattern = "^Search with .+ or enter address$"
-        return desc.range(of: pattern, options: .regularExpression) != nil
+
+        // AX Description pattern: "Search with <anything> or enter address"
+        if let desc = info.description,
+           desc.range(of: "^Search with .+ or enter address$", options: .regularExpression) != nil {
+            return true
+        }
+
+        // DOM ID (most reliable for Firefox-based browsers — Firefox stores the DOM
+        // element ID in AXDOMIdentifier, not AXIdentifier; needed when the AX
+        // description is localized). The urlbar is a native-chrome text field
+        // (AXTextField), so gate by role: web-content elements are never the
+        // urlbar, and skipping them avoids firing the lazy renderer query.
+        if info.role == "AXTextField", let domId = info.domIdentifier, domId == "urlbar-input" {
+            return true
+        }
+
+        return false
     }
     
     /// Check if focused element is Safari's address bar
@@ -1569,13 +1630,18 @@ class AppBehaviorDetector {
         // Check DOM Classes for OmniboxViewViews (Chrome, Edge, etc.)
         // or BraveOmniboxViewViews (Brave Browser)
         // or AddressTextfieldView (Opera)
-        if let domClasses = info.domClasses {
+        // Needed when the AX description is localized (non-English browser UI).
+        // The omnibox is a native Views control exposed as AXTextField, so gate
+        // by role: web-content elements (AXTextArea/AXWebArea/AXGroup) are never
+        // the omnibox, and skipping them avoids firing the lazy AXDOMClassList
+        // renderer query (Gmail freeze).
+        if info.role == "AXTextField", let domClasses = info.domClasses {
             if domClasses.contains("OmniboxViewViews") || domClasses.contains("BraveOmniboxViewViews")
                 || domClasses.contains("AddressTextfieldView") {
                 return true
             }
         }
-        
+
         return false
     }
     /// Check if the current context is Opera's Speed Dial page with degraded AX info.

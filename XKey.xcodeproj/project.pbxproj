@@ -84,6 +84,7 @@
 		7FBD214005ADB766CB3DF3B8 /* VNEngineMacro.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF69262CDE29C3D3410A3567 /* VNEngineMacro.swift */; };
 		81891108B8C7C600973DBBB2 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE144E0F510944E89100C852 /* SharedComponents.swift */; };
 		8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */; };
+		FELAZY0001 /* FocusedElementInfoLazyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FELAZY0002 /* FocusedElementInfoLazyTests.swift */; };
 		96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */; };
 		A1000001 /* XKeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001 /* XKeyApp.swift */; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* AppDelegate.swift */; };
@@ -223,6 +224,7 @@
 		69901F64AACBE0FBAC7C0E0F /* BackupRestoreSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BackupRestoreSection.swift; sourceTree = "<group>"; };
 		803B94EF161FE79A022FF806 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToggleRulesTests.swift; sourceTree = "<group>"; };
+		FELAZY0002 /* FocusedElementInfoLazyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusedElementInfoLazyTests.swift; sourceTree = "<group>"; };
 		8AE133FC7897416BBCED985C /* FloatingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingOverlay.swift; sourceTree = "<group>"; };
 		8C93A308BF783CDE94C5E53A /* TempOffToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarController.swift; sourceTree = "<group>"; };
 		8EAA0ED7079ABD1980FBFFAE /* SettingsWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
@@ -568,6 +570,7 @@
 				TEST00028 /* VNEngineAutoCapitalizeTests.swift */,
 				2259E2E83868C7ADD9DD4FF3 /* SessionMonitoringTests.swift */,
 				82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */,
+				FELAZY0002 /* FocusedElementInfoLazyTests.swift */,
 				LANG0002 /* AppLanguageTests.swift */,
 				ICLOUDSYNCTEST002 /* iCloudSyncManagerTests.swift */,
 				MACR0002 /* MacroManagerTests.swift */,
@@ -874,6 +877,7 @@
 				TEST00027 /* VNEngineAutoCapitalizeTests.swift in Sources */,
 				64C427CD211649CE8B7DDCE2 /* SessionMonitoringTests.swift in Sources */,
 				8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */,
+				FELAZY0001 /* FocusedElementInfoLazyTests.swift in Sources */,
 				LANG0001 /* AppLanguageTests.swift in Sources */,
 				ICLOUDSYNCTEST001 /* iCloudSyncManagerTests.swift in Sources */,
 				MACR0001 /* MacroManagerTests.swift in Sources */,

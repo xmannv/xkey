@@ -65,3 +65,5 @@ appcast.xml
 
 # graphify (local tooling config, not part of the project)
 .graphifyignore
+graphify-out/
+.codegraph/
