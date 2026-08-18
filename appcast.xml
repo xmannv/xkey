@@ -6,35 +6,61 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.24 (Build 20260721)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260721</link>
-      <sparkle:version>20260721</sparkle:version>
-      <sparkle:shortVersionString>1.2.24</sparkle:shortVersionString>
+      <title>Version 1.2.25 (Build 20260818)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260818</link>
+      <sparkle:version>20260818</sparkle:version>
+      <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(statusbar): add option to toggle input on single click</p>
-<p>Add a statusBarClickToToggle preference (default off, backward compatible). When enabled, a left-click on the menu bar icon toggles Vietnamese/English input directly, while right-click or Control-click opens the menu. When disabled, any click opens the menu as before.</p>
+<p>fix(injection): reduce AX queries into web renderer to stop Gmail/Chrome freeze</p>
+<p>Two mechanisms caused intermittent typing freezes in heavy web editors</p>
+<p>(Gmail compose in Chrome):</p>
+<ol>
+<li>FocusedElementInfo.from() eagerly queried AXDOMClassList and</li>
+</ol>
+<p>   AXDOMIdentifier on every snapshot. These attributes are served by the</p>
+<p>   browser's web renderer, forcing Chromium to keep web accessibility</p>
+<p>   enabled for the page — janking heavy pages like Gmail.</p>
+<ol>
+<li>getConfirmedInjectionMethod() did not store its live-detection</li>
+</ol>
+<p>   fallback result. Since clearMethodCache() runs on every mouse click,</p>
+<p>   arrow key, and app switch, every subsequent keyDown re-ran a full AX</p>
+<p>   snapshot on the event-tap thread until an async re-prime, stalling</p>
+<p>   the tap (and all typing) whenever the focused app was slow to answer.</p>
+<p>Changes:</p>
 <ul>
-<li>Add the preference to Preferences and persist it in SharedSettings</li>
+<li>Store the Priority-2 fallback via setConfirmedInjectionMethod, same</li>
 </ul>
+<p>  pattern as consumePendingMethodReprobe.</p>
 <ul>
-<li>Route clicks in StatusBarManager based on the preference and event type</li>
+<li>Make domIdentifier/domClasses lazy providers (same pattern as</li>
 </ul>
+<p>  textValueProvider); snapshot drops to 5 eager AX calls.</p>
 <ul>
-<li>Add a settings toggle in the General section with a description</li>
+<li>signature uses domIdentifierIfLoaded so the hot path never fires the</li>
 </ul>
+<p>  lazy renderer query.</p>
 <ul>
-<li>Log the setting in the debug info dump</li>
+<li>Gate the DOM-attribute fallback in isChromiumAddressBar and</li>
 </ul>
-<ul>
-<li>Add en and zh-Hans localizations for the new UI strings</li>
-</ul>
-<p>Also bump the app version and rewrite the README with bilingual (Vietnamese/English) documentation.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.24-20260721">Xem chi tiết trên GitHub</a></p>
+<p>  isFirefoxStyleAddressBar by role == AXTextField: the omnibox/urlbar</p>
+<p>  are native text fields, web content never is. Eager checks</p>
+<p>  (identifier, description) now run before the DOM legs, keeping</p>
+<p>  localized-UI detection working.</p>
+<p>Preserved: Notion code block detection, rules with AX patterns,</p>
+<p>built-in title-only rules (never fire DOM queries), address bar</p>
+<p>detection on localized browser UIs.</p>
+<p>Tests: FocusedElementInfoLazyTests (17 cases) covering lazy semantics,</p>
+<p>signature behavior, and all address-bar gate branches. Full XKeyTests</p>
+<p>suite passes; XKeyIM target builds.</p>
+<p>Also: bump version to 1.2.25 (build 20260818), ignore graphify-out/</p>
+<p>and .codegraph/ local tooling dirs.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260818">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 21 Jul 2026 11:12:49 +0000</pubDate>
+      <pubDate>Tue, 18 Aug 2026 15:23:04 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.24-20260721/XKey.dmg" sparkle:version="20260721" sparkle:shortVersionString="1.2.24" length="11706155" type="application/octet-stream" sparkle:edSignature="1vmTnr3MUs6fED8pEB6gZN1gCs8MMkRM/pTE3QHDNY7Np5VG5UlRa3CfoLflnKSwgogmqGGE2K9GJrDlHPbMAQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260818/XKey.dmg" sparkle:version="20260818" sparkle:shortVersionString="1.2.25" length="11723537" type="application/octet-stream" sparkle:edSignature="DQtpd83HGEbOshyzcxROuUNB9A/hTsRJtGgctiJaRgUmq1cndmFhcJBV0ZctKyNvDrOMSMVmTgbs9mwFq4ILBw==" />
     </item>
   </channel>
 </rss>
