@@ -6,7 +6,31 @@ import AppKit
 /// Ownership of the keyboard between XKey.app's tap and XKeyIM's tap is decided by
 /// a one-way App Group flag: XKeyIM arms it, XKey.app yields. A dead PID must never
 /// keep XKey.app locked out — XKeyIM can be killed without a clean shutdown.
+// MARK: - Live XKeyIM guard
+
+extension XCTestCase {
+    /// Skip when a live XKeyIM would race this test.
+    ///
+    /// Several classes assert on the App Group settings plist, or on state that its
+    /// change notifications reset. A running XKeyIM.app writes that same plist — tap
+    /// ownership, the Vietnamese toggle — and posts XKey.settingsDidChange into this
+    /// process, so with it alive those tests fail on timing rather than on the code.
+    /// Measured before adding this: the full suite is clean 5 runs of 5 with XKeyIM
+    /// stopped, and flakes about 2 in 10 with it running. Making that a skip with a
+    /// reason beats a red run nobody can act on. CI never has XKeyIM running, so
+    /// nothing is skipped there.
+    func skipIfXKeyIMIsRunning() throws {
+        let live = NSRunningApplication.runningApplications(withBundleIdentifier: "com.codetay.inputmethod.XKey")
+        try XCTSkipIf(!live.isEmpty,
+                      "XKeyIM is running (pid \(live[0].processIdentifier)) and writes the App Group store this test asserts on — quit it, or switch input source away and back, then rerun")
+    }
+}
+
 final class TapOwnershipTests: XCTestCase {
+
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
 
     /// Raw on-disk state of `vietnameseEnabled` before this test ran, captured in
     /// setUp() so it survives even if the test body throws, and restored in

@@ -7,6 +7,10 @@ import XCTest
 /// caller, never defaulted.
 final class TapEnvironmentTests: XCTestCase {
 
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
+
     private var originalOverlayAppNameProvider: (() -> String?)?
     private var originalRemoteDesktopInjectModeProvider: (() -> Bool)?
     private var originalWindowTitleRulesEnabled = true
@@ -93,6 +97,10 @@ final class TapEnvironmentTests: XCTestCase {
 /// field. `handleFocusCheck()` is the cheapest observable seam: it is internal, needs
 /// no running tap, and reports the result of its AX pass through host callbacks.
 final class TapEventSourceActiveHostGateTests: XCTestCase {
+
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
 
     private var originalTempOffToolbarEnabled = false
 

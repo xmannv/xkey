@@ -12,6 +12,10 @@ import XCTest
 // MARK: - Toggle Exclusion Rules Tests
 
 class ToggleExclusionRulesTests: XCTestCase {
+
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
     
     var handler: KeyboardEventHandler!
     
@@ -57,6 +61,10 @@ class ToggleExclusionRulesTests: XCTestCase {
 // MARK: - Toggle Window Title Rules Tests
 
 class ToggleWindowTitleRulesTests: XCTestCase {
+
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
     
     // MARK: - Default State Tests
     
@@ -547,6 +555,10 @@ class ToggleWindowTitleRulesTests: XCTestCase {
 // MARK: - EventTapManager Toggle Hotkey Slot Tests
 
 class ToggleHotkeySlotTests: XCTestCase {
+
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
     
     var eventTapManager: EventTapManager!
     

@@ -19,6 +19,10 @@ import XCTest
 
 final class AXPassOffMainThreadTests: XCTestCase {
 
+    override func setUpWithError() throws {
+        try skipIfXKeyIMIsRunning()
+    }
+
     private var originalTempOffToolbarEnabled = false
 
     override func setUp() {
