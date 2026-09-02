@@ -289,11 +289,24 @@ final class iCloudSyncManagerTests: XCTestCase {
         XCTAssertNil(sut.syncDataSizeBytes)
     }
 
+    /// Turn sync on, or skip.
+    ///
+    /// `iCloudSyncManager.isEnabled`'s setter opens with `guard Self.isKVSAvailable`,
+    /// and that checks the REAL NSUbiquitousKeyValueStore rather than the mock these
+    /// tests inject. A machine with no iCloud entitlement — a CI runner building with
+    /// CODE_SIGNING_ALLOWED=NO — makes the assignment a silent no-op, so every
+    /// assertion downstream of it fails for the environment rather than the code.
+    private func enableSyncOrSkip() throws {
+        sut.isEnabled = true
+        try XCTSkipUnless(sut.isEnabled,
+                          "needs a real iCloud key-value store; this machine has no iCloud entitlement")
+    }
+
     // MARK: First-enable detection
 
-    func testFirstEnableNoRemoteDataPushes() {
+    func testFirstEnableNoRemoteDataPushes() throws {
         // No remote data → enable should push and mark hasPushedBefore.
-        sut.isEnabled = true
+        try enableSyncOrSkip()
         XCTAssertTrue(defaults.bool(forKey: "XKey.sync.hasPushedBefore"))
     }
 
@@ -320,10 +333,10 @@ final class iCloudSyncManagerTests: XCTestCase {
         XCTAssertEqual(sut.status, .disabled)
     }
 
-    func testFirstEnableUseRemoteMarksHasPushed() {
+    func testFirstEnableUseRemoteMarksHasPushed() throws {
         let envelope = SyncEnvelope(payload: Data())
         mockStore.storage[SyncCategory.scalars.rawValue] = try! envelope.encoded()
-        sut.isEnabled = true
+        try enableSyncOrSkip()
 
         sut.applyFirstEnableChoice(.useRemote)
 
@@ -351,7 +364,7 @@ final class iCloudSyncManagerTests: XCTestCase {
         let forged = Forged(schemaVersion: SyncSchema.currentVersion + 1, deviceId: "x", updatedAt: Date(), payload: Data())
         mockStore.storage[SyncCategory.scalars.rawValue] = try PropertyListEncoder().encode(forged)
 
-        sut.isEnabled = true
+        try enableSyncOrSkip()
         sut.applyFirstEnableChoice(.useRemote)
 
         // Expect an error status because the envelope was rejected.
@@ -362,8 +375,8 @@ final class iCloudSyncManagerTests: XCTestCase {
 
     // MARK: Push category
 
-    func testPushCategoryWritesEnvelopeForList() {
-        sut.isEnabled = true
+    func testPushCategoryWritesEnvelopeForList() throws {
+        try enableSyncOrSkip()
         defaults.set(true, forKey: "XKey.sync.hasPushedBefore")
 
         sut.pushCategory(.macros)
