@@ -25,7 +25,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>InputMethodConnectionName</key>
-	<string>XKeyIM_Connection</string>
+	<string>com.codetay.inputmethod.XKey_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>XKeyIMController</string>
 	<key>InputMethodServerDelegateClass</key>

@@ -32,6 +32,23 @@ private func makeIsolatedDefaults(_ tag: String = UUID().uuidString) -> UserDefa
     return d
 }
 
+/// An envelope as a peer would have written it. SyncEnvelope always stamps this device's id, and
+/// pullCategory drops a merge-mode envelope carrying that id as an echo of our own push — so a
+/// pull can only be exercised through a hand-encoded one.
+private func foreignEnvelope(payload: Data, updatedAt: Date = Date()) throws -> Data {
+    struct Foreign: Codable {
+        let schemaVersion: Int
+        let deviceId: String
+        let updatedAt: Date
+        let payload: Data
+    }
+    return try PropertyListEncoder().encode(
+        Foreign(schemaVersion: SyncSchema.currentVersion,
+                deviceId: "peer-device",
+                updatedAt: updatedAt,
+                payload: payload))
+}
+
 // MARK: - SyncCollectionPayload (CRDT merge)
 
 final class SyncCollectionPayloadTests: XCTestCase {
@@ -196,6 +213,15 @@ final class SyncTombstoneStoreTests: XCTestCase {
         XCTAssertTrue(entries[0].deleted)
         XCTAssertEqual(entries[0].id, "x")
     }
+
+    /// The outgoing payload is fingerprinted byte for byte against the push memo, so the entry
+    /// order must not follow the backing Dictionary's per-process iteration order — two tombstones
+    /// inside the retention window would otherwise make an unchanged category look new once per
+    /// launch, and push.
+    func testTombstoneEntriesAreOrderedById() {
+        for id in ["c", "a", "b"] { store.record(category: .macros, id: id) }
+        XCTAssertEqual(store.tombstoneEntries(for: .macros).map(\.id), ["a", "b", "c"])
+    }
 }
 
 // MARK: - SyncCategory
@@ -350,6 +376,99 @@ final class iCloudSyncManagerTests: XCTestCase {
     func testPushDoesNothingWhenDisabled() {
         sut.pushAll()
         XCTAssertNil(mockStore.storage[SyncCategory.macros.rawValue])
+    }
+
+    /// A push whose payload is the one already in the store carries nothing: only the envelope's
+    /// own updatedAt would differ. Every settings change schedules a push for all five
+    /// categories, so writing those anyway spends five KVS writes on a change that touched one.
+    func testPushSkipsTheStoreWriteWhenThePayloadIsUnchanged() {
+        defaults.set(true, forKey: "XKey.iCloudSyncEnabled")
+        defaults.set(true, forKey: "XKey.sync.hasPushedBefore")
+
+        sut.pushCategory(.macros)
+        let first = mockStore.storage[SyncCategory.macros.rawValue]
+        XCTAssertNotNil(first, "the first push must seed the store")
+
+        sut.pushCategory(.macros)
+        XCTAssertEqual(mockStore.storage[SyncCategory.macros.rawValue], first,
+                       "an unchanged payload must not be written to the store a second time")
+    }
+
+    /// Pressing the Vietnamese toggle changes nothing the scalars payload carries — the key is in
+    /// scalarsExcludedKeys, which TapOwnershipTests.testVietnameseToggleIsNotSyncedAcrossMachines
+    /// pins — but it still posts the settings-changed notification. Stamping a fresher updatedAt
+    /// for that would let a keystroke carrying no setting win the merge on another Mac, against a
+    /// payload that predates the preference that Mac just set.
+    ///
+    /// Posts the notification instead of writing vietnameseEnabled: the shared plist is the real
+    /// one, and a write here invalidates the settings cache of every other test process.
+    func testSettingsChangeCarryingNoSyncedKeyDoesNotAdvanceScalarsTimestamp() throws {
+        sut.isEnabled = true
+        try XCTSkipUnless(sut.isEnabled, "iCloud KVS unavailable — the manager never started observing")
+
+        sut.pushCategory(.scalars)
+        let stamped = Date(timeIntervalSince1970: 1_000_000)
+        defaults.set(stamped, forKey: "XKey.sync.scalars.localUpdatedAt")
+
+        NotificationCenter.default.post(name: .sharedSettingsDidChange, object: nil)
+
+        XCTAssertEqual(defaults.object(forKey: "XKey.sync.scalars.localUpdatedAt") as? Date, stamped,
+                       "a change the scalars payload does not carry must not advance its timestamp")
+    }
+
+    /// The positive control for the suppression above: a change the scalars payload DOES carry must
+    /// still advance updatedAt and must still reach the store. Without it, a comparison that is too
+    /// eager — one that suppressed every push — would pass the whole suite.
+    ///
+    /// What makes a change "real" to the manager is that the push memo no longer describes the
+    /// payload this Mac holds. Seeding a stale memo reproduces exactly that, without writing the
+    /// shared plist: that plist is the real one, and a write here would change the developer's own
+    /// settings and invalidate the settings cache of every other test process.
+    func testSettingsChangeCarryingASyncedKeyAdvancesTheTimestampAndPushes() throws {
+        sut.isEnabled = true
+        try XCTSkipUnless(sut.isEnabled, "iCloud KVS unavailable — the manager never started observing")
+
+        sut.pushCategory(.scalars)
+        let seeded = mockStore.storage[SyncCategory.scalars.rawValue]
+        XCTAssertNotNil(seeded, "the first push must seed the store")
+
+        let stamped = Date(timeIntervalSince1970: 1_000_000)
+        defaults.set(stamped, forKey: "XKey.sync.scalars.localUpdatedAt")
+        defaults.set("stale-payload-signature",
+                     forKey: "XKey.sync.pushedSig.\(SyncCategory.scalars.rawValue)")
+
+        NotificationCenter.default.post(name: .sharedSettingsDidChange, object: nil)
+
+        XCTAssertGreaterThan(defaults.object(forKey: "XKey.sync.scalars.localUpdatedAt") as? Date ?? .distantPast,
+                             stamped,
+                             "a change the scalars payload carries must advance its timestamp")
+
+        sut.pushCategory(.scalars)
+        XCTAssertNotEqual(mockStore.storage[SyncCategory.scalars.rawValue], seeded,
+                          "a change the scalars payload carries must reach the store")
+    }
+
+    /// A device that only ever receives never writes the push memo, so everything it holds looks new
+    /// to the skip check: it re-pushes what it just pulled, and the very next settings change stamps
+    /// a fresh updatedAt over a payload a peer had just set — the revert-by-a-keystroke the
+    /// suppression above exists to stop, arriving from the pull side instead. Importing must leave
+    /// the memo describing what this device now holds.
+    ///
+    /// The payload is empty on purpose: importScalarsForSync rejects it, so the machine's real
+    /// settings are neither read into the assertion nor written. What is under test is that the pull
+    /// refreshes the memo at all.
+    func testPullRefreshesThePushMemoSoAReceivingDeviceStopsRePushing() throws {
+        defaults.set(true, forKey: "XKey.iCloudSyncEnabled")
+        defaults.set(true, forKey: "XKey.sync.hasPushedBefore")
+
+        let remote = try foreignEnvelope(payload: Data())
+        mockStore.storage[SyncCategory.scalars.rawValue] = remote
+
+        sut.pullAll()
+        sut.pushCategory(.scalars)
+
+        XCTAssertEqual(mockStore.storage[SyncCategory.scalars.rawValue], remote,
+                       "pushing the state we just pulled must not write the store")
     }
 
     // MARK: Sync now (bidirectional)

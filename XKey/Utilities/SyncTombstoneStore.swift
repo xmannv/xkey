@@ -53,8 +53,14 @@ final class SyncTombstoneStore {
     }
 
     /// Convert tombstones to SyncEntry records for inclusion in the outgoing collection payload.
+    ///
+    /// Sorted by id: they come out of a Dictionary, whose iteration order is seeded per process,
+    /// and an entry order that changes across launches makes an unchanged payload look new to the
+    /// push memo — one store write per category on the first push of every launch. No consumer
+    /// depends on the order: the outgoing payload appends them after the live entries, and the
+    /// import side adopts them by id.
     func tombstoneEntries(for category: SyncCategory) -> [SyncEntry] {
-        all(for: category).map { id, deletedAt in
+        all(for: category).sorted { $0.key < $1.key }.map { id, deletedAt in
             SyncEntry.tombstone(id: id, at: deletedAt)
         }
     }

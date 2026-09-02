@@ -3036,6 +3036,35 @@ class VNEngineTests: XCTestCase {
         XCTAssertEqual(typeTelex("task"), "ták")
         XCTAssertEqual(typeTelex("oaks"), "oák")   // bare vowel + k + s
     }
+
+    // MARK: - Stop coda (-c/-p) tone constraint — parity with existing -t/-k/ch handling
+
+    private func type(_ word: String) -> String {
+        for ch in word {
+            _ = engine.processKey(character: ch,
+                                  keyCode: CGKeyCode(VietnameseData.keyCode(for: ch) ?? 0),
+                                  isUppercase: ch.isUppercase)
+        }
+        return engine.getCurrentWord()
+    }
+
+    func testTelex_StopCodaC_RejectsGraveTone() {
+        // "bacf": huyền after stop coda -c must be rejected exactly like "batf" is
+        let resultT = type("batf")   // existing behavior — baseline
+        engine.reset()
+        let resultC = type("bacf")
+        XCTAssertEqual(resultC, resultT.replacingOccurrences(of: "t", with: "c"),
+                       "-c must behave like -t for invalid tones")
+    }
+
+    func testTelex_StopCodaP_RejectsGraveTone() {
+        let resultT = type("batf")
+        engine.reset()
+        let resultP = type("bapf")
+        XCTAssertEqual(resultP, resultT.replacingOccurrences(of: "t", with: "p"),
+                       "-p must behave like -t for invalid tones")
+    }
+
 }
 
 

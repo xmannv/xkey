@@ -819,7 +819,31 @@ class AppBehaviorDetector {
     /// SharedSettings directly, so the main XKey target injects this
     /// closure at startup. Default `false` if not wired.
     var remoteDesktopInjectModeProvider: (() -> Bool)?
-    
+
+    /// Runs one `detectInjectionMethod` + `setConfirmedInjectionMethod` off the CGEventTap
+    /// thread, after `delay` seconds.
+    ///
+    /// Nothing in this class can take an AX snapshot without blocking the thread it is
+    /// called on, and the thread every hot-path caller here runs on is the tap callback's.
+    /// TapEventSource owns the queue that can, and wires this in start() / clears it in
+    /// stop(), the same way it wires OverlayAppDetector's callbacks.
+    ///
+    /// Left nil, the tap keeps answering from the cache and its fallbacks, and for most of
+    /// the ways the cache is cleared the re-detection that would have been requested here
+    /// is already scheduled by whatever cleared it: the app-switch block (+0.05s), the
+    /// mouse-up monitor (handleFocusCheck +0.1s) and the overlay-close transition
+    /// (refreshInjectionMethodForOverlay).
+    ///
+    /// Not all of them. `clearConfirmedInjectionMethod()` is also reached through
+    /// CharacterInjector.clearMethodCache() from KeyboardEventHandler.sessionDidBecomeActive(),
+    /// which EventTapManager calls on NSWorkspace.sessionDidBecomeActiveNotification (Fast
+    /// User Switch back to this session) and which schedules nothing, and directly when the
+    /// debug window's Injection Test is switched off. Those, plus a pass superseded by a
+    /// newer one, a focus pass that found no focused element, and the browser chord below,
+    /// are what this exists for: with it nil they fall back until the next event-driven
+    /// pass happens to run.
+    var scheduleInjectionMethodDetection: ((TimeInterval) -> Void)?
+
     // MARK: - Force Override (for Injection Test)
     
     /// Force override injection method (set by Injection Test)
@@ -843,8 +867,73 @@ class AppBehaviorDetector {
     /// Refreshed alongside confirmedInjectionMethod inside detectInjectionMethod() — i.e. on
     /// focus/title/app/mouse changes, NOT per keystroke. Lets getInputMethodPolicyOverride()
     /// answer in the typing hot path without a live window-title AX query.
-    /// nil = not computed yet (falls back to a one-off live computation).
+    /// nil = not computed yet (falls back to `lastConfirmedInputMethodPolicy`).
     private var confirmedInputMethodPolicy: (policy: InputMethodPolicy?, ruleName: String?)?
+
+    // MARK: - Tap-thread fallbacks
+    //
+    // `clearConfirmedInjectionMethod()` empties both caches above on every mouse click,
+    // engine reset and app switch, and what refills them is asynchronous. The tap callback
+    // cannot refill them itself — that is a full AX snapshot on the thread the keystroke is
+    // travelling on, which is the stall this work exists to remove — so it answers from the
+    // last confirmed values instead until the scheduled detection lands.
+    //
+    // Kept across a clear rather than cleared with it, because a clear does not mean the
+    // answer is wrong: the common trigger is a click inside the field the user is already
+    // typing in. Three rules keep a stale or foreign value out of them, one per way a
+    // confirmation can stop describing the app the user is typing in:
+    // - an app switch calls clearInjectionMethodFallback(), which drops both;
+    // - the isOverlay guard in setConfirmedInjectionMethod keeps an overlay's .axDirect
+    //   out of the method fallback;
+    // - detectInjectionMethod mirrors into the policy fallback at the one site that
+    //   computes a policy for the frontmost app, so neither the (nil, nil) its overlay
+    //   branch confirms nor the (nil, nil) it confirms when there is no frontmost bundle
+    //   id is mirrored.
+    //
+    // That third rule is narrower than "a launcher cannot erase the underlying app's
+    // policy", which does NOT hold. The mirror site runs before the overlay branch and
+    // writes whatever the context it read matched, so a launcher can still wipe the
+    // fallback two ways: one that becomes frontmost (Raycast, Alfred) is what
+    // getCurrentBundleId() returns and matches no rule, and one that does not (Spotlight)
+    // still owns the window title a title-matched rule is compared against. Either way
+    // the keystrokes between the launcher closing and the next detection pass landing
+    // read (nil, nil) instead of the policy the user set on that window.
+
+    /// Last confirmed non-overlay injection method, or nil before the first one.
+    ///
+    /// Overlay methods (.axDirect for Spotlight/Raycast/Alfred) are deliberately never
+    /// retained: an overlay is a transient surface, and the fallback would outlive it. The
+    /// overlay's own keystrokes do not need it — while a launcher is open the confirmed
+    /// slot is set, so nothing falls back — whereas the keystroke right after it closes
+    /// runs on a cleared cache (the close path calls resetWithCursorMoved) and would
+    /// otherwise inject into the underlying app through the AX text-field path.
+    private var lastConfirmedInjectionMethod: InjectionMethodInfo?
+
+    /// Last input-method policy computed for the frontmost app, or nil before the first
+    /// one.
+    ///
+    /// Written only where detectInjectionMethod merges that app's window-title rules, and
+    /// deliberately not from the two places it confirms (nil, nil) for something other
+    /// than "this app has no policy": the overlay branch, where the launcher is a separate
+    /// input surface whose lack of rules must not outlive it, and the missing-bundle-id
+    /// early return. Both would otherwise erase a "force disable Vietnamese" rule for the
+    /// window underneath, which the keystroke right after an overlay closes then answers
+    /// from — the close path calls resetWithCursorMoved, so that keystroke runs on a
+    /// cleared cache.
+    ///
+    /// Those two exclusions are per-write, not a guarantee about launchers: the write that
+    /// does mirror can carry a launcher's context, and the Tap-thread fallbacks note above
+    /// spells out the two ways.
+    private var lastConfirmedInputMethodPolicy: (policy: InputMethodPolicy?, ruleName: String?)?
+
+    /// True once the tap path has asked for a detection it could not run itself, until a
+    /// confirmation lands or the caches are cleared again.
+    ///
+    /// One request per cleared-cache episode, not one per keystroke: every request bumps
+    /// axPassGeneration, which drops the pass already in flight, so a request on each
+    /// keystroke would keep superseding the very detection meant to end the misses — the
+    /// faster the user types, the longer the cache would stay empty.
+    private var injectionMethodDetectionRequested = false
 
     // MARK: - Address Bar Context Cache
     // When user focuses on a browser address bar (Chromium/Firefox), the injection method
@@ -871,6 +960,10 @@ class AppBehaviorDetector {
     /// - Parameter methodInfo: The injection method to use for subsequent keystrokes
     func setConfirmedInjectionMethod(_ methodInfo: InjectionMethodInfo) {
         confirmedInjectionMethod = methodInfo
+        if !methodInfo.isOverlay {
+            lastConfirmedInjectionMethod = methodInfo
+        }
+        injectionMethodDetectionRequested = false
         // Only clear address bar cache if the new confirmed method is NOT an address bar method.
         // When focus changes TO an address bar, detectInjectionMethod() caches the result,
         // then setConfirmedInjectionMethod is called. We must NOT clear the cache in this case.
@@ -904,25 +997,55 @@ class AppBehaviorDetector {
             return confirmed
         }
 
-        // Priority 2: Fallback to live detection.
-        // Store the result as confirmed: after clearConfirmedInjectionMethod()
-        // (mouse click, arrow keys, app switch) EVERY keystroke lands here until
-        // an async re-prime (handleFocusCheck +0.1s, AXObserver). Without storing,
-        // each of those keystrokes pays a full AX snapshot on the tap thread —
-        // when the focused app is busy (Chrome/Gmail) this stalls the event tap.
-        // The async paths still overwrite via setConfirmedInjectionMethod, same
-        // as the reprobe path (consumePendingMethodReprobe) already does.
-        let detected = detectInjectionMethod()
-        setConfirmedInjectionMethod(detected)
-        return detected
+        // Priority 2: no confirmation yet — answer without touching AX.
+        //
+        // This runs inside the CGEventTap callback (KeyboardEventHandler.shouldProcessEvent
+        // and CharacterInjector.inject), so the live detection that used to sit here is not
+        // an option: detectInjectionMethod() with no pre-resolved focusedInfo takes a full
+        // snapshot — focused element, window-title cascade, overlay probe, and the browser's
+        // DOM attributes for an AXTextField — and every one of those is a blocking
+        // round-trip into the app the user is typing in. It was 251 of the 936 tap-callback
+        // samples in the profile behind this change, and storing the result only capped it
+        // at one keystroke per cleared cache, not at zero.
+        //
+        // The fallback is the last non-overlay confirmation instead of `.defaultFast`,
+        // because a cleared cache usually means a click inside the same field, where that
+        // answer is exactly right; `.defaultFast` would drop the address-bar and terminal
+        // handling for as long as the miss lasts. Before the first confirmation of a
+        // session — and after an app switch, which clears the fallback too — there is
+        // nothing better than the default.
+        requestInjectionMethodDetection()
+        return lastConfirmedInjectionMethod ?? .defaultFast
     }
-    
+
+    /// Ask the host to run one detection off the tap thread. One per cleared-cache episode.
+    private func requestInjectionMethodDetection() {
+        guard !injectionMethodDetectionRequested else { return }
+        injectionMethodDetectionRequested = true
+        scheduleInjectionMethodDetection?(0)
+    }
+
     /// Clear confirmed injection method (call when context changes significantly)
     func clearConfirmedInjectionMethod() {
         confirmedInjectionMethod = nil
         confirmedInputMethodPolicy = nil
         clearAddressBarCache()
         _lastLoggedRuleMatchKey = ""  // Reset to log rule match after context change
+        // A new episode of misses gets a new request; without this reset the flag would
+        // still be set from the previous one and the tap would ask for nothing.
+        injectionMethodDetectionRequested = false
+    }
+
+    /// Drop the tap-thread fallbacks as well as the confirmed values.
+    ///
+    /// For the one context change that makes the last confirmation actively wrong rather
+    /// than merely stale: a different app. Its method and its window-title policy describe
+    /// the app the user just left. Called from the app-switch block alongside
+    /// clearConfirmedInjectionMethod() — that block is the only production path where the
+    /// frontmost app changes, and the +0.05s pass it schedules refills both.
+    func clearInjectionMethodFallback() {
+        lastConfirmedInjectionMethod = nil
+        lastConfirmedInputMethodPolicy = nil
     }
 
     // MARK: - Method Reprobe (focus-change probe)
@@ -930,57 +1053,76 @@ class AppBehaviorDetector {
     // search field) change the focused element before the async paths
     // (AXObserver with a ~100ms throttle, mouse-click retries) re-detect the
     // injection method, so the first characters typed right after the chord
-    // can use a stale method. EventTapManager arms a one-shot reprobe on those
-    // chords; the next PLAIN keyDown consumes it and re-detects synchronously.
-    // No "was a confirmation newer than the arm" shortcut here: async
-    // confirmations can carry a PRE-chord focus snapshot with a post-chord
-    // timestamp (throttled AXObserver delivery, scheduled mouse retries), so
-    // timestamps cannot prove freshness — re-detecting is the only safe call,
-    // and the chord filter keeps it rare.
+    // can use a stale method. EventTapManager calls armMethodReprobe() on those
+    // chords and it schedules one off-thread re-detection.
 
-    /// Timestamp of the last focus-moving chord arm signal (0 = disarmed)
-    private var methodReprobeArmedAt: CFAbsoluteTime = 0
+    /// How long the scheduled re-detections wait for the browser to move focus.
+    ///
+    /// A snapshot taken at chord time would read the OLD focused element: the CGEventTap
+    /// callback sees Cmd+L before the browser has processed it.
+    ///
+    /// Two of them, not one, because a scheduled pass RECORDS what it finds. The design
+    /// this replaced kept a probe armed until a keystroke arrived more than 30ms after the
+    /// chord and detected at that moment, so a browser got however long the user took to
+    /// type — usually 200ms or more — and a slow one simply got detected later. A single
+    /// scheduled pass turns that into a fixed budget: a Chrome that has not moved focus
+    /// yet when it runs pins the pre-chord method into both the confirmed slot and the
+    /// tap's fallback, and setConfirmedInjectionMethod clears
+    /// injectionMethodDetectionRequested, so the tap stops asking. The only thing left to
+    /// undo it is the AXObserver, throttled at 100ms and able to arrive carrying a
+    /// pre-chord snapshot of its own.
+    ///
+    /// So the first lands early enough to serve a first character at ~200ms, and the
+    /// second is the settle time, late enough to see a Cmd+T that took a moment on a
+    /// loaded machine. 50ms is also what OverlayAppDetector.armProbeDeferred waits, but
+    /// only the first one is that quantity: there 50ms is the floor of a mechanism that
+    /// keeps retrying for 0.8s, here it is one shot of a two-shot budget.
+    private static let methodReprobeDelays: [TimeInterval] = [0.05, 0.25]
 
-    /// Minimum settle time between the chord and a consuming keystroke.
-    /// A keystroke landing sooner would re-detect against the OLD focused
-    /// element (the browser hasn't processed the chord yet) and pin a stale
-    /// method — in that case the probe stays armed for the next keystroke.
-    private static let methodReprobeSettleTime: CFAbsoluteTime = 0.03
-
-    /// Arm a one-shot injection-method re-detection
-    /// (called on focus-moving Cmd-chords)
+    /// Re-detect the injection method after a focus-moving Cmd-chord.
+    ///
+    /// Scheduled from the chord rather than consumed by the next keystroke, which is where
+    /// this used to run: consuming it there meant a full AX snapshot — focused element,
+    /// window-title cascade, overlay probe, DOM attributes — inside the CGEventTap
+    /// callback, against a browser, which is the one app class where this project has
+    /// measured those round-trips at ~190ms each. The first shot also lands EARLIER than
+    /// the old consume did (chord +50ms, versus whenever the user's first character
+    /// arrives), so the character that motivated the reprobe still finds the address-bar
+    /// method; the second is what replaces the settle time the old consume got for free by
+    /// waiting for that character. See methodReprobeDelays.
+    ///
+    /// Restricted to browsers, as before: chord-driven focus jumps into autocomplete
+    /// fields are a browser pattern, and other apps keep the event-driven paths. The gate
+    /// moves to arm time with the rest; getCurrentBundleId() is an NSWorkspace read, not
+    /// an AX one, and it already ran on this thread in the consume path.
+    ///
+    /// Not a substitute for the AXObserver's focus-change notification, which re-detects
+    /// too — this exists because that one is throttled to 100ms and can be delivered
+    /// carrying a pre-chord snapshot.
     func armMethodReprobe() {
-        methodReprobeArmedAt = CFAbsoluteTimeGetCurrent()
-    }
-
-    /// Re-detect the injection method on the first plain keystroke after a
-    /// focus-moving Cmd-chord. One-shot. Restricted to browsers — chord-driven
-    /// focus jumps into autocomplete fields (Cmd+L/Cmd+T → omnibox) are a
-    /// browser pattern; other apps keep the existing event-driven paths.
-    func consumePendingMethodReprobe() {
-        guard methodReprobeArmedAt > 0 else { return }
-
-        // Keep the probe armed until the browser had time to move focus.
-        guard CFAbsoluteTimeGetCurrent() - methodReprobeArmedAt > Self.methodReprobeSettleTime else {
-            return
-        }
-
-        methodReprobeArmedAt = 0  // one-shot: consume even if we bail below
-
         guard let bundleId = getCurrentBundleId(),
-              Self.browserApps.contains(bundleId)
-                || Self.firefoxBasedBrowsers.contains(bundleId)
-                || Self.axAttributeDetectForBrowsers.contains(bundleId) else { return }
+              Self.isReprobeBrowser(bundleId) else { return }
 
-        let previous = confirmedInjectionMethod
-        let detected = detectInjectionMethod()
-        setConfirmedInjectionMethod(detected)
-        if let callback = debugLogCallback,
-           detected.description != previous?.description {
-            callback("[Reprobe] \(previous?.description ?? "nil") → \(detected.description)")
+        scheduleMethodReprobe()
+    }
+
+    /// Whether a chord in this app should reprobe. The two halves of armMethodReprobe are
+    /// split here because neither is testable through the other: what the gate reads is
+    /// the frontmost application, which no test can choose, and what the schedule asks for
+    /// is only observable past the gate.
+    static func isReprobeBrowser(_ bundleId: String) -> Bool {
+        return browserApps.contains(bundleId)
+            || firefoxBasedBrowsers.contains(bundleId)
+            || axAttributeDetectForBrowsers.contains(bundleId)
+    }
+
+    /// The reprobe itself, past the browser gate.
+    func scheduleMethodReprobe() {
+        for delay in Self.methodReprobeDelays {
+            scheduleInjectionMethodDetection?(delay)
         }
     }
-    
+
     // MARK: - Cache (only for detect() which is used for UI display)
     // Note: detectInjectionMethod(), findMatchingRule(), and detectIMKitBehavior() 
     // don't use cache to ensure fresh detection on every keystroke
@@ -1323,8 +1465,15 @@ class AppBehaviorDetector {
     
     // MARK: - Focused Element Info (Optimized - Single AX Query)
     
-    /// Struct containing all relevant AX attributes of the focused element
+    /// Holds all relevant AX attributes of the focused element
     /// Queried once to avoid multiple AXUIElementCreateSystemWide() calls
+    ///
+    /// A class, not a struct — the lazy DOM/title/caret fields below cache into `var`s,
+    /// so this is a reference type and everyone handed it shares one instance. It carries
+    /// no synchronisation of its own: `materialise` forces those fields on the queue that
+    /// built the snapshot and the instance is then handed to the main thread and used
+    /// only there. Handed over, never shared — a second reader on another thread would be
+    /// a data race, not a copy.
     class FocusedElementInfo {
         let element: AXUIElement?      // For hasCaret check (optional - nil when created without element)
         let role: String?
@@ -1395,7 +1544,17 @@ class AppBehaviorDetector {
             _windowTitleCached = .some(value)
             return value
         }
-        
+
+        /// Whether `windowTitle` has already been answered — true even when the answer
+        /// was nil. Reading it never fires the provider.
+        ///
+        /// This is the distinction a plain `windowTitle ?? somethingElse` cannot express:
+        /// "we asked AX and it said nothing" reads identically to "nobody has asked yet",
+        /// and the fallback then re-runs a cascade that has just failed. Every consumer
+        /// that used to have such a fallback goes through
+        /// `AppBehaviorDetector.windowTitleForMatching(focusedInfo:)` instead.
+        var windowTitleWasResolved: Bool { _windowTitleCached != nil }
+
         /// Whether element has a text caret — lazy-loaded because it requires
         /// an AX query for kAXSelectedTextRangeAttribute. Only needed by toolbar show/hide.
         private var _hasCaretCached: Bool?
@@ -1526,7 +1685,13 @@ class AppBehaviorDetector {
         /// particular are answered by the browser's web renderer; keeping them
         /// lazy avoids forcing Chromium to hold web accessibility on for heavy
         /// pages (Gmail jank). Snapshot cost drops to 5 eager AX calls.
-        static func from(_ element: AXUIElement) -> FocusedElementInfo {
+        /// - Parameter appElement: the frontmost app's AX element, for the window-title
+        ///   cascade. Pass it when the snapshot is taken off the main thread: resolving
+        ///   the title would otherwise read NSWorkspace there. It also pins the title to
+        ///   the app that was frontmost when the snapshot was taken, rather than
+        ///   whichever one is frontmost when something first asks. nil keeps the live
+        ///   lookup, which is what every main-thread caller wants.
+        static func from(_ element: AXUIElement, appElement: AXUIElement? = nil) -> FocusedElementInfo {
             let role = AXHelper.getString(element, attribute: kAXRoleAttribute)
             let subrole = AXHelper.getString(element, attribute: kAXSubroleAttribute)
             let description = AXHelper.getString(element, attribute: kAXDescriptionAttribute)
@@ -1541,16 +1706,96 @@ class AppBehaviorDetector {
                 identifier: identifier,
                 roleDescription: roleDescription,
                 textValueProvider: { AXHelper.getString(element, attribute: kAXValueAttribute) },
-                windowTitleProvider: {
-                    guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
-                    let appElement = AXUIElementCreateApplication(app.processIdentifier)
-                    return AXHelper.getWindowTitle(for: appElement)
-                },
+                windowTitleProvider: { resolveWindowTitle(appElement: appElement) },
                 domIdentifierProvider: { AXHelper.getString(element, attribute: "AXDOMIdentifier") },
                 domClassesProvider: { AXHelper.getStringArray(element, attribute: "AXDOMClassList") }
             )
         }
+
+        /// The window-title cascade against a pinned app element, or against whichever
+        /// app is frontmost when the caller did not pin one.
+        private static func resolveWindowTitle(appElement: AXUIElement?) -> String? {
+            if let appElement = appElement {
+                return AXHelper.getWindowTitle(for: appElement)
+            }
+            guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+            return AXHelper.getWindowTitle(for: AXUIElementCreateApplication(app.processIdentifier))
+        }
+
+        /// Force the AX-backed fields a later detection pass can read, so that pass makes
+        /// no AX call of its own. Meant to run on the queue that built this snapshot,
+        /// before it is handed to the main thread.
+        ///
+        /// Forced always:
+        /// - `windowTitle` — every rule-matching pass resolves it (findAllMatchingRules
+        ///   → windowTitleForMatching), Opera's Speed Dial check asks for it, and
+        ///   TapEventSource records it as lastDetectedTitle. Its cascade is up to six AX
+        ///   round-trips, the largest single item here.
+        ///
+        /// Forced only under the gates its own consumers apply, never wider: AXDOMIdentifier
+        /// and AXDOMClassList are answered by the browser's web renderer, and asking for
+        /// them forces Chromium to keep web accessibility on for the page — the jank the
+        /// laziness exists for. The gates:
+        /// - `role == "AXTextField"` — the only role for which isChromiumAddressBar
+        ///   (domClasses) and isFirefoxStyleAddressBar (domIdentifier) read them. Not a
+        ///   browser-chrome-only role: `<input type=text>` reports AXTextField in
+        ///   Chromium and WebKit too, which is exactly why isChromiumAddressBar has to
+        ///   look for OmniboxViewViews in domClasses to tell the omnibox apart from a
+        ///   page field. So this gate does fire on web content — it is as narrow as those
+        ///   two checks are, no narrower, and the renderer round-trip is what answering
+        ///   the omnibox question costs. What it does exclude is every other web role
+        ///   (AXTextArea/AXWebArea/AXGroup), which neither check would look at.
+        /// - `bundleId == "notion.id"` — isNotionCodeBlock reads domClasses there, at any role.
+        ///
+        /// Deliberately NOT forced:
+        /// - `textValue` — nothing on the detection or toolbar path reads it (only the
+        ///   debug window and the mouse-click debug log), and it can pull a whole
+        ///   document out of an editor or webview.
+        /// - DOM attributes for a custom Window Title Rule carrying axIdentifierPattern
+        ///   or axDOMClassList. Which element such a rule inspects is only known by
+        ///   running the matcher, so that query stays where it is today: on the main
+        ///   thread, inside matchRules. No built-in rule declares AX patterns, so this
+        ///   residual is empty until a user writes such a rule.
+        /// - `hasCaret` unless asked for — see `includingCaret`.
+        ///
+        /// - Parameters:
+        ///   - bundleId: the frontmost app's bundle ID, resolved by the caller (reading
+        ///     NSWorkspace off the main thread is what this avoids).
+        ///   - includingCaret: also force `hasCaret`, one AX round-trip that only the
+        ///     host's toolbar callback reads. A host with no toolbar (XKeyIM) passes
+        ///     false and does not pay for it.
+        func materialise(bundleId: String?, includingCaret: Bool) {
+            _ = windowTitle
+            if includingCaret {
+                _ = hasCaret
+            }
+            if role == "AXTextField" {
+                _ = domIdentifier
+                _ = domClasses
+            } else if bundleId == "notion.id" {
+                _ = domClasses
+            }
+        }
         
+        /// Snapshot for "AX reports no focused element at all".
+        ///
+        /// Not `empty`: that one is built without a windowTitleProvider, so its title is
+        /// resolved-to-nil by construction, and resolved answers are now trusted
+        /// (`windowTitleForMatching`). Detection still needs the title when nothing is
+        /// focused — Opera's Speed Dial is recognised by title alone, and Window Title
+        /// Rules match on it — so this variant keeps the title resolvable while carrying
+        /// no element attributes.
+        /// - Parameter appElement: as in `from(_:appElement:)`.
+        static func withoutFocusedElement(appElement: AXUIElement? = nil) -> FocusedElementInfo {
+            return FocusedElementInfo(
+                element: nil,
+                role: nil, subrole: nil, description: nil,
+                identifier: nil,
+                roleDescription: nil,
+                windowTitleProvider: { resolveWindowTitle(appElement: appElement) }
+            )
+        }
+
         static let empty = FocusedElementInfo(
             element: nil,
             role: nil, subrole: nil, description: nil,
@@ -1564,7 +1809,7 @@ class AppBehaviorDetector {
     /// - Returns: FocusedElementInfo containing all relevant attributes
     func getFocusedElementInfo() -> FocusedElementInfo {
         guard let element = AXHelper.getFocusedElement() else {
-            return .empty
+            return .withoutFocusedElement()
         }
         return FocusedElementInfo.from(element)
     }
@@ -1649,24 +1894,27 @@ class AppBehaviorDetector {
     /// no focused element or Unknown role — making isChromiumAddressBar() fail.
     ///
     /// Detection: Opera bundle ID + nil/Unknown role + window title "Speed Dial"
-    /// Guards are ordered cheapest-first: bundleId check → role check → AX window title query
+    /// Guards are ordered cheapest-first: bundleId check → role check → window title
     ///
-    /// NOTE: Uses getCurrentWindowTitle() (direct AX query) because on Speed Dial
-    /// there's no focused element, so FocusedElementInfo.empty has no windowTitleProvider.
-    private func isOperaSpeedDialAddressBar(bundleId: String, role: String?) -> Bool {
+    /// The title comes from the snapshot through windowTitleForMatching, so a title the
+    /// caller already resolved — including one a background AX pass resolved off the
+    /// main thread — is reused instead of being asked for a second time. Speed Dial has
+    /// no focused element, which is exactly why `getFocusedElementInfo()` returns a
+    /// `withoutFocusedElement()` snapshot rather than `empty`: it carries no element
+    /// attributes but can still resolve the title this check needs.
+    private func isOperaSpeedDialAddressBar(bundleId: String, role: String?, focusedInfo: FocusedElementInfo?) -> Bool {
         // 1. Cheapest: Must be Opera (string prefix check)
         guard bundleId.hasPrefix("com.opera.") || bundleId.hasPrefix("com.operasoftware.") else {
             return false
         }
-        
+
         // 2. Cheap: AXRole must be nil or Unknown (degraded/no focused element)
         if let role = role, role != "AXUnknown" && role != "Unknown" {
             return false
         }
-        
-        // 3. Expensive: Query window title directly (AX cascade call)
-        guard let windowTitle = getCurrentWindowTitle() else { return false }
-        return windowTitle == "Speed Dial"
+
+        // 3. Expensive: the window title (AX cascade call when nothing resolved it yet)
+        return windowTitleForMatching(focusedInfo: focusedInfo) == "Speed Dial"
     }
     
     /// Create InjectionMethodInfo for browser address bars (Chromium/Firefox) with caching.
@@ -1746,7 +1994,7 @@ class AppBehaviorDetector {
 
         // Chromium-based (Chrome, Edge, Brave, Opera, Vivaldi, Arc, ...)
         if isChromiumAddressBar(info: info) { return true }
-        if isOperaSpeedDialAddressBar(bundleId: bundleId, role: info.role) { return true }
+        if isOperaSpeedDialAddressBar(bundleId: bundleId, role: info.role, focusedInfo: info) { return true }
         if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: info) { return true }
         return false
     }
@@ -1787,6 +2035,27 @@ class AppBehaviorDetector {
     
     // MARK: - Window Title Detection
     
+    /// The window title to match rules and title-based detection against.
+    ///
+    /// What it replaced — `focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""` —
+    /// could not tell "we asked AX and the answer was nil" apart from "nobody has asked
+    /// yet". Those need opposite treatment: the first is an answer, the second is not.
+    /// A snapshot resolves its title to nil exactly when the AX cascade fails, which on
+    /// a slow app means it timed out — so the fallback re-ran, on the main thread, the
+    /// same up-to-six-round-trip cascade that had just timed out, at up to the AX
+    /// messaging timeout each. `FocusedElementInfo.windowTitleWasResolved` records which
+    /// case a snapshot is in, and `windowTitle` returns an already-resolved value
+    /// without touching AX.
+    ///
+    /// So: a snapshot answers for itself, nil included; only "no snapshot at all" —
+    /// nobody has asked — reaches for a live query.
+    private func windowTitleForMatching(focusedInfo: FocusedElementInfo?) -> String {
+        guard let focusedInfo = focusedInfo else {
+            return getCurrentWindowTitle() ?? ""
+        }
+        return focusedInfo.windowTitle ?? ""
+    }
+
     /// Get current window title using Accessibility API
     /// Note: Requires Accessibility permission (which XKey already has)
     func getCurrentWindowTitle() -> String? {
@@ -1872,7 +2141,7 @@ class AppBehaviorDetector {
             return nil
         }
         
-        let windowTitle = focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""
+        let windowTitle = windowTitleForMatching(focusedInfo: focusedInfo)
         var cachedAXInfo: FocusedElementInfo? = nil
         var matches: [WindowTitleRule] = []  // not used for returnFirst, but required by matchRules
         
@@ -1909,7 +2178,7 @@ class AppBehaviorDetector {
             return []
         }
         
-        let windowTitle = focusedInfo?.windowTitle ?? getCurrentWindowTitle() ?? ""
+        let windowTitle = windowTitleForMatching(focusedInfo: focusedInfo)
         var matchingRules: [WindowTitleRule] = []
         var cachedAXInfo: FocusedElementInfo? = nil
         
@@ -2016,9 +2285,19 @@ class AppBehaviorDetector {
         if let cached = confirmedInputMethodPolicy {
             return cached
         }
-        // Fallback: no detection has run yet (e.g. very first keystroke after launch).
-        let mergedResult = getMergedRuleResult()
-        return (mergedResult.inputMethodPolicy, mergedResult.hasMatches ? mergedResult.displayName : nil)
+        // Cache miss — the same one getConfirmedInjectionMethod() answers, since
+        // clearConfirmedInjectionMethod() empties both and detectInjectionMethod() refills
+        // both. Its only caller is KeyboardEventHandler.effectiveVietnameseEnabled(), on
+        // the CGEventTap thread, so the live getMergedRuleResult() that used to sit here
+        // is not an option: with Window Title Rules on it resolves the window title
+        // through an AX cascade of up to six round-trips into the frontmost app.
+        //
+        // Same fallback shape as the injection method: the last computed policy, which a
+        // click inside the same window does not invalidate, and (nil, nil) — no override,
+        // so the user's own Vietnamese setting decides — before the first detection of a
+        // session or after an app switch has dropped it.
+        requestInjectionMethodDetection()
+        return lastConfirmedInputMethodPolicy ?? (nil, nil)
     }
     
     /// Get current window title
@@ -2346,7 +2625,20 @@ class AppBehaviorDetector {
     /// 1. We must always call AX APIs to get current role (focus can change via keyboard)
     /// 2. The detection logic (string comparisons, Set lookups) is very fast
     /// 3. Simpler code without cache = fewer bugs
-    func detectInjectionMethod(focusedInfo: FocusedElementInfo? = nil) -> InjectionMethodInfo {
+    ///
+    /// - Parameters:
+    ///   - focusedInfo: pre-queried AX element info. Every AX-backed field it already
+    ///     carries is used as-is; anything still unresolved is resolved here, on the
+    ///     calling thread.
+    ///   - resolvedOverlayName: an overlay-launcher name the caller already resolved,
+    ///     as a double optional because "no overlay" and "did not ask" are different
+    ///     answers: `.none` means nothing was resolved, so `overlayAppNameProvider` is
+    ///     asked here as before; `.some(nil)` means the caller probed and there is no
+    ///     overlay; `.some(name)` means it probed and found one. Callers that resolve it
+    ///     themselves — the tap's off-main AX pass — keep the whole overlay probe, which
+    ///     costs up to five AX round-trips, off the thread this function runs on.
+    func detectInjectionMethod(focusedInfo: FocusedElementInfo? = nil,
+                               resolvedOverlayName: String?? = .none) -> InjectionMethodInfo {
         // Priority 0: Check force override (set by Injection Test)
         if let forcedMethod = forceInjectionMethod {
             let delays = forceDelays ?? getDefaultDelays(for: forcedMethod)
@@ -2379,6 +2671,16 @@ class AppBehaviorDetector {
         let mergedResult = getMergedRuleResult(focusedInfo: focusedInfo)
         confirmedInputMethodPolicy = (mergedResult.inputMethodPolicy,
                                       mergedResult.hasMatches ? mergedResult.displayName : nil)
+        // The one site that mirrors into the tap's policy fallback: this is the policy of
+        // the app the user is typing in, and it stays the right answer for the keystrokes
+        // that run while the confirmed slot is empty. The (nil, nil) written above for a
+        // missing bundle id and below for an overlay describe neither, so neither mirrors.
+        //
+        // "The app the user is typing in" is only ever the bundle id and window title this
+        // pass read, and a launcher can be the source of either — see the Tap-thread
+        // fallbacks note for the two ways that leaves (nil, nil) here in place of the
+        // underlying window's policy.
+        lastConfirmedInputMethodPolicy = confirmedInputMethodPolicy
 
         // Priority 0.2: Terminal panels in VSCode/Cursor/etc
         // Check directly via AX Description - doesn't go through overlay detection if it's a terminal panel (VSCode/Cursor)
@@ -2458,9 +2760,26 @@ class AppBehaviorDetector {
         // to edit the focused text field atomically via the Accessibility API instead —
         // this is immune to that race. injectViaAX falls back to the .autocomplete
         // synthetic path (Forward Delete + backspace) when AX is unavailable.
-        if let overlayName = overlayAppNameProvider?() {
+        //
+        // The `??` flattens the caller's answer when there is one — `.some(nil)` gives
+        // nil, meaning "probed, no overlay" — and only falls through to the provider
+        // when nothing was resolved. Asking the provider here is what makes this an AX
+        // call site: it runs OverlayAppDetector's probe, and with it the probe's cache
+        // write and visibility callback.
+        if let overlayName = resolvedOverlayName ?? overlayAppNameProvider?() {
             // Overlay launchers are a separate input surface — the underlying app's
             // window-title rules (and their policy) must not leak into Spotlight/Raycast/Alfred.
+            // Confirmed only, never mirrored into lastConfirmedInputMethodPolicy: this
+            // (nil, nil) is true for as long as the launcher is up and false the moment it
+            // closes, and the keystroke right after it closes reads the fallback, because
+            // the close path clears the confirmed slot through resetWithCursorMoved.
+            //
+            // Not mirroring HERE is not the same as leaving the fallback alone. The mirror
+            // above has already run this pass, against whatever getCurrentBundleId() and
+            // the window title reported — a frontmost launcher matches no rule, and a
+            // title-matched rule misses even when the launcher is only a panel — so the
+            // fallback may already hold (nil, nil) in place of the underlying window's
+            // policy. See the Tap-thread fallbacks note.
             confirmedInputMethodPolicy = (nil, nil)
             return InjectionMethodInfo(
                 method: .axDirect,
@@ -2540,7 +2859,7 @@ class AppBehaviorDetector {
             
             // Opera Speed Dial: AX returns Unknown role for address bar
             // Treat same as Chromium address bar
-            if isOperaSpeedDialAddressBar(bundleId: bundleId, role: currentRole) {
+            if isOperaSpeedDialAddressBar(bundleId: bundleId, role: currentRole, focusedInfo: focusedInfo) {
                 return makeAddressBarInjection(browserType: "Opera Speed Dial", bundleId: bundleId)
             }
             

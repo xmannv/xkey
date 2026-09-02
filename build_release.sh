@@ -355,7 +355,13 @@ if [ "$ENABLE_XKEYIM" = true ]; then
     
     # Check if XKeyIM scheme exists
     if xcodebuild -project XKey.xcodeproj -list 2>/dev/null | grep -q "XKeyIM"; then
-        
+
+        # XKey and XKeyIM share one derived-data path (./build). The XKey clean
+        # above only clears XKey's objects, so without this XKeyIM reuses stale
+        # object files from earlier commits and silently ships an old compile.
+        echo "🧹 Cleaning previous XKeyIM build..."
+        xcodebuild -project XKey.xcodeproj -scheme XKeyIM -configuration Release -derivedDataPath ./build clean
+
         if [ "$ENABLE_CODESIGN" = true ]; then
             xcodebuild -project XKey.xcodeproj \
               -scheme XKeyIM \

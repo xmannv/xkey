@@ -48,7 +48,7 @@ XKeyIM.app/
 ### 2. Info.plist keys
 ```xml
 <key>InputMethodConnectionName</key>
-<string>XKeyIM_Connection</string>
+<string>com.codetay.inputmethod.XKey_Connection</string>
 
 <key>InputMethodServerControllerClass</key>
 <string>XKeyIMController</string>
@@ -154,7 +154,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create IMK server
         server = IMKServer(
-            name: "XKeyIM_Connection",
+            name: "com.codetay.inputmethod.XKey_Connection",
             bundleIdentifier: Bundle.main.bundleIdentifier!
         )
     }

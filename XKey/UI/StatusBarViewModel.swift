@@ -38,6 +38,11 @@ class StatusBarViewModel: ObservableObject {
         self.keyboardHandler = keyboardHandler
         self.eventTapManager = eventTapManager
         
+        // Seed from the App Group before syncing: XKeyIM writes this flag too, and
+        // setupKeyboardHandling() has already applied the shared value to the handler
+        // via TapEnvironment. Starting from a hardcoded default would override it.
+        isVietnameseEnabled = SharedSettings.shared.vietnameseEnabled
+
         // Sync initial state with keyboard handler
         if let handler = keyboardHandler {
             handler.setVietnamese(isVietnameseEnabled)
@@ -97,6 +102,14 @@ class StatusBarViewModel: ObservableObject {
     func toggleVietnamese() {
         isVietnameseEnabled.toggle()
         keyboardHandler?.setVietnamese(isVietnameseEnabled)
+
+        // The user asking for a durable change: the status-bar click, the popover switch
+        // and the global hotkey all land here, and init() seeds from this same flag. Only
+        // XKeyIM used to write it, so one "off" from XKeyIM's menu stuck forever — XKey.app
+        // could never write its way back out. Smart Switch and input-source restores
+        // deliberately do NOT persist: those are transient per-app state, not a preference.
+        SharedSettings.shared.vietnameseEnabled = isVietnameseEnabled
+
         log("Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
         
         // Play beep sound if enabled

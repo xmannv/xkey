@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AppKit
 
 /// App Group identifier for sharing data between XKey and XKeyIM
 /// Note: macOS Sequoia+ requires TeamID prefix for native apps distributed outside App Store
@@ -88,6 +89,13 @@ enum SharedSettingsKey: String {
 
     // Remote desktop injection mode
     case remoteDesktopInjectMode = "XKey.remoteDesktopInjectMode"
+
+    // XKeyIM event tap ownership (one-way: XKeyIM arms, XKey.app yields)
+    case xkeyIMTapArmed = "XKey.xkeyIMTapArmed"
+    case xkeyIMTapPID = "XKey.xkeyIMTapPID"
+
+    // Global Vietnamese on/off, shared by both processes
+    case vietnameseEnabled = "XKey.vietnameseEnabled"
 
     // Remote desktop target mode (this machine is being remoted into)
     case isRemoteDesktopTarget = "XKey.isRemoteDesktopTarget"
@@ -185,9 +193,12 @@ class SharedSettings {
     private let cacheLock = NSLock()
 
     /// Cached plist dictionary so per-keystroke setting reads (spell check, engine
-    /// flags, ...) don't hit disk. The main app is the only writer; writes update
-    /// this cache directly. XKeyIM only reads and refreshes via the distributed
-    /// settings-changed notification that accompanies every write.
+    /// flags, ...) don't hit disk. BOTH processes write: the main app writes every
+    /// setting, and XKeyIM writes `xkeyIMTapArmed`, `xkeyIMTapPID` and
+    /// `vietnameseEnabled`. Reads are served from this cache, refreshed via the
+    /// distributed settings-changed notification; writes go through mutatePlist,
+    /// which merges onto the current on-disk dictionary so a stale cache can never
+    /// revert what the other process wrote.
     private var cachedPlistDict: [String: Any]?
 
     /// Cached decoded user dictionary so per-word spell checks don't re-decode JSON.
@@ -199,7 +210,7 @@ class SharedSettings {
     private var cacheGeneration = 0
 
     /// Identifies this process in distributed settings notifications so our own
-    /// observer can skip invalidating the cache that writePlistDict just updated.
+    /// observer can skip invalidating the cache that mutatePlist just updated.
     private static let processTag = "xkey-\(ProcessInfo.processInfo.processIdentifier)"
 
     // MARK: - Initialization
@@ -216,7 +227,7 @@ class SharedSettings {
             object: nil,
             queue: nil
         ) { [weak self] notification in
-            // Skip our own writes — writePlistDict already updated the cache
+            // Skip our own writes — mutatePlist already updated the cache
             if (notification.object as? String) == Self.processTag { return }
             self?.invalidateCache()
         }
@@ -259,27 +270,50 @@ class SharedSettings {
         return dict
     }
 
-    /// Write the entire plist dictionary
-    private func writePlistDict(_ dict: [String: Any]) {
+    /// Read-modify-write a set of keys under one lock hold, merging onto the CURRENT
+    /// on-disk dictionary rather than this process's cache.
+    ///
+    /// Both XKey.app and XKeyIM write this plist. A merge onto a stale cache silently
+    /// reverts whatever the other process wrote since that cache was filled — including
+    /// the tap-ownership flag, which would put both processes in the keystroke path.
+    ///
+    /// ponytail: no cross-process file lock, so two writes that interleave inside this
+    /// hold can still lose one. Window is a single write, not a cache lifetime. Upgrade
+    /// to an flock on the plist if a report ever shows a lost write.
+    private func mutatePlist(_ body: (inout [String: Any]) -> Void) {
         guard let url = plistURL else { return }
 
         do {
-            let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
-
-            // Disk write + cache update under one lock hold so a concurrent
-            // reader can never observe cache/disk divergence. On write failure
-            // the cache is left untouched (still matches disk).
             cacheLock.lock()
             defer { cacheLock.unlock() }
-            try data.write(to: url)
+
+            var dict: [String: Any]
+            if let data = try? Data(contentsOf: url),
+               let onDisk = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+                dict = onDisk
+            } else {
+                // Missing file on a fresh install, or a transient read error: fall back
+                // to the cache so a write can't drop values this process already holds.
+                dict = cachedPlistDict ?? [:]
+            }
+
+            body(&dict)
+
+            let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
+            // .atomic: the other process reads this file directly, and this re-reads it on
+            // every write. A non-atomic write truncates in place, so a reader can catch a
+            // half-written file — and a torn read here is what the fallback to
+            // `cachedPlistDict ?? [:]` above turns into a lost update or a wiped file.
+            try data.write(to: url, options: .atomic)
             cachedPlistDict = dict
             cachedUserDictionaryWords = nil
             cacheGeneration += 1
         } catch {
+            // Outside the lock hold: the defer above runs on the way out of the do block.
             sharedLogError("Failed to write plist: \(error)")
         }
     }
-    
+
     /// Read a Bool value from plist
     private func readBool(forKey key: String) -> Bool {
         let dict = readPlistDict()
@@ -297,9 +331,7 @@ class SharedSettings {
     
     /// Write a Bool value to plist
     private func writeBool(_ value: Bool, forKey key: String) {
-        var dict = readPlistDict()
-        dict[key] = value
-        writePlistDict(dict)
+        mutatePlist { $0[key] = value }
     }
     
     /// Read an Int value from plist
@@ -316,9 +348,7 @@ class SharedSettings {
     
     /// Write an Int value to plist
     private func writeInt(_ value: Int, forKey key: String) {
-        var dict = readPlistDict()
-        dict[key] = value
-        writePlistDict(dict)
+        mutatePlist { $0[key] = value }
     }
     
     /// Read a String value from plist
@@ -329,9 +359,7 @@ class SharedSettings {
     
     /// Write a String value to plist
     private func writeString(_ value: String, forKey key: String) {
-        var dict = readPlistDict()
-        dict[key] = value
-        writePlistDict(dict)
+        mutatePlist { $0[key] = value }
     }
     
     /// Read a Data value from plist
@@ -342,9 +370,7 @@ class SharedSettings {
     
     /// Write a Data value to plist
     private func writeData(_ value: Data, forKey key: String) {
-        var dict = readPlistDict()
-        dict[key] = value
-        writePlistDict(dict)
+        mutatePlist { $0[key] = value }
     }
     
     // MARK: - Hotkey Settings
@@ -874,6 +900,231 @@ class SharedSettings {
         }
     }
 
+    // MARK: - Vietnamese On/Off (shared by both processes)
+
+    /// Global Vietnamese on/off. Lives here because BOTH the tap path
+    /// (KeyboardEventHandler) and the marked-text path (XKeyIMController) must read
+    /// one truth — XKeyIM used to keep a private in-memory flag that neither
+    /// persisted nor synced, which is exactly the desync class this replaces.
+    /// Defaults to true so a fresh install types Vietnamese.
+    var vietnameseEnabled: Bool {
+        get {
+            // readPlistDict() returns a non-optional [String: Any] in this file, so
+            // the only optional here is the key lookup itself: key absent -> true.
+            guard let value = readPlistDict()[SharedSettingsKey.vietnameseEnabled.rawValue] as? Bool
+            else { return true }
+            return value
+        }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.vietnameseEnabled.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    // MARK: - XKeyIM Tap Ownership
+
+    /// True while XKeyIM's event tap is armed. Armed and disarmed only by XKeyIM; the
+    /// one write from XKey.app is clearing an orphan whose arming process is gone.
+    var xkeyIMTapArmed: Bool {
+        get { readBool(forKey: SharedSettingsKey.xkeyIMTapArmed.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.xkeyIMTapArmed.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    /// PID of the XKeyIM process that armed the tap, so a crashed XKeyIM cannot
+    /// keep XKey.app locked out forever.
+    var xkeyIMTapPID: Int {
+        get { readInt(forKey: SharedSettingsKey.xkeyIMTapPID.rawValue) }
+        set {
+            writeInt(newValue, forKey: SharedSettingsKey.xkeyIMTapPID.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    /// Called by XKeyIM when its tap goes live. Flag and PID move together in one
+    /// mutation: two separate writes leave a window where the other process can read
+    /// "armed" against the previous owner's PID.
+    func armXKeyIMTap(pid: Int) {
+        mutatePlist {
+            $0[SharedSettingsKey.xkeyIMTapPID.rawValue] = pid
+            $0[SharedSettingsKey.xkeyIMTapArmed.rawValue] = true
+        }
+        notifySettingsChanged()
+    }
+
+    /// Called by XKeyIM on deactivate and on terminate.
+    func disarmXKeyIMTap() {
+        mutatePlist {
+            $0[SharedSettingsKey.xkeyIMTapArmed.rawValue] = false
+            $0[SharedSettingsKey.xkeyIMTapPID.rawValue] = 0
+        }
+        notifySettingsChanged()
+    }
+
+    /// The question XKey.app asks: should I keep my hands off the keyboard?
+    /// True only when SOME OTHER process armed the tap and that process really is
+    /// XKeyIM, still running — the arming process itself is never the audience for
+    /// this question, so it must never read `true` for its own PID (otherwise
+    /// XKeyIM's own tap delegate would yield to itself and stop processing every
+    /// keystroke).
+    ///
+    /// Liveness alone is not enough. Flag and PID live in a persistent plist, so a
+    /// kernel panic or hard power-off leaves them set (applicationWillTerminate never
+    /// runs), and XKeyIM's login-launched PID sits in the low range reassigned early
+    /// on the next boot. `kill(pid, 0)` would then succeed against whatever unrelated
+    /// process inherited the PID and lock XKey.app out of the keyboard permanently,
+    /// with no UI indication — so verify identity, not just existence. `kill(pid, 0)`
+    /// stays as the cheap pre-check ahead of the bundle lookup.
+    ///
+    /// XKey.app does not suspend its tap while XKeyIM is armed — it yields per event —
+    /// so this is read on EVERY keystroke, and both the `kill(2)` and the
+    /// LaunchServices lookup are too expensive to pay there. The answer is memoised on
+    /// `cacheGeneration`, which every write goes through (`armXKeyIMTap`,
+    /// `disarmXKeyIMTap`) and which the distributed settings notification bumps through
+    /// `invalidateCache()`, so a real ownership change from either process is still
+    /// seen on the very next event.
+    var isXKeyIMTapOwningInput: Bool {
+        let generation = currentCacheGeneration
+        let now = ProcessInfo.processInfo.systemUptime
+
+        ownershipMemoLock.lock()
+        if let memo = ownershipMemo,
+           memo.generation == generation,
+           now - memo.capturedAt < Self.ownershipMemoMaxAge {
+            ownershipMemoLock.unlock()
+            return memo.value
+        }
+        ownershipMemoLock.unlock()
+
+        // Computed outside the memo lock: the compute path can write the plist (the
+        // self-heal below), and no lock in this type may be held across that.
+        let value = computeIsXKeyIMTapOwningInput()
+
+        ownershipMemoLock.lock()
+        ownershipMemo = (value, generation, now)
+        ownershipMemoLock.unlock()
+        return value
+    }
+
+    private func computeIsXKeyIMTapOwningInput() -> Bool {
+        guard xkeyIMTapArmed else { return false }
+        let pid = xkeyIMTapPID
+        guard pid > 0 else { return false }
+        guard pid != Int(getpid()) else { return false }
+        guard kill(pid_t(pid), 0) == 0 else {
+            clearOrphanedTapOwnership(pid: pid)
+            return false
+        }
+        let runningApp = NSRunningApplication(processIdentifier: pid_t(pid))
+        // NOT treated as an orphan: NSRunningApplication can return nil for a live,
+        // correct XKeyIM, and clearing the flag here would put both processes back in
+        // the keystroke path. Log it instead — failing this check silently is how
+        // "XKey transforms every keystroke twice" comes back as an unreproducible report.
+        guard runningApp?.bundleIdentifier == Self.xkeyIMBundleIdentifier else {
+            logTapOwnershipIdentityMismatch(pid: pid, identity: runningApp?.bundleIdentifier)
+            return false
+        }
+        return true
+    }
+
+    /// Rate-limited: this only runs on a memo miss, which already bounds it to a few per
+    /// second, and a few log lines per second forever on the keystroke path is its own
+    /// freeze.
+    private func logTapOwnershipIdentityMismatch(pid: Int, identity: String?) {
+        guard shouldLogTapOwnershipWarning() else { return }
+        sharedLogWarning("XKeyIM tap ownership armed for live PID \(pid), but its identity is \(identity ?? "unavailable") rather than \(Self.xkeyIMBundleIdentifier) — not yielding the keyboard")
+    }
+
+    /// One throttle for both tap-ownership warnings: both fire from the memo-miss path,
+    /// which repeats for as long as the condition lasts. Sharing the timestamp can
+    /// suppress one warning behind the other — acceptable for two diagnostics about the
+    /// same flag, and cheaper than a second timer to keep in step.
+    private func shouldLogTapOwnershipWarning() -> Bool {
+        let now = ProcessInfo.processInfo.systemUptime
+        ownershipMemoLock.lock()
+        defer { ownershipMemoLock.unlock() }
+        guard now - lastTapOwnershipWarningLogAt >= Self.tapOwnershipWarningLogInterval else {
+            return false
+        }
+        lastTapOwnershipWarningLogAt = now
+        return true
+    }
+
+    /// Clear an ownership flag whose arming process is definitively gone. `kill(2)`
+    /// failing is the kernel-panic / hard-power-off case: applicationWillTerminate never
+    /// ran, and leaving the flag on disk means the next boot can reassign that low PID to
+    /// an unrelated process, at which point liveness starts passing again.
+    ///
+    /// No notification: the process that would care is the one that died, mutatePlist has
+    /// already updated this process's cache, and a synchronous distributed post on the
+    /// keystroke path is its own freeze risk. Bumping the cache generation is what
+    /// retires the memo.
+    private func clearOrphanedTapOwnership(pid: Int) {
+        // One attempt per cache generation. A successful write bumps the generation and
+        // the flag then reads false, so this only bites when the write FAILED (full disk,
+        // read-only container): nothing changed, the memo expires 250 ms later, and the
+        // heal would otherwise repeat a synchronous plist read and write four times a
+        // second forever, on the main thread inside a CGEventTap callback. Any real
+        // ownership change bumps the generation and re-arms the heal.
+        let generation = currentCacheGeneration
+        ownershipMemoLock.lock()
+        let alreadyAttempted = lastOrphanHealAttemptGeneration == generation
+        lastOrphanHealAttemptGeneration = generation
+        ownershipMemoLock.unlock()
+        guard !alreadyAttempted else { return }
+
+        if shouldLogTapOwnershipWarning() {
+            sharedLogWarning("XKeyIM tap ownership armed for dead PID \(pid) — clearing the orphaned flag")
+        }
+        mutatePlist { dict in
+            // Clear only the PID this compute decided was dead. mutatePlist has just
+            // re-read the current dictionary from disk, and XKeyIM may have re-armed with
+            // a fresh PID since the read that started this compute — overwriting that is
+            // the lost update mutatePlist exists to prevent, and it puts both processes
+            // in the keystroke path with no notification to correct it.
+            guard (dict[SharedSettingsKey.xkeyIMTapPID.rawValue] as? Int) == pid else { return }
+            dict[SharedSettingsKey.xkeyIMTapArmed.rawValue] = false
+            dict[SharedSettingsKey.xkeyIMTapPID.rawValue] = 0
+        }
+    }
+
+    /// XKeyIM's CFBundleIdentifier (XKeyIM/Info.plist) — the identity the ownership
+    /// flag must belong to. Internal so a test can pin it against that plist: a typo
+    /// here leaves the suite green while XKey.app never yields the keyboard again.
+    static let xkeyIMBundleIdentifier = "com.codetay.inputmethod.XKey"
+
+    /// Guards `ownershipMemo`, `lastTapOwnershipWarningLogAt` and
+    /// `lastOrphanHealAttemptGeneration`. Separate from
+    /// `cacheLock`, and never held while the memo is being computed, so the compute
+    /// path stays free to write the plist.
+    private let ownershipMemoLock = NSLock()
+    private var ownershipMemo: (value: Bool, generation: Int, capturedAt: TimeInterval)?
+    private var lastTapOwnershipWarningLogAt: TimeInterval = -.infinity
+    private var lastOrphanHealAttemptGeneration: Int?
+
+    /// Backstop for the ownership change no write can announce: XKeyIM dying without
+    /// disarming leaves the flag armed on disk, so nothing bumps the cache generation
+    /// and the memo would otherwise answer `true` until some unrelated setting changed.
+    ///
+    /// ponytail: polling ceiling — that one case is seen up to 250 ms late, during which
+    /// XKey.app keeps yielding to a process that is gone. Observe the owner directly
+    /// (NSWorkspace.didTerminateApplicationNotification) if that window ever matters.
+    ///
+    /// Internal so the memo test can measure against the real window instead of pinning a
+    /// copy of the literal that drifts the day this one changes.
+    static let ownershipMemoMaxAge: TimeInterval = 0.25
+
+    /// At most one tap-ownership warning per this interval.
+    private static let tapOwnershipWarningLogInterval: TimeInterval = 60
+
+    private var currentCacheGeneration: Int {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return cacheGeneration
+    }
+
     var isRemoteDesktopTarget: Bool {
         get { readBool(forKey: SharedSettingsKey.isRemoteDesktopTarget.rawValue) }
         set {
@@ -1074,19 +1325,20 @@ class SharedSettings {
     /// In case of App Group path change between versions, this ensures
     /// settings are written to the correct location
     func forceWriteCurrentSettings() {
-        // Read the current plist dictionary
-        let currentDict = readPlistDict()
-        
-        // If nothing to save, skip
-        guard !currentDict.isEmpty else {
+        // Empty body on purpose: the job is to guarantee the file exists in the current
+        // App Group container, not to change any value, and mutatePlist round-trips the
+        // CURRENT on-disk dictionary to do it. Rebuilding the dictionary from the cache
+        // and writing the whole thing back would push this process's possibly-stale copy
+        // of xkeyIMTapArmed over whatever XKeyIM wrote since — right before a restart,
+        // and with no notification — leaving both processes in the keystroke path.
+        var count = 0
+        mutatePlist { count = $0.count }
+
+        if count == 0 {
             sharedLogWarning("forceWriteCurrentSettings: No settings to save")
-            return
+        } else {
+            sharedLogSuccess("Force saved \(count) settings to plist")
         }
-        
-        // Force write it back to ensure the file exists and is up-to-date
-        writePlistDict(currentDict)
-        
-        sharedLogSuccess("Force saved \(currentDict.count) settings to plist")
     }
 
     /// Notify that settings have changed (for observers)
@@ -1102,8 +1354,11 @@ class SharedSettings {
 
         // Post distributed notification for cross-app communication.
         // object carries the sender's process tag so our own observer can skip
-        // the redundant cache invalidation (XKeyIM observes with object: nil
-        // and is unaffected by the object value).
+        // the redundant cache invalidation. XKeyIM observes with object: nil but
+        // TapController compares the delivered object against a process tag it builds
+        // in the same format, to drop its own posts — so the format is load-bearing in
+        // both processes. If the two ever drift apart that filter fails open and XKeyIM
+        // pays one redundant tap-environment rebuild per self-posted change.
         // deliverImmediately: XKeyIM is a background IMK process — without it
         // the notification can be coalesced/held and its settings cache would
         // stay stale until the next delivery.
@@ -1120,6 +1375,12 @@ class SharedSettings {
     /// Keys excluded from the scalar payload because they are owned by dedicated sync categories
     /// (macros / rules / excluded apps / user dictionary). Keeping them out prevents double-writes.
     /// Also excludes device-specific keys that must not sync across machines.
+    ///
+    /// Deliberately NOT the same set as the keys importSettings() preserves: that list is about a
+    /// manual backup made on this machine, this one about data crossing machines. vietnameseEnabled
+    /// belongs here but not there — it must not follow the user to another Mac, yet restoring their
+    /// own backup should give them back the on/off state they saved. Merging the two lists
+    /// reintroduces one of those two bugs, whichever way it is merged.
     private static let scalarsExcludedKeys: Set<String> = [
         SharedSettingsKey.macrosData.rawValue,
         SharedSettingsKey.excludedApps.rawValue,
@@ -1128,6 +1389,16 @@ class SharedSettings {
         // Device-specific: machine B (remote target) ≠ machine A (controller).
         // Syncing this would break Notion/Kiro on the controller machine.
         SharedSettingsKey.isRemoteDesktopTarget.rawValue,
+        // Device-specific: which process owns the keyboard is decided per machine, and
+        // a PID from another machine is meaningless here — acting on it makes this
+        // machine's XKey.app yield to whatever local process holds that number.
+        SharedSettingsKey.xkeyIMTapArmed.rawValue,
+        SharedSettingsKey.xkeyIMTapPID.rawValue,
+        // Device-specific: Vietnamese on/off is momentary state bound to a hotkey and to
+        // each machine's own menu, the same family as isRemoteDesktopTarget rather than a
+        // durable preference like input method or code table. Syncing it means the toggle
+        // hotkey on one machine turns the others off too.
+        SharedSettingsKey.vietnameseEnabled.rawValue,
     ]
 
     /// Sensitive keys that must never leave the device. Currently empty — translation providers
@@ -1147,17 +1418,19 @@ class SharedSettings {
     func importScalarsForSync(from data: Data) {
         guard let incoming = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return }
 
-        var merged = readPlistDict()
+        // Merged onto the CURRENT on-disk dictionary, not this process's cache: `preserve`
+        // only stops incoming values from landing, and a whole-dictionary write built from
+        // a stale cache still pushes this process's own stale tap-ownership flag to disk —
+        // which puts both processes in the keystroke path with nothing to heal it, because
+        // the heal only runs for a flag that reads armed.
         let preserve = Self.scalarsExcludedKeys.union(Self.sensitiveScalarKeys)
-        for (k, v) in incoming where !preserve.contains(k) {
-            merged[k] = v
+        mutatePlist { dict in
+            for (k, v) in incoming where !preserve.contains(k) {
+                dict[k] = v
+            }
         }
 
-        isBatchUpdating = true
-        writePlistDict(merged)
-        isBatchUpdating = false
-
-        if let langRaw = merged[SharedSettingsKey.appLanguage.rawValue] as? String,
+        if let langRaw = readPlistDict()[SharedSettingsKey.appLanguage.rawValue] as? String,
            AppLanguage(rawValue: langRaw) != nil {
             UserDefaults.standard.set(langRaw, forKey: "appLanguage")
         }
@@ -1246,8 +1519,12 @@ class SharedSettings {
             case let uuid as UUID: rawId = uuid.uuidString
             default: rawId = nil
             }
+            // .sortedKeys: without it the same object re-serialises with a different key order
+            // from one call to the next, so its content signature — and with it the entry's
+            // updatedAt — changes on every snapshot. That defeats the per-entry timestamp memo
+            // and makes every push a store write, even when no list changed.
             guard let id = rawId,
-                  let encoded = try? JSONSerialization.data(withJSONObject: obj) else { return nil }
+                  let encoded = try? JSONSerialization.data(withJSONObject: obj, options: .sortedKeys) else { return nil }
             return SyncEntry(id: id, updatedAt: timestampProvider(id, encoded), deleted: false, data: encoded)
         }
     }
@@ -1265,7 +1542,9 @@ class SharedSettings {
     // MARK: User dictionary
 
     func snapshotUserDictForSync(timestampProvider: (String, Data) -> Date) -> [SyncEntry] {
-        let words = getUserDictionaryWords()
+        // Sorted: the words come out of a Set, whose order is seeded per process, and an entry
+        // order that changes across launches makes an unchanged payload look new to the push memo.
+        let words = getUserDictionaryWords().sorted()
         return words.map { word in
             let data = Data(word.utf8)
             return SyncEntry(id: word, updatedAt: timestampProvider(word, data), deleted: false, data: data)
@@ -1324,8 +1603,27 @@ class SharedSettings {
             importDict.removeValue(forKey: "_exportDate")
             importDict.removeValue(forKey: "_appVersion")
             
-            // Write all settings
-            writePlistDict(importDict)
+            // Write all settings, but keep the live tap-ownership state: it is device-local
+            // state rather than a setting, so a backup exported while XKeyIM was not armed
+            // would otherwise remove the flag on restore, leaving both processes in the
+            // keystroke path with nothing to heal it — the heal only runs for a flag that
+            // reads armed. The current values come out of the on-disk dictionary
+            // mutatePlist hands us, not out of this process's cache.
+            //
+            // Only the tap keys, deliberately: this is a shorter list than scalarsExcludedKeys,
+            // which additionally holds back vietnameseEnabled, isRemoteDesktopTarget, and the
+            // four list-data keys macrosData, excludedApps, windowTitleRules and
+            // userDictionaryWords. The list-data keys are excluded there because they sync as
+            // their own per-entry categories rather than inside the scalars blob; the two
+            // device-specific ones must not cross machines over iCloud, but they are the user's
+            // own saved state here and a restore should bring them back. Do not unify the lists.
+            let tapKeys = [SharedSettingsKey.xkeyIMTapArmed.rawValue,
+                           SharedSettingsKey.xkeyIMTapPID.rawValue]
+            mutatePlist { dict in
+                let preserved = tapKeys.map { ($0, dict[$0]) }
+                dict = importDict
+                for (key, value) in preserved { dict[key] = value }
+            }
             sharedLogSuccess("Imported settings successfully")
 
             // Sync app language to UserDefaults.standard so AppLanguage.applyLanguage()
@@ -1753,4 +2051,11 @@ extension Notification.Name {
     
     /// Posted when translation toolbar settings change (enabled/disabled)
     static let translationToolbarSettingsDidChange = Notification.Name("XKey.translationToolbarSettingsDidChange")
+
+    /// Posted when a macro is added, edited, deleted, or reordered so the typing engine
+    /// and any open macro management UI reload from the plist.
+    static let macrosDidChange = Notification.Name("XKey.macrosDidChange")
+
+    /// Posted when hotkey recording starts/stops. UserInfo contains "isRecording": Bool
+    static let hotkeyRecordingStateChanged = Notification.Name("XKey.hotkeyRecordingStateChanged")
 }

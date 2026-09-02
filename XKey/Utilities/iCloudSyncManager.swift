@@ -35,6 +35,7 @@ final class iCloudSyncManager: NSObject {
     private let hasPushedBeforeKey    = "XKey.sync.hasPushedBefore"
     private let scalarsLocalUpdatedAtKey = "XKey.sync.scalars.localUpdatedAt"
     private let entrySigPrefix        = "XKey.sync.entrySig."
+    private let pushedSigPrefix       = "XKey.sync.pushedSig."
 
     // MARK: - Mutable state
 
@@ -246,6 +247,16 @@ final class iCloudSyncManager: NSObject {
         setCategoryStatus(category, .pushing)
         do {
             let envelope = try buildOutgoingEnvelope(for: category)
+            let payloadSignature = canonicalSignature(of: envelope.payload)
+            if payloadSignature == lastPushedSignature(for: category) {
+                // Nothing new to send — only the envelope's own updatedAt would differ. Paying a
+                // store write for that is what turns a change carrying no synced key (the
+                // Vietnamese toggle, and every other key in scalarsExcludedKeys) into one
+                // NSUbiquitousKeyValueStore write per category.
+                setCategoryStatus(category, .synced(Date()))
+                notifyStatusChanged()
+                return
+            }
             let encoded = try envelope.encoded()
             if encoded.count > category.softQuotaBytes {
                 setCategoryStatus(category, .quotaExceeded)
@@ -255,6 +266,7 @@ final class iCloudSyncManager: NSObject {
             }
             kvStore.setData(encoded, forKey: category.rawValue)
             kvStore.synchronize()
+            defaults.set(payloadSignature, forKey: pushedSignatureKey(category))
             defaults.set(Date(), forKey: lastSyncDateKey)
             setCategoryStatus(category, .synced(Date()))
             sharedLogSuccess("iCloud sync: pushed \(category.rawValue) (\(encoded.count) B)")
@@ -285,6 +297,48 @@ final class iCloudSyncManager: NSObject {
             let updatedAt = (defaults.object(forKey: scalarsLocalUpdatedAtKey) as? Date) ?? Date()
             return SyncEnvelope(payload: blob, updatedAt: updatedAt)
         }
+    }
+
+    // MARK: - Push memo
+
+    private func pushedSignatureKey(_ category: SyncCategory) -> String {
+        "\(pushedSigPrefix)\(category.rawValue)"
+    }
+
+    /// Fingerprint of the payload this device last pushed for `category`, or nil when there is
+    /// nothing to match against — including when the store holds no value for it, which retires
+    /// the memo after a store reset so the next push runs instead of being skipped as a repeat.
+    private func lastPushedSignature(for category: SyncCategory) -> String? {
+        guard kvStore.data(forKey: category.rawValue) != nil else { return nil }
+        return defaults.string(forKey: pushedSignatureKey(category))
+    }
+
+    /// Point the scalars memo at the state this device now holds. An import moves that state
+    /// without going through a push, so without this the memo keeps describing the payload we
+    /// pushed before the import.
+    ///
+    /// Signed over the export rather than over the bytes that arrived, because both readers of
+    /// this memo compare it against exportScalarsForSync(): the push's own skip check, and the
+    /// stamp guard in localSettingsDidChange. A stale value reopens both — a change that returns
+    /// the payload to the previously pushed value is skipped as a repeat and never leaves this
+    /// Mac, and a device that only ever receives keeps a memo nothing matches, so every settings
+    /// change stamps a fresh updatedAt and pushes.
+    private func refreshScalarsPushMemo() {
+        defaults.set(canonicalSignature(of: SharedSettings.shared.exportScalarsForSync() ?? Data()),
+                     forKey: pushedSignatureKey(.scalars))
+    }
+
+    /// Content fingerprint of a payload, stable across launches.
+    ///
+    /// The payload's own bytes are not: exportScalarsForSync() serialises a Swift Dictionary,
+    /// whose iteration order is seeded per process, and the binary plist writer emits keys in
+    /// that order. The XML writer sorts them, so re-serialising through it makes unchanged
+    /// settings fingerprint the same in every launch instead of looking new once per launch.
+    private func canonicalSignature(of payload: Data) -> String {
+        guard let plist = try? PropertyListSerialization.propertyList(from: payload, format: nil),
+              let canonical = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        else { return signature(of: payload) }
+        return signature(of: canonical)
     }
 
     // MARK: - Pull
@@ -383,16 +437,26 @@ final class iCloudSyncManager: NSObject {
                     merged = local.merged(with: remotePayload)
                 }
                 self.applyCollection(merged, to: category)
+                // Retire the memo left by our last push: it describes a payload the store no longer
+                // holds, and a push whose payload happens to match it would be skipped as a repeat
+                // even though the store never received it. The remote bytes are the right value
+                // here rather than the merged result — pullMergeThenPushAll pushes immediately
+                // after this, and that push must still go out whenever the merge produced anything
+                // the store does not already have.
+                self.defaults.set(self.canonicalSignature(of: envelope.payload),
+                                  forKey: self.pushedSignatureKey(category))
             } else {
                 // scalars whole-blob
                 switch mode {
                 case .overwriteLocal:
                     SharedSettings.shared.importScalarsForSync(from: envelope.payload)
+                    self.refreshScalarsPushMemo()
                 case .mergeWithLocal:
                     let localTimestamp = (self.defaults.object(forKey: self.scalarsLocalUpdatedAtKey) as? Date) ?? .distantPast
                     if envelope.updatedAt > localTimestamp {
                         SharedSettings.shared.importScalarsForSync(from: envelope.payload)
                         self.defaults.set(envelope.updatedAt, forKey: self.scalarsLocalUpdatedAtKey)
+                        self.refreshScalarsPushMemo()
                     }
                 }
             }
@@ -533,10 +597,19 @@ final class iCloudSyncManager: NSObject {
 
     @objc private func localSettingsDidChange() {
         guard isEnabled, !isPulling, !awaitingFirstEnableDecision else { return }
-        // Bump scalars timestamp on any local change. Coarse but safe — the manager doesn't
-        // know which category a setting belongs to, so we mark scalars unconditionally and
-        // schedule a push for every list category to recompute signatures.
-        defaults.set(Date(), forKey: scalarsLocalUpdatedAtKey)
+        // Bump the scalars timestamp on any local change the scalars payload actually carries.
+        // Coarse but safe — the manager doesn't know which category a setting belongs to, so
+        // every list category is marked dirty to recompute signatures, and the push drops the
+        // ones whose payload turns out to be unchanged.
+        //
+        // A change confined to keys the payload excludes (scalarsExcludedKeys — the Vietnamese
+        // toggle among them) must not stamp: a fresher updatedAt on a payload that is identical
+        // to the last push still wins the merge at the other end, and reverts the preference a
+        // peer set in the meantime with our copy that predates it.
+        if canonicalSignature(of: SharedSettings.shared.exportScalarsForSync() ?? Data())
+            != lastPushedSignature(for: .scalars) {
+            defaults.set(Date(), forKey: scalarsLocalUpdatedAtKey)
+        }
         for c in SyncCategory.allCases { dirtyCategories.insert(c) }
         schedulePush()
     }
@@ -564,6 +637,10 @@ final class iCloudSyncManager: NSObject {
         if reason == NSUbiquitousKeyValueStoreAccountChange {
             defaults.set(false, forKey: hasPushedBeforeKey)
             tombstones.clearAll()
+            // The push memo fingerprints what this device wrote to the previous account's
+            // store. Keeping it would let the first push to the new account be skipped as a
+            // repeat of something that account never received.
+            for c in SyncCategory.allCases { defaults.removeObject(forKey: pushedSignatureKey(c)) }
             sharedLogWarning("iCloud account changed — re-sync state cleared")
             return
         }
@@ -642,6 +719,7 @@ final class iCloudSyncManager: NSObject {
         defaults.removeObject(forKey: scalarsLocalUpdatedAtKey)
         for c in SyncCategory.allCases {
             defaults.removeObject(forKey: c.rawValue)
+            defaults.removeObject(forKey: pushedSignatureKey(c))
             kvStore.setData(nil, forKey: c.rawValue)
         }
         tombstones.clearAll()

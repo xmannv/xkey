@@ -40,9 +40,11 @@
 		102986BD2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */; };
 		1029C48F2EF0504D0073ABCD /* DonationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1029C48E2EF0504D0073ABCD /* DonationView.swift */; };
 		10333D132F11209900DDEF2E /* ForceAccessibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */; };
+		E52C8374BDB6409AA627DBCF /* ForceAccessibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10333D122F11209900DDEF2E /* ForceAccessibilityManager.swift */; };
 		1045F4272EF91CBA00F735BE /* VNEngineEnglishDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045F4262EF91CBA00F735BE /* VNEngineEnglishDetection.swift */; };
 		1045F4282EF91CBA00F735BE /* VNEngineEnglishDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045F4262EF91CBA00F735BE /* VNEngineEnglishDetection.swift */; };
 		105B938D2F3883530018DC12 /* AXErrorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B938C2F3883530018DC12 /* AXErrorExtension.swift */; };
+		3C23BFF9E89A48B2A4AB7CED /* AXErrorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B938C2F3883530018DC12 /* AXErrorExtension.swift */; };
 		105B938F2F3883C10018DC12 /* FloatingToolbarPositioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B938E2F3883C10018DC12 /* FloatingToolbarPositioning.swift */; };
 		105B93912F38848D0018DC12 /* WindowPinManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93902F38848D0018DC12 /* WindowPinManager.swift */; };
 		105B93932F388AAA0018DC12 /* FloatingToolbarStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105B93922F388AAA0018DC12 /* FloatingToolbarStyle.swift */; };
@@ -85,6 +87,8 @@
 		81891108B8C7C600973DBBB2 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE144E0F510944E89100C852 /* SharedComponents.swift */; };
 		8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */; };
 		FELAZY0001 /* FocusedElementInfoLazyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FELAZY0002 /* FocusedElementInfoLazyTests.swift */; };
+		WTRES00001 /* WindowTitleResolutionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = WTRES00002 /* WindowTitleResolutionTests.swift */; };
+		AXOFFM0001 /* AXPassOffMainThreadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AXOFFM0002 /* AXPassOffMainThreadTests.swift */; };
 		96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */; };
 		A1000001 /* XKeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001 /* XKeyApp.swift */; };
 		A1000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000002 /* AppDelegate.swift */; };
@@ -99,9 +103,19 @@
 		A100000A /* CharacterInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000A /* CharacterInjector.swift */; };
 		A100000B /* KeyboardEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B /* KeyboardEventHandler.swift */; };
 		A100000C /* AdvancedInjectionMethods.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* AdvancedInjectionMethods.swift */; };
+		IMTAP01 /* EventTapManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000009 /* EventTapManager.swift */; };
+		IMTAP02 /* KeyboardEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000B /* KeyboardEventHandler.swift */; };
+		IMTAP03 /* CharacterInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000A /* CharacterInjector.swift */; };
+		IMTAP04 /* AdvancedInjectionMethods.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000C /* AdvancedInjectionMethods.swift */; };
+		IMTAP05 /* SecureInputStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECINP0002 /* SecureInputStateMachine.swift */; };
+		IMTAP06 /* OverlayAppDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1089F7EB2EF76F2300E833ED /* OverlayAppDetector.swift */; };
 		AA51E2E403268ACC6EF82BA4 /* TempOffToolbarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE2F92D3911EB5987686864 /* TempOffToolbarViewModel.swift */; };
 		AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
 		AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
+		TAPENV0002 /* TapEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0001 /* TapEnvironment.swift */; };
+		TAPENV0003 /* TapEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0001 /* TapEnvironment.swift */; };
+		TAPSRC0002 /* TapEventSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPSRC0001 /* TapEventSource.swift */; };
+		TAPSRC0003 /* TapEventSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPSRC0001 /* TapEventSource.swift */; };
 		APPVERSION001 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPVERSION002 /* AppVersion.swift */; };
 		BD23C4DFC4585965C86E2B51 /* BackupRestoreSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69901F64AACBE0FBAC7C0E0F /* BackupRestoreSection.swift */; };
 		C4EDC498282B5B6D76626F6D /* AdvancedSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F362794B762A19FE8D883F35 /* AdvancedSection.swift */; };
@@ -138,6 +152,7 @@
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
 		TEST00001 /* VNEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00002 /* VNEngineTests.swift */; };
+		TAPENV0005 /* TapEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0004 /* TapEnvironmentTests.swift */; };
 		TEST00003 /* KeyCodeToCharacterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00004 /* KeyCodeToCharacterTests.swift */; };
 		TEST00019 /* TypingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00020 /* TypingBufferTests.swift */; };
 		TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00022 /* VNEngineBufferIntegrationTests.swift */; };
@@ -145,6 +160,14 @@
 		TEST00025 /* AXDirectFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00026 /* AXDirectFallbackTests.swift */; };
 		TEST00027 /* VNEngineAutoCapitalizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00028 /* VNEngineAutoCapitalizeTests.swift */; };
 		ADAPT0001 /* VNEngineAdaptiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAPT0002 /* VNEngineAdaptiveTests.swift */; };
+		SCRSIM0001 /* ScreenSimulationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCRSIM0002 /* ScreenSimulationTests.swift */; };
+		TAPOWN0001 /* TapOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPOWN0002 /* TapOwnershipTests.swift */; };
+		EMST0001 /* EngineManagerSharingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EMST0002 /* EngineManagerSharingTests.swift */; };
+		CORPUS0001 /* CorpusRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CORPUS0002 /* CorpusRegressionTests.swift */; };
+		CORPUS0003 /* telex_test_suite.csv in Resources */ = {isa = PBXBuildFile; fileRef = CORPUS0004 /* telex_test_suite.csv */; };
+		KSPERF0001 /* KeystrokePerfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = KSPERF0002 /* KeystrokePerfTests.swift */; };
+		IMEACT0001 /* IMEActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMEACT0002 /* IMEActivation.swift */; };
+		IMEACT0003 /* IMEActivationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMEACT0004 /* IMEActivationTests.swift */; };
 		TOMBSTONE001 /* SyncTombstoneStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = TOMBSTONE002 /* SyncTombstoneStore.swift */; };
 		TOMBSTONE003 /* SyncTombstoneStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = TOMBSTONE002 /* SyncTombstoneStore.swift */; };
 		TRANSLATTB001 /* TranslationToolbarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRANSLATTB002 /* TranslationToolbarController.swift */; };
@@ -225,6 +248,8 @@
 		803B94EF161FE79A022FF806 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToggleRulesTests.swift; sourceTree = "<group>"; };
 		FELAZY0002 /* FocusedElementInfoLazyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusedElementInfoLazyTests.swift; sourceTree = "<group>"; };
+		WTRES00002 /* WindowTitleResolutionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowTitleResolutionTests.swift; sourceTree = "<group>"; };
+		AXOFFM0002 /* AXPassOffMainThreadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AXPassOffMainThreadTests.swift; sourceTree = "<group>"; };
 		8AE133FC7897416BBCED985C /* FloatingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingOverlay.swift; sourceTree = "<group>"; };
 		8C93A308BF783CDE94C5E53A /* TempOffToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarController.swift; sourceTree = "<group>"; };
 		8EAA0ED7079ABD1980FBFFAE /* SettingsWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
@@ -248,6 +273,8 @@
 		A3000002 /* XKey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = XKey.entitlements; sourceTree = "<group>"; };
 		A7801294053CCB45DE7232D2 /* VNEngineSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VNEngineSettings.swift; sourceTree = "<group>"; };
 		AB12CD332F79A00100FACADE /* AXHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXHelper.swift; sourceTree = "<group>"; };
+		TAPENV0001 /* TapEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEnvironment.swift; sourceTree = "<group>"; };
+		TAPSRC0001 /* TapEventSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEventSource.swift; sourceTree = "<group>"; };
 		APPVERSION002 /* AppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		B65F5E57423E05ADF4033DCD /* TempOffToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarView.swift; sourceTree = "<group>"; };
 		C5461DA850B59B52384E81D6 /* StatusBarPopoverView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatusBarPopoverView.swift; sourceTree = "<group>"; };
@@ -275,6 +302,7 @@
 		MACROVM002 /* MacroManagementViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagementViewModel.swift; sourceTree = "<group>"; };
 		STATUSBARVM002 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
 		TEST00002 /* VNEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineTests.swift; sourceTree = "<group>"; };
+		TAPENV0004 /* TapEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEnvironmentTests.swift; sourceTree = "<group>"; };
 		TEST00004 /* KeyCodeToCharacterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCodeToCharacterTests.swift; sourceTree = "<group>"; };
 		TEST00005 /* XKeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XKeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TEST00020 /* TypingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBufferTests.swift; sourceTree = "<group>"; };
@@ -283,6 +311,14 @@
 		TEST00026 /* AXDirectFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXDirectFallbackTests.swift; sourceTree = "<group>"; };
 		TEST00028 /* VNEngineAutoCapitalizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineAutoCapitalizeTests.swift; sourceTree = "<group>"; };
 		ADAPT0002 /* VNEngineAdaptiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineAdaptiveTests.swift; sourceTree = "<group>"; };
+		SCRSIM0002 /* ScreenSimulationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenSimulationTests.swift; sourceTree = "<group>"; };
+		TAPOWN0002 /* TapOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapOwnershipTests.swift; sourceTree = "<group>"; };
+		EMST0002 /* EngineManagerSharingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineManagerSharingTests.swift; sourceTree = "<group>"; };
+		CORPUS0002 /* CorpusRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorpusRegressionTests.swift; sourceTree = "<group>"; };
+		CORPUS0004 /* telex_test_suite.csv */ = {isa = PBXFileReference; lastKnownFileType = text; path = XKeyTests/Resources/telex_test_suite.csv; sourceTree = SOURCE_ROOT; };
+		KSPERF0002 /* KeystrokePerfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokePerfTests.swift; sourceTree = "<group>"; };
+		IMEACT0002 /* IMEActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XKeyIM/IMEActivation.swift; sourceTree = SOURCE_ROOT; };
+		IMEACT0004 /* IMEActivationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMEActivationTests.swift; sourceTree = "<group>"; };
 		TOMBSTONE002 /* SyncTombstoneStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncTombstoneStore.swift; sourceTree = "<group>"; };
 		TRANSLATTB002 /* TranslationToolbarController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarController.swift; sourceTree = "<group>"; };
 		TRANSLATTB004 /* TranslationToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranslationToolbarView.swift; sourceTree = "<group>"; };
@@ -393,6 +429,8 @@
 				10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */,
 				AB12CD332F79A00100FACADE /* AXHelper.swift */,
 				51300ED94BA488E725A6605B /* DebugLogger.swift */,
+				TAPENV0001 /* TapEnvironment.swift */,
+				TAPSRC0001 /* TapEventSource.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -571,13 +609,24 @@
 				2259E2E83868C7ADD9DD4FF3 /* SessionMonitoringTests.swift */,
 				82224BF07EC7A838D6A022DB /* ToggleRulesTests.swift */,
 				FELAZY0002 /* FocusedElementInfoLazyTests.swift */,
+				WTRES00002 /* WindowTitleResolutionTests.swift */,
+				AXOFFM0002 /* AXPassOffMainThreadTests.swift */,
 				LANG0002 /* AppLanguageTests.swift */,
 				ICLOUDSYNCTEST002 /* iCloudSyncManagerTests.swift */,
 				MACR0002 /* MacroManagerTests.swift */,
 				ADAPT0002 /* VNEngineAdaptiveTests.swift */,
+				SCRSIM0002 /* ScreenSimulationTests.swift */,
+				TAPOWN0002 /* TapOwnershipTests.swift */,
+				EMST0002 /* EngineManagerSharingTests.swift */,
 				DBGLOG0002 /* DebugLoggerTests.swift */,
 				INJROUTE0002 /* InjectionRoutingTests.swift */,
 				SECINP0004 /* SecureInputStateMachineTests.swift */,
+				CORPUS0002 /* CorpusRegressionTests.swift */,
+				CORPUS0004 /* telex_test_suite.csv */,
+				KSPERF0002 /* KeystrokePerfTests.swift */,
+				IMEACT0002 /* IMEActivation.swift */,
+				IMEACT0004 /* IMEActivationTests.swift */,
+				TAPENV0004 /* TapEnvironmentTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -718,6 +767,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CORPUS0003 /* telex_test_suite.csv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -745,6 +795,10 @@
 				100D2BDA2EF2C1D800C26B87 /* VNWordBuffer.swift in Sources */,
 				10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */,
+				TAPENV0002 /* TapEnvironment.swift in Sources */,
+				TAPSRC0002 /* TapEventSource.swift in Sources */,
+				3C23BFF9E89A48B2A4AB7CED /* AXErrorExtension.swift in Sources */,
+				E52C8374BDB6409AA627DBCF /* ForceAccessibilityManager.swift in Sources */,
 				102986BC2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */,
 				100D2BDB2EF2C1D800C26B87 /* MacroManager.swift in Sources */,
 				100D2BDC2EF2C1D800C26B87 /* InputProcessor.swift in Sources */,
@@ -756,6 +810,12 @@
 				259D34BEC13552450AB30413 /* DebugLogger.swift in Sources */,
 				F97414DB17E4F78264530EF1 /* KeyCodeToCharacter.swift in Sources */,
 				TYPBUF003 /* TypingBuffer.swift in Sources */,
+				IMTAP01 /* EventTapManager.swift in Sources */,
+				IMTAP02 /* KeyboardEventHandler.swift in Sources */,
+				IMTAP03 /* CharacterInjector.swift in Sources */,
+				IMTAP04 /* AdvancedInjectionMethods.swift in Sources */,
+				IMTAP05 /* SecureInputStateMachine.swift in Sources */,
+				IMTAP06 /* OverlayAppDetector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -772,6 +832,8 @@
 				A1000002 /* AppDelegate.swift in Sources */,
 				10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */,
+				TAPENV0003 /* TapEnvironment.swift in Sources */,
+				TAPSRC0003 /* TapEventSource.swift in Sources */,
 				A1000003 /* VNCharacter.swift in Sources */,
 				A1000004 /* VNCharacterMap.swift in Sources */,
 				10A214992ED42DFA005B52BD /* HotkeyRecorderView.swift in Sources */,
@@ -878,13 +940,23 @@
 				64C427CD211649CE8B7DDCE2 /* SessionMonitoringTests.swift in Sources */,
 				8B4B48A67B6088E74942F573 /* ToggleRulesTests.swift in Sources */,
 				FELAZY0001 /* FocusedElementInfoLazyTests.swift in Sources */,
+				WTRES00001 /* WindowTitleResolutionTests.swift in Sources */,
+				AXOFFM0001 /* AXPassOffMainThreadTests.swift in Sources */,
 				LANG0001 /* AppLanguageTests.swift in Sources */,
 				ICLOUDSYNCTEST001 /* iCloudSyncManagerTests.swift in Sources */,
 				MACR0001 /* MacroManagerTests.swift in Sources */,
 				ADAPT0001 /* VNEngineAdaptiveTests.swift in Sources */,
+				SCRSIM0001 /* ScreenSimulationTests.swift in Sources */,
+				TAPOWN0001 /* TapOwnershipTests.swift in Sources */,
+				EMST0001 /* EngineManagerSharingTests.swift in Sources */,
 				DBGLOG0001 /* DebugLoggerTests.swift in Sources */,
 				INJROUTE0001 /* InjectionRoutingTests.swift in Sources */,
 				SECINP0003 /* SecureInputStateMachineTests.swift in Sources */,
+				CORPUS0001 /* CorpusRegressionTests.swift in Sources */,
+				KSPERF0001 /* KeystrokePerfTests.swift in Sources */,
+				IMEACT0001 /* IMEActivation.swift in Sources */,
+				IMEACT0003 /* IMEActivationTests.swift in Sources */,
+				TAPENV0005 /* TapEnvironmentTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -8,6 +8,7 @@
 
 import Cocoa
 import InputMethodKit
+import Carbon
 
 
 // Note: Notification.Name.xkeySettingsDidChange is defined in SharedSettings.swift
@@ -29,9 +30,15 @@ class XKeyIMAppDelegate: NSObject, NSApplicationDelegate {
             // Create IMK server
             // The connection name must match InputMethodConnectionName in Info.plist
             server = IMKServer(
-                name: Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String ?? "XKeyIM_Connection",
+                name: Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String ?? "com.codetay.inputmethod.XKey_Connection",
                 bundleIdentifier: Bundle.main.bundleIdentifier!
             )
+
+            // One-time cleanup: keys from the removed direct-insert probe.
+            for key in ["XKeyIM.probeFallbackApps", "XKeyIM.probeConfirmedApps",
+                        "XKeyIM.caretLiarApps"] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
 
             IMKitDebugger.shared.log("Input Method server started", category: "STARTUP")
             IMKitDebugger.shared.log("Bundle ID = \(Bundle.main.bundleIdentifier ?? "unknown")", category: "STARTUP")
@@ -43,10 +50,23 @@ class XKeyIMAppDelegate: NSObject, NSApplicationDelegate {
                 name: .xkeySettingsDidChange,
                 object: nil
             )
+
+            // TIS selection is authoritative for whether XKeyIM is active — it also
+            // covers per-document switching, which can skip activateServer entirely.
+            DistributedNotificationCenter.default().addObserver(
+                forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+                object: nil, queue: .main
+            ) { _ in
+                TapController.shared.inputSourceChanged(
+                    isXKeyIM: XKeyIMController.isXKeyIMSelectedInputSource())
+            }
         }
     }
-    
+
     nonisolated func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            TapController.shared.shutdown()
+        }
         NSLog("XKeyIM: Input Method server stopping")
     }
     

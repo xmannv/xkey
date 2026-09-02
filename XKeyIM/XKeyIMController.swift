@@ -8,6 +8,7 @@
 
 import Cocoa
 import InputMethodKit
+import Carbon
 
 /// IMKit-based Vietnamese input controller
 /// This is the main class that handles keyboard input for the Input Method
@@ -35,9 +36,6 @@ class XKeyIMController: IMKInputController {
 
     /// Settings from shared App Group
     private var settings: XKeyIMSettings!
-
-    /// Whether currently in Vietnamese mode
-    private var isVietnameseEnabled: Bool = true
 
     /// Last settings reload time (for debouncing)
     private var lastReloadTime: Date = .distantPast
@@ -187,7 +185,13 @@ class XKeyIMController: IMKInputController {
     }
     
     // MARK: - IMKInputController Overrides
-    
+
+    override func recognizedEvents(_ sender: Any!) -> Int {
+        // keyDown + flagsChanged: commit the pending word the moment a modifier
+        // goes DOWN, so the first ⌘/⌃ chord acts on committed text rather than a stale composition.
+        return Int(NSEvent.EventTypeMask.keyDown.union(.flagsChanged).rawValue)
+    }
+
     /// Bundle IDs of overlay apps that should use direct mode instead of marked text
     /// This avoids the "Enter twice" issue in Spotlight and similar apps
     private static let overlayAppBundleIds: Set<String> = [
@@ -210,7 +214,20 @@ class XKeyIMController: IMKInputController {
         }
         return false
     }
-    
+
+    /// Passthrough classes: the IME behaves as OFF for these clients.
+    /// - Remote desktop / VM viewers forward raw scancodes to a guest OS —
+    ///   composed Vietnamese is meaningless there (guest runs its own IME).
+    ///   IMKit mode has no clipboard-inject fallback, so this is unconditional
+    ///   (unlike CGEvent mode's remoteDesktopInjectMode opt-in).
+    /// - Apps the user excluded in XKey Settings (parity with injection mode,
+    ///   KeyboardEventHandler.isCurrentAppExcluded()).
+    private func isPassthroughClient(_ bundleId: String) -> Bool {
+        if RemoteDesktopBundleIds.all.contains(bundleId.lowercased()) { return true }
+        if settings.exclusionRulesEnabled, settings.excludedBundleIds.contains(bundleId) { return true }
+        return false
+    }
+
     /// Check if current focused element is a secure text field (password field)
     /// Secure text fields don't support IMKit marked text properly -
     /// selectedRange() always returns NSNotFound, causing duplicate characters on commit
@@ -223,18 +240,13 @@ class XKeyIMController: IMKInputController {
         return false
     }
     
-    /// Determine if we should use marked text for this client
-    /// Returns false for overlay apps and secure text fields
+    /// Without the tap, marked text is the only channel that composes correctly
+    /// everywhere. Overlay launchers and secure fields are the two exceptions where
+    /// a composition session misbehaves, so they still get plain insertion.
     private func shouldUseMarkedText(_ client: IMKTextInput) -> Bool {
-        if isOverlayApp(client) {
-            return false  // Use direct mode for overlay apps
-        }
-        // Secure text fields (password fields) don't support marked text properly
-        // selectedRange() always returns NSNotFound, causing duplicate characters on commit
-        if isSecureTextField(client) {
-            return false
-        }
-        return settings.useMarkedText
+        if isOverlayApp(client) { return false }
+        if isSecureTextField(client) { return false }
+        return true
     }
     
     private func updateIMUpperCaseStatus(character: Character) {
@@ -267,14 +279,77 @@ class XKeyIMController: IMKInputController {
     
     /// Handle keyboard events
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
-        guard let event = event, event.type == .keyDown else {
+        guard let event = event else { return false }
+        if event.type == .flagsChanged {
+            if event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control) {
+                // A ⌘/⌃ chord is about to fire. In overlay panels (Spotlight/
+                // Raycast) macOS does NOT route the chord's keyDown to the IME at
+                // all, so the .command/.control branches below never run there —
+                // this modifier-down moment is the ONLY place to finalize the
+                // word. Direct mode keeps composingText empty while the ENGINE
+                // still holds the word being typed: without the engine reset,
+                // Cmd+A-then-type appends to the stale buffer ("nghiệm"+"thu" →
+                // "nghiệmthuw" → w/r never transform → raw "thuwr" on screen).
+                if let client = sender as? IMKTextInput, !composingText.isEmpty {
+                    commitComposition(client)
+                }
+                engine.reset()
+                currentWordLength = 0
+                markedTextStartLocation = NSNotFound
+            }
             return false
         }
+        guard event.type == .keyDown else { return false }
 
         guard let client = sender as? IMKTextInput else {
             return false
         }
-        
+
+        // The channel just switched (tap armed or disarmed). Finish the word in
+        // progress on an explicit boundary instead of letting a desync heuristic
+        // fire a keystroke later — the two channels track a word differently, so a
+        // carried-over buffer describes text the new channel never wrote.
+        if TapController.shared.consumeChannelChange() {
+            if !composingText.isEmpty { commitComposition(client) }
+            engine.reset()
+            composingText = ""
+            currentWordLength = 0
+            markedTextStartLocation = NSNotFound
+        }
+
+        // The tap owns the keyboard: it sees every physical key before the app does
+        // and does all the typing. IMKit must not also process them — and our own
+        // injected synthetic events arrive here too, so composing on them would
+        // double-type. Pure pipe.
+        if TapController.shared.isArmed {
+            return false
+        }
+
+        // --- Early passthrough guards (passthrough decisions must come BEFORE any
+        // composition work; a wrong in-place guess loses diacritics) ---
+
+        // Secure input (password fields): never compose, never log content.
+        // IsSecureEventInputEnabled() is the system-wide truth — bundle-id checks
+        // (com.apple.SecurityAgent below) miss in-app password fields.
+        if IsSecureEventInputEnabled() {
+            if !composingText.isEmpty { commitComposition(client) }
+            engine.reset()
+            composingText = ""
+            currentWordLength = 0
+            markedTextStartLocation = NSNotFound
+            return false
+        }
+
+        let earlyBundleId = client.bundleIdentifier() ?? ""
+        if isPassthroughClient(earlyBundleId) {
+            if !composingText.isEmpty { commitComposition(client) }
+            engine.reset()
+            composingText = ""
+            currentWordLength = 0
+            markedTextStartLocation = NSNotFound
+            return false
+        }
+
         // Update effective useMarkedText based on current client
         // For overlay apps (Spotlight, Raycast, Alfred), use direct mode to avoid "Enter twice"
         let bundleId = client.bundleIdentifier() ?? "unknown"
@@ -363,7 +438,7 @@ class XKeyIMController: IMKInputController {
             currentWordLength = 0
             markedTextStartLocation = NSNotFound
         }
-        
+
         // Update last known location for next comparison
         lastKnownSelectionLocation = currentSelection.location
         
@@ -453,12 +528,13 @@ class XKeyIMController: IMKInputController {
             // If there was composing text, IMKit may not pass through the Ctrl+key properly
             // So we manually create and post a new event to ensure terminal receives it
             if hadComposingText {
-                if let cgEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(event.keyCode), keyDown: true) {
+                if let src = CGEventSource(stateID: .hidSystemState),
+                   let cgEvent = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(event.keyCode), keyDown: true) {
                     cgEvent.flags = .maskControl
                     cgEvent.post(tap: .cgSessionEventTap)
-                    
+
                     // Also post key up event
-                    if let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(event.keyCode), keyDown: false) {
+                    if let keyUpEvent = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(event.keyCode), keyDown: false) {
                         keyUpEvent.flags = .maskControl
                         keyUpEvent.post(tap: .cgSessionEventTap)
                     }
@@ -474,6 +550,14 @@ class XKeyIMController: IMKInputController {
         case 0x33: // Backspace
             IMKitDebugger.shared.log("BACKSPACE - calling handleBackspace()", category: "BACKSPACE")
             let result = handleBackspace(client: client)
+            if !result, lastKnownSelectionLocation != NSNotFound, lastKnownSelectionLocation > 0 {
+                // Pass-through backspace: the client deletes one character, so the caret
+                // moves BACK by one. handle() above recorded the pre-delete caret, and the
+                // cursor-move check only tolerates a forward step (+1) — without this
+                // prediction the next keystroke reads the caret as an unexpected jump and
+                // fires resetWithCursorMoved(), wiping the buffer and the restore history.
+                lastKnownSelectionLocation -= 1
+            }
             IMKitDebugger.shared.log("BACKSPACE - handleBackspace returned \(result)", category: "BACKSPACE")
             return result
 
@@ -559,7 +643,7 @@ class XKeyIMController: IMKInputController {
                     )
                 } else if !effectiveUseMarkedText && !undoneText.isEmpty {
                     // Direct mode (Spotlight, Raycast, Alfred): Replace current word with raw keystrokes
-                    // Use the same approach as replaceTextDirect() for reliability
+                    // Use the same approach as insertTextDirect() for reliability
                     let selectedRange = client.selectedRange()
                     IMKitDebugger.shared.log("ESC - direct mode undo: replacing \(currentWordLength) chars at pos \(selectedRange.location) with '\(undoneText)'", category: "ESC")
                     
@@ -711,7 +795,7 @@ class XKeyIMController: IMKInputController {
         }
 
         // Check if Vietnamese is enabled
-        guard isVietnameseEnabled else {
+        guard SharedSettings.shared.vietnameseEnabled else {
             return false
         }
 
@@ -748,11 +832,18 @@ class XKeyIMController: IMKInputController {
                 replacementRange: NSRange(location: NSNotFound, length: 0)
             )
             
+            // No "+ 1" here, unlike the Space / pass-through branches: insertText()
+            // above ALREADY put the character in, so this caret read is the post-insert
+            // one. Adding 1 made the next keystroke see actual == expected - 1, which
+            // the cursor-move check reads as an unexpected jump and answers with
+            // resetWithCursorMoved() — wiping the history this branch's
+            // processWordBreak() just saved, so a following Backspace could not
+            // restore the word ("thuwr" + "4" + Backspace + "s" → "thửs").
             let currentSelection = client.selectedRange()
             if currentSelection.location != NSNotFound {
-                lastKnownSelectionLocation = currentSelection.location + 1
+                lastKnownSelectionLocation = currentSelection.location
             }
-            
+
             return true  // We handled it - don't let system insert again
         }
 
@@ -834,71 +925,47 @@ class XKeyIMController: IMKInputController {
     
     /// Handle engine result
     private func handleResult(_ result: VNEngine.ProcessResult, client: IMKTextInput) {
-        // OPTIMIZATION: Use user's settings directly instead of detecting app behavior
-        // This eliminates Accessibility API calls that cause 3-5s lag when switching apps
-        // User can control marked text mode via XKey settings
-        let useMarkedText = effectiveUseMarkedText
-
-        if useMarkedText {
-            // Option 1: Marked text mode - RECOMMENDED
-            // IMPORTANT: Use getCurrentWord() to get FULL word, not just delta
-            // result.newCharacters only contains changed characters (e.g., "ư")
-            // but we need the entire word (e.g., "thư")
-            let fullWord = engine.getCurrentWord()
+        let fullWord = engine.getCurrentWord()
+        if effectiveUseMarkedText {
             setMarkedText(fullWord, client: client)
         } else {
-            // Option 2: Direct replacement mode
-            // IMPORTANT: Also use getCurrentWord() to get FULL word!
-            // result.newCharacters only contains delta (changed chars), not full word
-            // Using delta would replace "thu" with just "ư" → lose "th"!
-            let fullWord = engine.getCurrentWord()
-            replaceTextDirect(newText: fullWord, client: client)
+            insertTextDirect(newText: fullWord, client: client)
         }
     }
-    
-    /// Replace text directly without marked text (Option 2)
-    /// This method tracks the current word length and replaces it atomically
-    private func replaceTextDirect(newText: String, client: IMKTextInput) {
-        // IMPORTANT: Clear any existing marked text first to prevent underline
-        // When useMarkedText is false, we should not have any marked text showing
+
+    /// Direct insertion for clients where a composition session misbehaves
+    /// (overlay launchers "Enter twice", secure fields reporting NSNotFound).
+    /// Deliberately minimal: no probing, no per-app learning, no caret-liar
+    /// detection — when Accessibility is granted the tap owns typing, and this
+    /// path only has to be correct, not clever.
+    private func insertTextDirect(newText: String, client: IMKTextInput) {
         if !composingText.isEmpty {
-            client.setMarkedText(
-                "",
-                selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: 0)
-            )
+            client.setMarkedText("",
+                                 selectionRange: NSRange(location: 0, length: 0),
+                                 replacementRange: NSRange(location: NSNotFound, length: 0))
             composingText = ""
         }
 
         let selectedRange = client.selectedRange()
-
-        // Replace the current word we've been building
         if currentWordLength > 0 && selectedRange.location >= currentWordLength {
-            // Calculate replacement range based on tracked word length
-            let replaceRange = NSRange(
-                location: selectedRange.location - currentWordLength,
-                length: currentWordLength
-            )
-
-            // Atomic replacement - delete old word and insert new word
+            // Inline autocomplete (Spotlight, omnibox class) keeps its suggestion as a
+            // SELECTION starting at the caret. Replacing only the typed word makes the
+            // client commit that suggestion as real text first. Swallow it into the
+            // range instead. cursorTrackingBroken clients report garbage here, so they
+            // never widen it.
+            let suggestionLength = (!cursorTrackingBroken && selectedRange.length > 0)
+                ? selectedRange.length : 0
+            let replaceRange = NSRange(location: selectedRange.location - currentWordLength,
+                                       length: currentWordLength + suggestionLength)
             client.insertText(newText, replacementRange: replaceRange)
         } else {
-            // First character - just insert
-            client.insertText(
-                newText,
-                replacementRange: NSRange(location: NSNotFound, length: 0)
-            )
+            client.insertText(newText, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
 
-        // Update tracked length for next character
-        // Use UTF-16 count because NSRange uses UTF-16 code units
         currentWordLength = newText.utf16.count
-        
-        // Update cursor tracking for direct mode
-        let newSelection = client.selectedRange()
-        lastKnownSelectionLocation = newSelection.location
+        lastKnownSelectionLocation = client.selectedRange().location
     }
-    
+
     /// Set marked text (with underline) - Option 1
     /// This is the standard IMKit way - marked text replaces itself automatically
     private func setMarkedText(_ text: String, client: IMKTextInput) {
@@ -928,7 +995,9 @@ class XKeyIMController: IMKInputController {
         // This avoids the "highlighted" appearance and shows only underline like JOkey
         let attributes: [NSAttributedString.Key: Any] = [
             .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .underlineColor: NSColor.secondaryLabelColor
+            // Near-invisible underline: marked text's reliability without the visual
+            // noise Vietnamese typists reject (some IMEs ship no underline at all).
+            .underlineColor: NSColor.textColor.withAlphaComponent(0.15)
             // IMPORTANT: No backgroundColor - this prevents highlighting/bôi đen
             // IMPORTANT: No .markedClauseSegment - let the system use mark(forStyle:at:)
         ]
@@ -1001,24 +1070,22 @@ class XKeyIMController: IMKInputController {
         }
 
         // Direct mode or no marked text (including after Space)
-        // For overlay apps: Skip complex backspace handling entirely
-        // Spotlight/Raycast/Alfred should handle backspace natively to avoid "word jumping" bug
-        // when user presses backspace after space (which would trigger word restore from history)
+        // The client deletes the character itself; we only keep the engine in sync,
+        // otherwise its buffer drifts from the screen and composition breaks after backspace.
         if !effectiveUseMarkedText {
-            // In direct mode (overlay apps), pass backspace through but KEEP ENGINE IN SYNC
-            // If we don't update engine buffer, it will be out of sync with what's on screen
-            // causing Vietnamese composition to fail after backspace
-            if currentWordLength > 0 {
-                // Decrement word length to match what Spotlight will delete
-                currentWordLength -= 1
-                // Also update engine buffer to stay in sync
-                _ = engine.processBackspace()
-                IMKitDebugger.shared.log("Direct mode backspace: wordLen now \(currentWordLength)", category: "BACKSPACE")
-            } else {
-                // After space or at word boundary - reset engine to prevent stale state
-                engine.reset()
-                IMKitDebugger.shared.log("Direct mode backspace: at boundary, engine reset", category: "BACKSPACE")
-            }
+            // Always feed the engine, exactly like the main app's handleBackspace().
+            // At a word boundary (currentWordLength == 0, i.e. backspacing over the
+            // space that ended the previous word) this is the call that consumes
+            // spaceCount and restores the previous word from history, which is what
+            // makes "type word → Space → Backspace → fix its tone" work. Calling
+            // reset() here instead cleared spaceCount AND the history, so the restore
+            // could never happen and the next key started a brand new word.
+            _ = engine.processBackspace()
+            // Resync the tracked on-screen word length with whatever the engine now
+            // holds: after a restore that is the whole previous word, not one char less.
+            // insertTextDirect() builds its replacement range from this value.
+            currentWordLength = engine.getCurrentWord().utf16.count
+            IMKitDebugger.shared.log("Direct mode backspace: wordLen now \(currentWordLength)", category: "BACKSPACE")
             return false  // Let Spotlight handle backspace natively
         }
         
@@ -1070,7 +1137,7 @@ class XKeyIMController: IMKInputController {
                 // Set as marked text with underline
                 let attributes: [NSAttributedString.Key: Any] = [
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .underlineColor: NSColor.secondaryLabelColor
+                    .underlineColor: NSColor.textColor.withAlphaComponent(0.15)
                 ]
                 let attributedText = NSAttributedString(string: restoredWord, attributes: attributes)
                 
@@ -1174,6 +1241,9 @@ class XKeyIMController: IMKInputController {
     /// Called when input method is activated
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
+        // `isSelected` decides whether this is a genuine activate or a late,
+        // out-of-order one arriving after TIS already moved away (see IMEActivation).
+        TapController.shared.imeDidActivate(isSelected: Self.isXKeyIMSelectedInputSource())
         reloadSettings()
         engine.resetWithCursorMoved()  // App switch - we don't know cursor context
         composingText = ""
@@ -1228,8 +1298,21 @@ class XKeyIMController: IMKInputController {
     /// Called when input method is deactivated
     override func deactivateServer(_ sender: Any!) {
         commitComposition(sender)
+        // `stillSelected` decides whether this is a genuine deactivate or a late,
+        // out-of-order one from a client we already left (see IMEActivation).
+        TapController.shared.imeDidDeactivate(stillSelected: Self.isXKeyIMSelectedInputSource())
         super.deactivateServer(sender)
         NSLog("XKeyIMController: Deactivated")
+    }
+
+    /// Is XKeyIM the OS-selected keyboard input source right now? This is the
+    /// authority IMEActivation defers to — lifecycle callbacks are only hints.
+    static func isXKeyIMSelectedInputSource() -> Bool {
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+              let ptr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
+        else { return false }
+        let id = Unmanaged<CFString>.fromOpaque(ptr).takeUnretainedValue() as String
+        return id.hasPrefix("com.codetay.inputmethod.XKey")
     }
     
     /// Return candidates (not used)
@@ -1287,7 +1370,7 @@ class XKeyIMController: IMKInputController {
         // kTSMHiliteSelectedRawText = 1: selected raw text
         // kTSMHiliteSelectedConvertedText = 2: selected converted text
         attributes[NSAttributedString.Key.underlineStyle] = NSUnderlineStyle.single.rawValue
-        attributes[NSAttributedString.Key.underlineColor] = NSColor.textColor
+        attributes[NSAttributedString.Key.underlineColor] = NSColor.textColor.withAlphaComponent(0.15)
 
         // Add the clause segment marker
         attributes[NSAttributedString.Key.markedClauseSegment] = NSNumber(value: style)
@@ -1306,7 +1389,7 @@ class XKeyIMController: IMKInputController {
         
         // Vietnamese toggle
         let vnItem = NSMenuItem(
-            title: isVietnameseEnabled ? "✓ Tiếng Việt" : "Tắt Tiếng Việt",
+            title: SharedSettings.shared.vietnameseEnabled ? "✓ Tiếng Việt" : "Tắt Tiếng Việt",
             action: #selector(toggleVietnamese),
             keyEquivalent: ""
         )
@@ -1335,16 +1418,40 @@ class XKeyIMController: IMKInputController {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        menu.addItem(NSMenuItem.separator())
+
+        let permitted = TapController.hasEventPermission()
+        let status = NSMenuItem(
+            title: permitted
+                ? (TapController.shared.isArmed ? "Chế độ gõ: phím thật" : "Chế độ gõ: gạch chân")
+                : "Chế độ gõ: gạch chân (chưa có quyền Trợ năng)",
+            action: nil, keyEquivalent: "")
+        status.isEnabled = false
+        menu.addItem(status)
+
+        if !permitted {
+            let grant = NSMenuItem(title: "Cấp quyền Trợ năng…",
+                                   action: #selector(openAccessibilitySettings), keyEquivalent: "")
+            grant.target = self
+            menu.addItem(grant)
+        }
+
+        let reset = NSMenuItem(title: "Đặt lại & xin lại quyền Trợ năng",
+                               action: #selector(resetAccessibilityGrant), keyEquivalent: "")
+        reset.target = self
+        menu.addItem(reset)
+
         return menu
     }
     
     @objc private func toggleVietnamese() {
-        isVietnameseEnabled.toggle()
+        let enabled = !SharedSettings.shared.vietnameseEnabled
+        SharedSettings.shared.vietnameseEnabled = enabled
+        TapController.shared.applyVietnameseEnabled(enabled)
         engine.reset()
         composingText = ""
         currentWordLength = 0
         markedTextStartLocation = NSNotFound
-        NSLog("XKeyIMController: Vietnamese = \(isVietnameseEnabled)")
     }
     
     @objc private func openXKeySettings() {
@@ -1366,6 +1473,32 @@ class XKeyIMController: IMKInputController {
                 NSLog("XKeyIMController: Failed to launch XKey: \(error)")
             }
         }
+    }
+
+    @objc private func openAccessibilitySettings() {
+        // Fires the system prompt from THIS process — it is the code identity being
+        // asked about, so the prompt must not come from XKey.app.
+        _ = AXIsProcessTrustedWithOptions(
+            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Recovery for a grant that exists but no longer matches this build's signature:
+    /// the Settings checkbox is drawn from the bundle id while the actual check uses
+    /// the requirement recorded when the grant was made, so a stale row looks enabled
+    /// and still fails. Resetting our own row (no root needed — it can only REMOVE
+    /// permission) lets the next prompt write a fresh one.
+    /// Only ever on an explicit user click; never automatic.
+    @objc private func resetAccessibilityGrant() {
+        guard let bundleId = Bundle.main.bundleIdentifier else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        task.arguments = ["reset", "Accessibility", bundleId]
+        try? task.run()
+        task.waitUntilExit()
+        openAccessibilitySettings()
     }
 }
 
@@ -1407,6 +1540,8 @@ class XKeyIMSettings {
     var customConsonants: String = XKeyIMSettings.defaultCustomConsonants
     var useMarkedText: Bool = true  // Default to true - standard IMKit behavior
     var debugModeEnabled: Bool = false  // Controls whether XKeyIM writes to ~/XKey_Debug.log
+    var exclusionRulesEnabled: Bool = false
+    var excludedBundleIds: Set<String> = []
     
     init() {
         reload()
@@ -1451,6 +1586,15 @@ class XKeyIMSettings {
         
         // Debug Mode - controls whether XKeyIM writes to ~/XKey_Debug.log
         debugModeEnabled = readBool(forKey: "XKey.debugModeEnabled")
+
+        // Excluded apps (parity with injection mode's exclusion rules)
+        exclusionRulesEnabled = readBool(forKey: "XKey.exclusionRulesEnabled")
+        if let dict = readPlistDict(), let data = dict["XKey.excludedApps"] as? Data,
+           let apps = try? JSONDecoder().decode([ExcludedApp].self, from: data) {
+            excludedBundleIds = Set(apps.map(\.bundleIdentifier))
+        } else {
+            excludedBundleIds = []
+        }
     }
     
     // MARK: - Plist Read Helpers

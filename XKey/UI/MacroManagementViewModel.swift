@@ -9,11 +9,6 @@ import Foundation
 import AppKit
 import UniformTypeIdentifiers
 
-// Notification names
-extension Notification.Name {
-    static let macrosDidChange = Notification.Name("XKey.macrosDidChange")
-}
-
 struct MacroItem: Identifiable, Codable {
     let id: UUID
     let text: String

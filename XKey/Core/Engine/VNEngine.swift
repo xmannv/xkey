@@ -849,8 +849,8 @@ class VNEngine {
                     }
                 }
                 
-                // Limit mark for end consonant: "C", "T" - OpenKey: checkCorrectVowel
-                // Cannot use huyền (F), hỏi (R), ngã (X) with end consonant C or T
+                // Limit mark for end consonant: "C", "T", "P" - OpenKey: checkCorrectVowel
+                // Cannot use huyền (F), hỏi (R), ngã (X) with end consonant C, T, K or P
                 if isCorrect && charset.count > 1 {
                     let isMarkFRX = (vInputType != 1) ? 
                         (keyCode == VietnameseData.KEY_F || keyCode == VietnameseData.KEY_R || keyCode == VietnameseData.KEY_X) :
@@ -858,8 +858,8 @@ class VNEngine {
                     
                     if isMarkFRX {
                         if charset[1] == VietnameseData.KEY_C || charset[1] == VietnameseData.KEY_T ||
-                           charset[1] == VietnameseData.KEY_K {
-                            logCallback?("  → Rejected: mark FRX with end consonant C/T/K")
+                           charset[1] == VietnameseData.KEY_K || charset[1] == VietnameseData.KEY_P {
+                            logCallback?("  → Rejected: mark FRX with end consonant C/T/K/P")
                             isCorrect = false
                         } else if charset.count > 2 && charset[2] == VietnameseData.KEY_T {
                             logCallback?("  → Rejected: mark FRX with end consonant T")
@@ -2145,7 +2145,9 @@ class VNEngine {
                     }
                 } else if index >= 2 &&
                           (chr(Int(index) - 1) == VietnameseData.KEY_T ||
-                           chr(Int(index) - 1) == VietnameseData.KEY_K) {
+                           chr(Int(index) - 1) == VietnameseData.KEY_K ||
+                           chr(Int(index) - 1) == VietnameseData.KEY_C ||
+                           chr(Int(index) - 1) == VietnameseData.KEY_P) {
                     let vowelData = typingWord[Int(index) - 2]
                     let hasMark1 = (vowelData & VNEngine.MARK1_MASK) != 0
                     let hasMark5 = (vowelData & VNEngine.MARK5_MASK) != 0
@@ -2187,12 +2189,14 @@ class VNEngine {
             return
         }
 
-        // Debug: print typingWord contents
-        var debugBuffer = "typingWord: "
-        for i in 0..<Int(index) {
-            debugBuffer += "[\(i)]=\(String(format: "0x%X", typingWord[i])) "
+        // Debug: print typingWord contents (guarded — never build strings when nobody listens)
+        if logCallback != nil {
+            var debugBuffer = "typingWord: "
+            for i in 0..<Int(index) {
+                debugBuffer += "[\(i)]=\(String(format: "0x%X", typingWord[i])) "
+            }
+            logCallback?("  → \(debugBuffer)")
         }
-        logCallback?("  → \(debugBuffer)")
         
         findAndCalculateVowel(forGrammar: true)
         logCallback?("  → vowelCount=\(vowelCount), vowelStartIndex=\(vowelStartIndex), vowelEndIndex=\(vowelEndIndex)")
@@ -3455,7 +3459,7 @@ extension VNEngine {
             
             if shouldCheckRestore {
                 let wordToCheck = getCurrentWord()
-                
+
                 // Check if the word is valid Vietnamese
                 let isValidWord = checkWordSpelling(word: wordToCheck)
                 logCallback?("processWordBreak: wordToCheck='\(wordToCheck)', isValid=\(isValidWord)")

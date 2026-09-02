@@ -10,32 +10,6 @@ import SwiftUI
 import Combine
 import Sparkle
 
-// MARK: - AXObserver Callback (C function)
-
-/// C callback for AXObserver notifications (focus change + title change)
-/// Must be outside class since AXObserver requires a C function pointer
-/// Dispatches to appropriate handler based on notification type
-private func axNotificationCallback(
-    observer: AXObserver,
-    element: AXUIElement,
-    notificationName: CFString,
-    refcon: UnsafeMutableRawPointer?
-) {
-    // Get AppDelegate instance from refcon
-    guard let refcon = refcon else { return }
-    let appDelegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
-    let name = notificationName as String
-    
-    // Handle on main thread — dispatch to appropriate handler
-    DispatchQueue.main.async {
-        if name == kAXFocusedUIElementChangedNotification as String {
-            appDelegate.handleAXFocusChanged(element)
-        } else if name == kAXTitleChangedNotification as String {
-            appDelegate.handleAXTitleChanged()
-        }
-    }
-}
-
 // MARK: - Focused Element Info (typealias to AppBehaviorDetector)
 
 /// Use the unified FocusedElementInfo struct from AppBehaviorDetector
@@ -64,9 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferencesWindowController: PreferencesWindowController?
     private var readWordHotKeyMonitor: Any?
     private var readWordGlobalHotKeyMonitor: Any?
-    private var appSwitchObserver: NSObjectProtocol?
-    private var appDeactivateObserver: NSObjectProtocol?
-    private var mouseClickMonitor: Any?
+    private var tapEventSource: TapEventSource?
     private var permissionAlertShown = false
     private var permissionCheckTimer: Timer?
     private var inputSourceManager: InputSourceManager?
@@ -74,8 +46,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var switchXKeyGlobalHotkeyMonitor: Any?
     private var tempOffToolbarHotkeyMonitor: Any?
     private var tempOffToolbarGlobalHotkeyMonitor: Any?
-    private var focusObserver: AXObserver?
-    private var focusObserverPID: pid_t = 0
     private var lastFocusedElement: AXUIElement?
     private var updaterController: SPUStandardUpdaterController?
     private var sparkleUpdateDelegate: SparkleUpdateDelegate?
@@ -90,27 +60,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Consumed (set to nil) after handleInputSourceChange reads it.
     private var smartSwitchHandledBundleId: String? = nil
     
-    /// Track the last focused element's signature for injection detection
-    /// Used to detect when user switches from web content to address bar, etc.
-    /// Signature includes role, subrole, and description/identifier
-    private var lastFocusedElementSignature: String = ""
-    
-    /// Throttle AXObserver focus change callbacks to prevent rapid-fire AX queries
-    /// When apps have animations or autocomplete, AXObserver can fire many times per second
-    private var lastAXFocusChangeTime: CFAbsoluteTime = 0
-    private let axFocusChangeThrottleInterval: CFAbsoluteTime = 0.1 // 100ms
-    
-    /// Delayed title verification after AXObserver focus change (Layer 2)
-    /// Catches stale window titles when apps update title AFTER focus change notification
-    private var titleVerificationWorkItem: DispatchWorkItem?
-    
-    /// Window title used in last detection — for comparing in delayed verification
-    private var lastDetectedTitle: String?
-    
-    /// Debounce for kAXTitleChangedNotification (Layer 1)
-    /// Apps may fire multiple title changes during a single navigation (e.g., "Loading..." → final title)
-    private var titleChangeDebounceWorkItem: DispatchWorkItem?
-
     // MARK: - Initialization
 
     override init() {
@@ -185,20 +134,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Bound every AX call this process makes. Detection probes and AX
-        // injection run on the event-tap thread for each keystroke; a hung
-        // focused app must degrade them to their synthetic fallbacks instead
-        // of stalling input until macOS disables the event tap.
-        AXHelper.setGlobalMessagingTimeout(0.25)
-        
         // Create debug window first
         setupDebugWindow()
-        
+
         // Load and apply preferences
         let preferences = SharedSettings.shared.loadPreferences()
-        
-        // Load custom Window Title Rules
-        AppBehaviorDetector.shared.loadCustomRules()
+
         debugWindowController?.logEvent("Loaded \(AppBehaviorDetector.shared.getCustomRules().count) custom Window Title Rules")
 
         // Reload rules into the engine when an iCloud pull rewrites the store. Matching reads
@@ -210,18 +151,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppBehaviorDetector.shared.loadCustomRules()
             AppBehaviorDetector.shared.clearCache()
         }
-        
-        // Inject OverlayAppDetector into AppBehaviorDetector
-        // This allows Shared/AppBehaviorDetector to detect overlay apps without direct dependency
-        AppBehaviorDetector.shared.overlayAppNameProvider = {
-            return OverlayAppDetector.shared.getVisibleOverlayAppName()
-        }
 
-        // Inject remoteDesktopInjectMode preference (Shared module can't see SharedSettings)
-        AppBehaviorDetector.shared.remoteDesktopInjectModeProvider = {
-            return SharedSettings.shared.remoteDesktopInjectMode
-        }
-        
         // Connect debug logging from AppBehaviorDetector to Debug Window
         AppBehaviorDetector.shared.debugLogCallback = { [weak self] message in
             self?.debugWindowController?.logEvent(message)
@@ -244,10 +174,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupReadWordHotkey()
 
         // Setup app switch observer
-        setupAppSwitchObserver()
-        
-        // Setup mouse click monitor
-        setupMouseClickMonitor()
+        // (also wires the mouse click monitor and overlay callback — Task 8)
+        setupTapEventSource()
 
         // Setup input source manager
         setupInputSourceManager()
@@ -324,14 +252,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSEvent.removeMonitor(monitor)
         }
 
-        // Stop focus observer
-        removeAXObserver()
+        // Stop focus observer + remove app switch observer
+        // (TapEventSource.stop() now calls removeAXObserver() itself — Task 7)
+        tapEventSource?.stop()
 
-        // Remove app switch observer
-        if let observer = appSwitchObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-        }
-        
         // Stop permission check timer
         permissionCheckTimer?.invalidate()
         permissionCheckTimer = nil
@@ -427,7 +351,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventTapManager = EventTapManager()
         eventTapManager?.delegate = keyboardHandler
         debugWindowController?.logEvent("Event tap manager created, delegate set")
-        
+
+        // Wire host state into the tap layer through the one contract both hosts
+        // share, before the tap can start and make its first AX call.
+        let tapPreferences = SharedSettings.shared.loadPreferences()
+        let environment = TapEnvironment(
+            preferences: tapPreferences,
+            overlayAppName: { OverlayAppDetector.shared.getVisibleOverlayAppName() },
+            remoteDesktopInjectMode: { SharedSettings.shared.remoteDesktopInjectMode },
+            windowTitleRulesEnabled: tapPreferences.windowTitleRulesEnabled,
+            vietnameseEnabled: SharedSettings.shared.vietnameseEnabled,
+            axMessagingTimeout: 0.25
+        )
+        environment.apply(to: keyboardHandler!)
+
         // Connect per-keystroke debug logging for handler + event tap
         updateHotPathLogWiring()
         
@@ -1178,148 +1115,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setupAppSwitchObserver() {
-        // Listen for app activation changes to reset engine buffer
-        // This prevents buffer from previous app affecting typing in new app
-        appSwitchObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let self = self else { return }
+    private func setupTapEventSource() {
+        // While XKeyIM's tap owns the keystroke path, XKey.app's own tap transforms
+        // nothing (KeyboardEventHandler.shouldProcessEvent yields on the same flag),
+        // so the AX work that feeds it would only duplicate XKeyIM's against the same
+        // target app. Read per event, not captured once: the flag flips while this
+        // process keeps running.
+        let source = TapEventSource(handler: keyboardHandler!,
+                                    isActiveHost: { !SharedSettings.shared.isXKeyIMTapOwningInput })
 
-            // Record the new frontmost app for per-keystroke exclusion checks.
-            // The bundle ID comes straight from the notification's userInfo — no
-            // extra IPC. nil falls back to a live NSWorkspace query per keystroke.
-            let activatedApp = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            self.keyboardHandler?.noteFrontmostApp(bundleId: activatedApp?.bundleIdentifier)
+        // Smart Switch stays in AppDelegate permanently — app/status-bar behaviour.
+        source.onSmartSwitch = { [weak self] notification in
+            self?.handleSmartSwitch(notification: notification)
+        }
 
-            // Reset keyboard handler engine when switching apps
-            // Use resetForAppSwitch() which assumes typing mid-sentence to prevent
-            // Forward Delete from deleting text on the right of cursor
-            self.keyboardHandler?.resetForAppSwitch()
+        // Debug window stays in AppDelegate permanently — it's XKey.app UI.
+        source.onLogEvent = { [weak self] message in
+            self?.debugWindowController?.logEvent(message)
+        }
 
-            AppBehaviorDetector.shared.clearConfirmedInjectionMethod()
-            
-            // Cancel pending title verifications from previous app
-            self.titleVerificationWorkItem?.cancel()
-            self.titleChangeDebounceWorkItem?.cancel()
-            self.lastDetectedTitle = nil
+        // Secure Input overlay/status bar stay in AppDelegate permanently —
+        // they're XKey.app UI.
+        source.onEvaluateSecureInput = { [weak self] in
+            self?.evaluateSecureInput()
+        }
 
-            // Apply Force Accessibility (AXManualAccessibility) FIRST if matching rule exists
-            // This MUST happen BEFORE detectInjectionMethod() because:
-            // 1. Force AX enables enhanced accessibility for Electron/Chromium apps
-            // 2. detectInjectionMethod() may need to read AX values
-            // 3. AX values won't be available without Force AX enabled first
-            ForceAccessibilityManager.shared.applyForCurrentApp()
-            
-            // Small delay to allow AX tree to update after setting AXManualAccessibility
-            // Electron/Chromium apps need a moment to refresh their accessibility tree
-            // NOTE: handleSmartSwitch is also inside this delay because it evaluates window
-            // title rules via getTargetInputSourceOverride() → getMergedRuleResult().
-            // Without the delay, window title may not be available yet (AX timing issue).
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                guard let self = self else { return }
-                
-                // Handle Smart Switch - auto switch language per app
-                // Moved INSIDE delay to ensure window title is available for rule-based
-                // input source switching (targetInputSourceId in rules)
-                self.handleSmartSwitch(notification: notification)
-                
-                // Detect and set confirmed injection method for the new app
-                // This ensures keystrokes use correct method immediately after app switch
-                let detector = AppBehaviorDetector.shared
-                let focusedInfo = detector.getFocusedElementInfo()
-                let injectionInfo = detector.detectInjectionMethod(focusedInfo: focusedInfo)
-                detector.setConfirmedInjectionMethod(injectionInfo)
-
-                // DEBUG: Log window title available at app switch time
-                let switchWindowTitle = focusedInfo.windowTitle ?? "(nil)"
-                self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
-                self.debugWindowController?.logEvent("   Window: \(switchWindowTitle)")
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
-                
-                // Setup AXObserver for the new app to monitor focus changes (CMD+T, etc.)
-                if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-                    self.setupAXObserverForApp(app)
-                }
-                
-                // Check Secure Input on app switch — password managers often enable it when focused
-                self.evaluateSecureInput()
+        // Temp-off/translation toolbars stay in AppDelegate permanently —
+        // they're XKey.app UI (XKeyIM has neither).
+        source.onNoFocusedElement = {
+            if SharedSettings.shared.tempOffToolbarEnabled && TempOffToolbarController.shared.isVisible {
+                TempOffToolbarController.shared.hide()
             }
-            
-            // Reset intra-app focus tracking (new app = new baseline)
-            self.lastFocusedElementSignature = ""
+        }
+        source.onCheckToolbarForFocusedElement = { [weak self] elementInfo in
+            self?.checkAndShowToolbarForFocusedElement(with: elementInfo)
+        }
+        source.onResetLastFocusedElement = { [weak self] in
+            self?.lastFocusedElement = nil
+        }
+        source.onUpdateLastFocusedElement = { [weak self] element in
+            self?.lastFocusedElement = element
         }
 
-        // Safety net for the frontmost-app cache: if an app deactivates without a
-        // matching didActivate (rare edge cases), clear the cache so exclusion
-        // checks fall back to a live NSWorkspace query until the next activation.
-        appDeactivateObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didDeactivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.keyboardHandler?.noteFrontmostApp(bundleId: nil)
+        // Debug window stays in AppDelegate permanently — it's XKey.app UI.
+        source.isDebugWindowVisible = { [weak self] in
+            self?.debugWindowController?.window?.isVisible == true
         }
+        source.onLogMouseClickDetection = { [weak self] attempt, wasRetried, injectionInfo, focusedInfo in
+            self?.logFinalMouseClickDetection(attempt: attempt, wasRetried: wasRetried, injectionInfo: injectionInfo, focusedInfo: focusedInfo)
+        }
+
+        // Smart Switch/per-app language for the overlay app stays in AppDelegate
+        // permanently — app/status-bar behaviour.
+        source.onEnableVietnameseForOverlay = { [weak self] in
+            self?.enableVietnameseForOverlay()
+        }
+        source.onSaveLanguageForOverlay = { [weak self] overlayName in
+            self?.saveLanguageForOverlay(overlayName: overlayName)
+        }
+        source.onRestoreLanguageForCurrentApp = { [weak self] in
+            self?.restoreLanguageForCurrentApp()
+        }
+
+        source.start()
+        tapEventSource = source
 
         debugWindowController?.logEvent("App switch observer registered")
-
-        // Setup overlay detector callback to restore language when overlay closes
-        setupOverlayDetectorCallback()
     }
 
-    /// Setup callback for overlay visibility changes
-    private func setupOverlayDetectorCallback() {
-        OverlayAppDetector.shared.onOverlayVisibilityChanged = { [weak self] isVisible, overlayName in
-            guard let self = self else { return }
-            
-            let detector = AppBehaviorDetector.shared
-            let injectionInfo = detector.detectInjectionMethod()
-            detector.setConfirmedInjectionMethod(injectionInfo)
-
-            if isVisible {
-                // When overlay opens (hidden → visible):
-                // 1. Detect and set injection method for overlay (Spotlight/Raycast/Alfred)
-                // 2. Apply Smart Switch for overlay (restore saved language)
-                // 3. Reset mid-sentence flag (overlay apps start with empty/fresh input)
-                self.debugWindowController?.logEvent("Overlay opened - checking overlay rules")
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
-                self.enableVietnameseForOverlay()
-                
-                // CRITICAL FIX: When overlay opens (e.g., CMD+Space for Spotlight),
-                // reset mid-sentence flag. The resetForAppSwitch() called earlier sets isTypingMidSentence=true
-                // to protect text in normal apps, but overlay apps always start fresh.
-                // If user clicks into existing text, mouse click handler will set mid-sentence appropriately.
-                self.keyboardHandler?.resetMidSentenceFlag()
-                let name = overlayName ?? "Overlay"
-                self.debugWindowController?.logEvent("'\(name)' opened → reset mid-sentence flag")
-            } else {
-                // When overlay closes (visible → hidden):
-                // 1. Detect and set injection method for the underlying app
-                // 2. Save overlay's language (using overlayName from callback, cache is already cleared)
-                // 3. Restore language for current app
-                // 4. Set mid-sentence flag (protect text in underlying app)
-                self.debugWindowController?.logEvent("Overlay closed - saving overlay state, restoring underlying app language")
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
-                // Save overlay's language BEFORE restoring underlying app
-                // Use overlayName from callback parameter (cache is already cleared at this point)
-                self.saveLanguageForOverlay(overlayName: overlayName)
-                self.restoreLanguageForCurrentApp()
-                
-                // When overlay closes, user returns to previous app where cursor position is unknown.
-                // Set mid-sentence flag to protect text on the right of cursor.
-                // Note: Overlay close doesn't trigger didActivateApplicationNotification since
-                // frontmost app is still the original app (Spotlight runs as overlay, not frontmost).
-                self.keyboardHandler?.resetWithCursorMoved()
-                self.debugWindowController?.logEvent("Overlay closed → set mid-sentence flag (protect underlying app)")
-            }
-        }
-    }
-    
     /// Enable Vietnamese when overlay opens (Spotlight/Raycast/Alfred)
     /// This ensures user can type Vietnamese in overlay, regardless of previous app's rule
     private func enableVietnameseForOverlay() {
@@ -1531,93 +1394,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         smartSwitchHandledBundleId = bundleId
     }
     
-    private func setupMouseClickMonitor() {
-        // Monitor mouse up events to detect focus changes
-        // Using mouseUp instead of mouseDown to avoid triggering during drag operations
-        // When user releases mouse, they have completed a click or drag selection
-        
-        // Global monitor - catches clicks in OTHER apps
-        mouseClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp, .otherMouseUp]) { [weak self] event in
-            // Arm overlay probe — mouse clicks can dismiss overlays (Spotlight, Raycast, Alfred)
-            OverlayAppDetector.shared.armProbe()
-            
-            // Reset engine when mouse is released (click completed or drag finished)
-            // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
-            self?.keyboardHandler?.resetWithCursorMoved()
+    // MARK: - Mouse Click Monitoring
+    //
+    // setupMouseClickMonitor, logMouseClickInputDetection, and
+    // detectBehaviorWithRetry moved to TapEventSource (Task 8), driven by its
+    // start()/stop(). logFinalMouseClickDetection (below) stays here — it's a
+    // pure debug-window logging function (XKey.app UI) — and is reached via
+    // TapEventSource.onLogMouseClickDetection.
 
-            // Log detailed input detection info (ONLY when debug window is visible)
-            // This avoids expensive AX calls during normal usage
-            // PERF: Skip when debug window is hidden to fix spring-loaded tools lag
-            // Note: Overlay mid-sentence reset is handled by OverlayAppDetector's timer callback
-            if self?.debugWindowController?.window?.isVisible == true {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                    self?.logMouseClickInputDetection()
-                }
-            }
-
-            // Reset lastFocusedElement to allow toolbar to re-show after auto-hide
-            // When user clicks, they might be moving cursor within same field
-            self?.lastFocusedElement = nil
-
-            // Trigger toolbar check with slight delay to allow focus to settle
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self?.handleFocusCheck()
-            }
-        }
-    }
-
-    /// Log detailed information about the input type when mouse is clicked
-    /// Uses 3x retry detection with 0.15s interval to handle AX API timing issues
-    /// This fixes false positive overlay detection when clicking another app while Spotlight is visible
-    private func logMouseClickInputDetection() {
-        // Start 3x retry detection to handle AX API timing issues
-        // When user clicks, focused element may still report Spotlight (stale data)
-        // After 300ms (0.15s x 2), AX API should have updated to the new focused element
-        detectBehaviorWithRetry(attempt: 1, maxAttempts: 3, interval: 0.15)
-    }
-    
-    /// Perform behavior detection with retry to handle AX API timing issues
-    /// - Parameters:
-    ///   - attempt: Current attempt number (1-based)
-    ///   - maxAttempts: Maximum number of attempts
-    ///   - interval: Time interval between attempts in seconds
-    private func detectBehaviorWithRetry(attempt: Int, maxAttempts: Int, interval: TimeInterval) {
-        let detector = AppBehaviorDetector.shared
-        
-        // OPTIMIZED: Query focusedInfo ONCE, pass to detectInjectionMethod
-        let focusedInfo = detector.getFocusedElementInfo()
-        
-        // Detect injection method from current snapshot
-        let injectionInfo = detector.detectInjectionMethod(focusedInfo: focusedInfo)
-        
-        // IMMEDIATELY set confirmed injection method so keystrokes use this method
-        // This applies the best available method at each retry attempt
-        detector.setConfirmedInjectionMethod(injectionInfo)
-        
-        // Check if an overlay app is still visible (may be stale AX data after click)
-        // Uses OverlayAppDetector which queries actual AX state, not bundle-cached detect()
-        let isOverlayVisible = OverlayAppDetector.shared.isOverlayAppVisible()
-        
-        if attempt < maxAttempts && isOverlayVisible {
-            // Overlay still visible - might be AX timing issue, retry after interval
-            let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() ?? "overlay"
-            if attempt == 1 {
-                debugWindowController?.logEvent("Mouse click detected (checking for AX timing...)")
-            }
-            debugWindowController?.logEvent("   Attempt \(attempt): \(overlayName) → \(injectionInfo.method) (applying...)")
-            
-            // Schedule next attempt
-            DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
-                self?.detectBehaviorWithRetry(attempt: attempt + 1, maxAttempts: maxAttempts, interval: interval)
-            }
-            return
-        }
-        
-        // Final attempt OR no overlay - log the result
-        // OPTIMIZED: Pass pre-queried data to avoid redundant AX queries in logging
-        logFinalMouseClickDetection(attempt: attempt, wasRetried: attempt > 1, injectionInfo: injectionInfo, focusedInfo: focusedInfo)
-    }
-    
     /// Log final mouse click detection result
     /// OPTIMIZED: Accepts pre-queried injectionInfo and focusedInfo to avoid redundant AX queries
     /// This is a pure logging function — all detection is already done by detectBehaviorWithRetry
@@ -2057,10 +1841,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupTempOffToolbar() {
         // Always setup notification observer for settings changes
         setupTempOffToolbarSettingsObserver()
-        
-        // Setup AXObserver for focus change monitoring (injection detection)
-        // AXObserver runs regardless of toolbar setting for injection method detection
-        setupFocusChangeMonitoring()
+
+        // AXObserver focus change monitoring (injection detection) is now started
+        // by TapEventSource.start() (Task 7) — setupTapEventSource() runs earlier
+        // in applicationDidFinishLaunching, so it is already active by this point.
 
         let preferences = SharedSettings.shared.loadPreferences()
 
@@ -2142,343 +1926,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugWindowController?.logEvent("Temp off toolbar disabled (AXObserver still active)")
     }
 
-    /// Setup monitoring for focus changes to auto-show toolbar when focusing text fields
-    private func setupFocusChangeMonitoring() {
-        // Use NSWorkspace notification to detect app activation
-        // Then check if focused element is a text field
-        NotificationCenter.default.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleFocusCheck()
-        }
-
-        // Mouse clicks are already handled by mouseClickMonitor
-        // Focus changes within apps are handled by AXObserver (event-driven, no polling)
-        
-        // Setup AXObserver for the current frontmost app on launch
-        if let frontApp = NSWorkspace.shared.frontmostApplication {
-            setupAXObserverForApp(frontApp)
-        }
-
-        debugWindowController?.logEvent("Focus change monitoring enabled (AXObserver + NSWorkspace notifications)")
-    }
-    
-    /// Main focus check handler - gets focused element once and passes to both processors
-    /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes in a single query
-    private func handleFocusCheck() {
-        // Get focused element ONCE (avoid duplicate AX API calls)
-        guard let axElement = AXHelper.getFocusedElement() else {
-            // No focused element - hide toolbar if visible
-            if SharedSettings.shared.tempOffToolbarEnabled && TempOffToolbarController.shared.isVisible {
-                TempOffToolbarController.shared.hide()
-            }
-            return
-        }
-        
-        // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
-        // This reduces AX API calls from ~10 to ~5 per focus check
-        let elementInfo = FocusedElementInfo.from(axElement)
-        
-        // 1. ALWAYS check for injection method changes (CMD+T, Tab, etc.)
-        checkIntraAppFocusChange(with: elementInfo)
-        
-        // 2. Check toolbar display (only if enabled)
-        if SharedSettings.shared.tempOffToolbarEnabled {
-            checkAndShowToolbarForFocusedElement(with: elementInfo)
-        }
-    }
-
-    // MARK: - Intra-App Focus Monitoring
-    
-    /// Check if focused element has changed within the same app (e.g., CMD+T in browser)
-    /// If so, re-detect injection method (but DO NOT reset engine - that's handled by user actions)
-    /// Also re-primes cache when confirmedInjectionMethod was cleared (e.g., after mouse click)
-    /// - Parameter elementInfo: Cached AX element info (passed from handleFocusCheck)
-    private func checkIntraAppFocusChange(with elementInfo: FocusedElementInfo) {
-        // OPTIMIZED: Use pre-computed signature from FocusedElementInfo
-        let currentSignature = elementInfo.signature
-        let detector = AppBehaviorDetector.shared
-        
-        // Check if signature changed (different element type)
-        if currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty {
-            
-            // Re-detect injection method (needed for address bar, terminal, etc.)
-            let previousMethod = detector.confirmedInjectionMethod
-            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
-            
-            // Log focus change
-            debugWindowController?.logEvent("Focus changed (keyboard): \(lastFocusedElementSignature) → \(currentSignature)")
-            
-            // ALWAYS set confirmed method to ensure cache is populated
-            detector.setConfirmedInjectionMethod(injectionInfo)
-            
-            // Log injection method change
-            if let prev = previousMethod, (prev.method != injectionInfo.method || prev.description != injectionInfo.description) {
-                let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-                let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
-                debugWindowController?.logEvent("   Injection: \(prev.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
-            }
-            
-            // NOTE: Engine reset is NOT done here!
-            // Engine reset is handled by explicit user actions:
-            // - Mouse click (setupMouseClickMonitor)
-            // - Tab key (KeyboardEventHandler.processKeyEvent)
-            // - Arrow keys / Home / End / PageUp / PageDown (KeyboardEventHandler.processKeyEvent)
-            // - App switch (handleAppSwitch)
-            //
-            // Focus change detection is ONLY for re-detecting injection method.
-            // This avoids issues where apps "refine" focus after user starts typing
-            // (e.g., VSCode: AXWindow → AXTextArea, Facebook: dropdown menus).
-            
-            // NEW: Notify engine about focus change during typing
-            // This is important for suggestion popup scenarios where keystrokes may go to popup
-            // causing buffer desync. Engine will use AX verify at next word break.
-            keyboardHandler?.engine.notifyFocusChanged()
-        } else if detector.confirmedInjectionMethod == nil {
-            // Cache was cleared (e.g., by mouse click resetWithCursorMoved)
-            // but signature is unchanged (same field).
-            // Re-prime cache to avoid live AX detection on every keystroke.
-            let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
-            detector.setConfirmedInjectionMethod(injectionInfo)
-        }
-        
-        // Update last signature
-        lastFocusedElementSignature = currentSignature
-    }
-    
     // MARK: - AXObserver for Focus Changes
-    
-    /// Setup AXObserver for the given app to receive focus change notifications
-    /// This is called when app switches to monitor focus changes within that app (e.g., Cmd+T in browser)
-    private func setupAXObserverForApp(_ app: NSRunningApplication) {
-        // Skip if it's XKey itself
-        guard app.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
-        
-        let pid = app.processIdentifier
-        
-        // Skip if already observing this app
-        guard pid != focusObserverPID else { return }
-        
-        // Remove existing observer if any
-        removeAXObserver()
-        
-        // Create new observer for this app
-        var observer: AXObserver?
-        let result = AXObserverCreate(pid, axNotificationCallback, &observer)
-        
-        guard result == .success, let newObserver = observer else {
-            debugWindowController?.logEvent("AXObserver: Failed to create for PID \(pid) (error: \(result.rawValue))")
-            return
-        }
-        
-        // Get the app's AXUIElement
-        let appElement = AXUIElementCreateApplication(pid)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        
-        // Register for focused UI element changed notification
-        let addResult = AXObserverAddNotification(
-            newObserver,
-            appElement,
-            kAXFocusedUIElementChangedNotification as CFString,
-            refcon
-        )
-        
-        guard addResult == .success else {
-            debugWindowController?.logEvent("AXObserver: Failed to add focus notification for PID \(pid) (error: \(addResult.rawValue))")
-            return
-        }
-        
-        // Register for window title changed notification (Layer 1)
-        // Catches apps that update window title AFTER focus change (e.g., Slack channel switch)
-        let titleResult = AXObserverAddNotification(
-            newObserver,
-            appElement,
-            kAXTitleChangedNotification as CFString,
-            refcon
-        )
-        
-        if titleResult != .success {
-            // Non-fatal: some apps may not support this notification
-            // Layer 2 (delayed verification) will handle those cases
-            debugWindowController?.logEvent("AXObserver: Title notification not supported for PID \(pid)")
-        }
-        
-        // Add observer to run loop
-        CFRunLoopAddSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(newObserver),
-            .defaultMode
-        )
-        
-        // Save observer and PID
-        focusObserver = newObserver
-        focusObserverPID = pid
-        
-        debugWindowController?.logEvent("AXObserver: Monitoring '\(app.localizedName ?? "Unknown")' (PID: \(pid))")
-    }
-    
-    /// Remove current AXObserver
-    private func removeAXObserver() {
-        // Cancel pending title verifications
-        titleVerificationWorkItem?.cancel()
-        titleVerificationWorkItem = nil
-        titleChangeDebounceWorkItem?.cancel()
-        titleChangeDebounceWorkItem = nil
-        lastDetectedTitle = nil
-        
-        guard let observer = focusObserver else { return }
-        
-        // Remove from run loop
-        CFRunLoopRemoveSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(observer),
-            .defaultMode
-        )
-        
-        focusObserver = nil
-        focusObserverPID = 0
-    }
-    
-    /// Handle focus changed notification from AXObserver
-    /// This is called by the C callback function
-    /// OPTIMIZED: Uses FocusedElementInfo to cache AX attributes
-    /// ALWAYS re-detects injection method (event-driven path, already throttled)
-    /// to catch same-app context switches (tab/window) where signature stays the same
-    /// but window title rules and injection method may change.
-    func handleAXFocusChanged(_ element: AXUIElement) {
-        // Throttle: Skip if called too rapidly (< 100ms since last call)
-        // This prevents blocking the main thread when AXObserver fires rapidly
-        // (e.g., during autocomplete, animations, or rapid UI updates)
-        let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastAXFocusChangeTime > axFocusChangeThrottleInterval else {
-            return
-        }
-        lastAXFocusChangeTime = now
-        
-        // OPTIMIZED: Get all AX attributes in a single pass via FocusedElementInfo
-        let elementInfo = FocusedElementInfo.from(element)
-        let currentSignature = elementInfo.signature
-        let signatureChanged = currentSignature != lastFocusedElementSignature && !lastFocusedElementSignature.isEmpty
-        
-        // ALWAYS re-detect injection method in event-driven path.
-        // AXObserver fires indicate genuine focus changes (throttle handles spam).
-        // With pre-fetched focusedInfo, re-detection is pure logic (no extra AX calls).
-        // This ensures same-app tab/window switches re-evaluate window title rules
-        // even when AX role/subrole/description are identical.
-        let detector = AppBehaviorDetector.shared
-        // Read cache BEFORE re-detection to compare correctly
-        let previousMethod = detector.confirmedInjectionMethod
-        let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo)
-        
-        // Log focus change (only when signature actually changed)
-        if signatureChanged {
-            debugWindowController?.logEvent("Focus changed (AXObserver): \(lastFocusedElementSignature) → \(currentSignature)")
-        }
-        
-        // ALWAYS set confirmed method to ensure cache is populated
-        // (after mouse click clears cache, this re-populates it)
-        detector.setConfirmedInjectionMethod(injectionInfo)
-        
-        // Log injection method change
-        if let prev = previousMethod, (prev.method != injectionInfo.method || prev.description != injectionInfo.description) {
-            let axWindowTitle = elementInfo.windowTitle ?? "(nil)"
-            let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
-            let emptyCharStr = injectionInfo.needsEmptyCharPrefix ? ", emptyCharPrefix=true" : ""
-            debugWindowController?.logEvent("   Injection: \(prev.description) → \(injectionInfo.description) [\(textMethodName)\(emptyCharStr)]")
-            debugWindowController?.logEvent("   Window: \(axWindowTitle)")
-        }
-        
-        // Layer 2: Schedule delayed title verification
-        // Apps like Slack update window title 200-500ms AFTER focus change notification.
-        // The detection above may have used a STALE title → wrong rule applied.
-        // This re-checks the title after a delay and re-detects if it changed.
-        // Note: windowTitle was lazy-loaded by detectInjectionMethod → now cached in elementInfo
-        lastDetectedTitle = elementInfo.windowTitle
-        titleVerificationWorkItem?.cancel()
-        let verifyWork = DispatchWorkItem { [weak self] in
-            self?.performTitleChangeRedetection()
-        }
-        titleVerificationWorkItem = verifyWork
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: verifyWork)
-        
-        // NOTE: Engine reset is NOT done here!
-        // See checkIntraAppFocusChange for explanation.
-        
-        // NEW: Notify engine about focus change during typing
-        if signatureChanged {
-            keyboardHandler?.engine.notifyFocusChanged()
-        }
-        
-        // Update last signature (for timer-based checkIntraAppFocusChange)
-        lastFocusedElementSignature = currentSignature
+    //
+    // The AX focus/title monitoring machinery (setupFocusChangeMonitoring,
+    // handleFocusCheck, checkIntraAppFocusChange, setupAXObserverForApp,
+    // removeAXObserver, handleAXFocusChanged, handleAXTitleChanged,
+    // performTitleChangeRedetection) moved to TapEventSource (Task 7), driven
+    // by its start()/stop(). setupMouseClickMonitor — the other caller that
+    // used to reach handleFocusCheck() by name — moved alongside it in Task 8,
+    // so this forwarder is now kept only for enableTempOffToolbar, which still
+    // calls handleFocusCheck() by name.
 
-        // Focusing a password field enables Secure Input with no app switch — WebKit does
-        // this in Safari and Chrome. This is the only trigger that catches it promptly.
-        evaluateSecureInput()
-
-        // Check toolbar display (only if enabled)
-        // This ensures toolbar shows/hides when focus changes via keyboard (CMD+T, Tab, etc.)
-        let preferences = SharedSettings.shared.loadPreferences()
-        let shouldShowTempOffToolbar = preferences.tempOffToolbarEnabled
-        let shouldShowTranslationToolbar = preferences.translationEnabled && preferences.translationToolbarEnabled
-        
-        if shouldShowTempOffToolbar || shouldShowTranslationToolbar {
-            // Reset lastFocusedElement to force toolbar re-evaluation
-            lastFocusedElement = nil
-            checkAndShowToolbarForFocusedElement(with: elementInfo)
-        } else {
-            // Just update for tracking
-            lastFocusedElement = element
-        }
-    }
-    
-    // MARK: - Window Title Change Re-detection
-    
-    /// Handle window title changed notification from AXObserver (Layer 1)
-    /// Apps like Slack fire this when switching channels/conversations
-    /// Uses debounce to coalesce rapid-fire title updates
-    func handleAXTitleChanged() {
-        // Guard: Only re-detect if we have a confirmed method (active context)
-        guard AppBehaviorDetector.shared.confirmedInjectionMethod != nil else { return }
-        
-        // Debounce: Coalesce rapid title changes (e.g., "Loading..." → "vn-abc - Slack")
-        // We want the FINAL title, not intermediate states
-        titleChangeDebounceWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            self?.performTitleChangeRedetection()
-        }
-        titleChangeDebounceWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
-    }
-    
-    /// Re-detect injection method after window title changed
-    /// Called by both Layer 1 (kAXTitleChangedNotification) and Layer 2 (delayed verification)
-    /// Uses lastDetectedTitle guard to avoid duplicate work when both layers trigger
-    private func performTitleChangeRedetection() {
-        let detector = AppBehaviorDetector.shared
-        
-        // Query fresh window title (1-3 AX calls — lightweight)
-        let freshTitle = detector.getCurrentWindowTitle() ?? ""
-        
-        // Skip if title hasn't actually changed from last detection
-        guard freshTitle != (lastDetectedTitle ?? "") else { return }
-        
-        // Title DID change — re-detect with fresh state
-        lastDetectedTitle = freshTitle
-        
-        let previousMethod = detector.confirmedInjectionMethod
-        let injectionInfo = detector.detectInjectionMethod()
-        
-        // Only update and log if detection result actually changed
-        if previousMethod == nil ||
-           injectionInfo.method != previousMethod!.method ||
-           injectionInfo.description != previousMethod!.description {
-            detector.setConfirmedInjectionMethod(injectionInfo)
-            debugWindowController?.logEvent("[TitleVerify] \"\(freshTitle.prefix(60))\"")
-            debugWindowController?.logEvent("   Injection: \(previousMethod?.description ?? "nil") → \(injectionInfo.description)")
-        }
+    private func handleFocusCheck() {
+        tapEventSource?.handleFocusCheck()
     }
     
     /// Check if focused element is a text field and show toolbar
@@ -2494,7 +1954,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let showTranslation = preferences.translationEnabled && preferences.translationToolbarEnabled
         
         // Check if it's the same element as before (using signature)
-        if currentSignature == lastFocusedElementSignature && lastFocusedElement != nil {
+        // lastFocusedElementSignature now lives on TapEventSource (Task 7) —
+        // read through it; "" matches the pre-move default before any signature
+        // is ever recorded.
+        if currentSignature == (tapEventSource?.lastFocusedElementSignature ?? "") && lastFocusedElement != nil {
             // Same element - update positions if visible, or re-show if hidden (only if has caret)
             let hasTextCursor = elementInfo.hasCaret
             

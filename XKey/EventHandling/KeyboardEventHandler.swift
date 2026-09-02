@@ -147,8 +147,30 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // logging is off — see updateEngineLogWiring)
         updateEngineLogWiring()
 
-        // Share managers with VNEngine
-
+        // Share managers with VNEngine. These are process-wide statics (see
+        // VNEngineMacro.swift / VNEngineSmartSwitch.swift), so this write is
+        // visible to every VNEngine instance in the process — including one
+        // created before this handler existed, e.g. XKeyIMController's own
+        // marked-text engine in XKeyIM, which is built well before the tap
+        // ever arms and constructs a KeyboardEventHandler.
+        //
+        // That sharing is intentional, not a leak: there is exactly one set
+        // of user-defined macros and one per-app language map, and every
+        // engine in the process should see the same one, regardless of
+        // which channel (tap or marked text) is currently typing. The two
+        // channels are also mutually exclusive at any instant (XKeyIMController
+        // stops processing keys while TapController.isArmed), so this never
+        // races two engines against each other.
+        //
+        // Today this rebind is a no-op for XKeyIM's marked-text channel:
+        // XKeyIMController.applySettings() never sets macroEnabled, so its
+        // engine's vUseMacro stays 0 and it never calls into macroManager;
+        // smart-switch's app-language checks (checkSmartSwitchForApp /
+        // handleAppSwitch) are only ever driven by XKey.app's AppDelegate,
+        // never by XKeyIMController or this handler's own tap pipeline. If
+        // marked-text macro support is ever wired up, this shared instance
+        // is what makes it see the exact same macros the tap uses — see
+        // EngineManagerSharingTests for the guard on that convergence.
         VNEngine.setSharedMacroManager(macroManager)
         VNEngine.setSharedSmartSwitchManager(smartSwitchManager)
 
@@ -334,6 +356,16 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
+        // Another process's XKeyIM tap is armed for the app in front. Two taps must
+        // never both transform one keystroke. This is per-app-accurate: the flag
+        // only exists while XKeyIM is the active IME, so switching to an ABC app
+        // hands control straight back to us (the global input-source suspend cannot
+        // do that). isXKeyIMTapOwningInput is PID-relative, so this is never true
+        // inside XKeyIM's own handler for its own tap.
+        if SharedSettings.shared.isXKeyIMTapOwningInput {
+            return false
+        }
+
         // Check if current app is in excluded list
         if isCurrentAppExcluded() {
             return false
@@ -347,19 +379,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // state (not vLanguage), so this does not interfere with it.
         engine.vLanguage = effectiveVietnameseEnabled ? 1 : 0
 
-        // Consume a pending injection-method reprobe (armed by focus-moving
-        // Cmd-chords in EventTapManager) before reading the confirmed method,
-        // so the first character typed after Cmd+L/Cmd+T already uses the
-        // address-bar method.
-        // Skip the chord keystroke itself (Cmd still down): the browser hasn't
-        // processed the chord yet, so re-detecting now would read the OLD focus.
-        // Skip when nothing will be processed (Vietnamese off and no English-
-        // mode macros): the method is unused then, the detect would be wasted —
-        // the probe stays armed and is consumed if processing is re-enabled.
-        if type == .keyDown && !event.flags.contains(.maskCommand)
-            && (effectiveVietnameseEnabled || (macroEnabled && macroInEnglishMode)) {
-            AppBehaviorDetector.shared.consumePendingMethodReprobe()
-        }
+        // The injection-method reprobe that used to be consumed here is now scheduled by
+        // armMethodReprobe() itself, off this thread, 50ms and again 250ms after the chord
+        // — see AppBehaviorDetector.methodReprobeDelays. Consuming it here meant a full AX
+        // snapshot inside the tap callback on the first character after every Cmd+L/Cmd+T.
 
         // Check if injection method is passthrough - bypass all XKey processing.
         let confirmedMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
@@ -924,16 +947,23 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Overlay apps use floating panels that don't become frontmostApplication,
         // so NSWorkspace.shared.frontmostApplication would return the excluded app underneath.
         // We must check overlay visibility FIRST to avoid blocking Vietnamese in overlays.
-        if OverlayAppDetector.shared.isOverlayAppVisible() {
-            // FIX: When overlay is visible, ensure confirmedInjectionMethod reflects the overlay context.
-            // Without this, there's a 0-500ms gap between overlay becoming visible and timer polling
-            // updating the injection method. During this gap, keystrokes use the stale method from
-            // the previous app (e.g., .fast from Chrome instead of .autocomplete for Spotlight).
-            let currentMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
-            if !currentMethod.description.contains("Overlay") {
-                let updatedMethod = AppBehaviorDetector.shared.detectInjectionMethod()
-                AppBehaviorDetector.shared.setConfirmedInjectionMethod(updatedMethod)
-            }
+        //
+        // The cache, never the probe. This runs inside the CGEventTap callback, and
+        // isOverlayAppVisible() would ask the FRONTMOST app's focused element four
+        // questions plus AXHelper.getFocusedElement() — up to five blocking round-trips
+        // per keystroke, into the app the user is typing in. TapEventSource answers
+        // OverlayAppDetector.onProbeArmed and runs those reads on its AX queue instead,
+        // so this value is what that work settled on.
+        //
+        // The injection method that used to be re-detected here — synchronously, on this
+        // thread, whenever the confirmed one did not describe an overlay — is now set by
+        // the same transition that turns this cache positive. cachedOverlayVisible only
+        // ever goes false→true inside OverlayAppDetector.handleOverlayFound, which fires
+        // onOverlayVisibilityChanged in that same main-thread turn (the only other writer
+        // that can put a true there, applyDismissCheck, runs only while an overlay is
+        // ALREADY visible), and TapEventSource's handler for it re-detects and confirms
+        // the method from an off-main snapshot with the overlay name resolved.
+        if OverlayAppDetector.shared.lastKnownOverlayVisible {
             return false  // Overlay apps are never excluded - allow Vietnamese typing
         }
         

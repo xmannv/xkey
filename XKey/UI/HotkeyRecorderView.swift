@@ -34,13 +34,6 @@ private struct HotkeyPreset: Identifiable {
     ]
 }
 
-// MARK: - Recording State Notification
-
-extension Notification.Name {
-    /// Posted when hotkey recording starts/stops. UserInfo contains "isRecording": Bool
-    static let hotkeyRecordingStateChanged = Notification.Name("XKey.hotkeyRecordingStateChanged")
-}
-
 struct HotkeyRecorderView: View {
     @Binding var hotkey: Hotkey
     @State private var isRecording = false
