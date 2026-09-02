@@ -6,61 +6,32 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20260818)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260818</link>
-      <sparkle:version>20260818</sparkle:version>
+      <title>Version 1.2.25 (Build 20260828)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260828</link>
+      <sparkle:version>20260828</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(injection): reduce AX queries into web renderer to stop Gmail/Chrome freeze</p>
-<p>Two mechanisms caused intermittent typing freezes in heavy web editors</p>
-<p>(Gmail compose in Chrome):</p>
-<ol>
-<li>FocusedElementInfo.from() eagerly queried AXDOMClassList and</li>
-</ol>
-<p>   AXDOMIdentifier on every snapshot. These attributes are served by the</p>
-<p>   browser's web renderer, forcing Chromium to keep web accessibility</p>
-<p>   enabled for the page — janking heavy pages like Gmail.</p>
-<ol>
-<li>getConfirmedInjectionMethod() did not store its live-detection</li>
-</ol>
-<p>   fallback result. Since clearMethodCache() runs on every mouse click,</p>
-<p>   arrow key, and app switch, every subsequent keyDown re-ran a full AX</p>
-<p>   snapshot on the event-tap thread until an async re-prime, stalling</p>
-<p>   the tap (and all typing) whenever the focused app was slow to answer.</p>
-<p>Changes:</p>
-<ul>
-<li>Store the Priority-2 fallback via setConfirmedInjectionMethod, same</li>
-</ul>
-<p>  pattern as consumePendingMethodReprobe.</p>
-<ul>
-<li>Make domIdentifier/domClasses lazy providers (same pattern as</li>
-</ul>
-<p>  textValueProvider); snapshot drops to 5 eager AX calls.</p>
-<ul>
-<li>signature uses domIdentifierIfLoaded so the hot path never fires the</li>
-</ul>
-<p>  lazy renderer query.</p>
-<ul>
-<li>Gate the DOM-attribute fallback in isChromiumAddressBar and</li>
-</ul>
-<p>  isFirefoxStyleAddressBar by role == AXTextField: the omnibox/urlbar</p>
-<p>  are native text fields, web content never is. Eager checks</p>
-<p>  (identifier, description) now run before the DOM legs, keeping</p>
-<p>  localized-UI detection working.</p>
-<p>Preserved: Notion code block detection, rules with AX patterns,</p>
-<p>built-in title-only rules (never fire DOM queries), address bar</p>
-<p>detection on localized browser UIs.</p>
-<p>Tests: FocusedElementInfoLazyTests (17 cases) covering lazy semantics,</p>
-<p>signature behavior, and all address-bar gate branches. Full XKeyTests</p>
-<p>suite passes; XKeyIM target builds.</p>
-<p>Also: bump version to 1.2.25 (build 20260818), ignore graphify-out/</p>
-<p>and .codegraph/ local tooling dirs.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260818">Xem chi tiết trên GitHub</a></p>
+<p>fix(smart-switch): keep excluded apps out of Smart Switch</p>
+<p>The excluded-app check only ran in the per-keystroke path, so an app on the</p>
+<p>exclusion list still took part in Smart Switch: activating it restored its</p>
+<p>saved language and flipped the menu bar to V, and the state it recorded then</p>
+<p>leaked to the next app that had no saved entry of its own.</p>
+<p>Move the passthrough and user-list logic into isAppExcluded(bundleIdentifier:)</p>
+<p>— dead until now — so it also honours the exclusionRulesEnabled master switch,</p>
+<p>and have isCurrentAppExcluded() delegate to it after its overlay exemption.</p>
+<p>The tap path behaves exactly as before; the Smart Switch paths now share the</p>
+<p>same predicate and skip excluded apps when restoring on app switch, when an</p>
+<p>input source change arrives, when an overlay is dismissed, and when the user</p>
+<p>toggles E/V by hand.</p>
+<p>Overlay apps (Spotlight, Raycast, Alfred) are never excluded by design, so</p>
+<p>their Smart Switch sites are left untouched.</p>
+<p>Fixes #321</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260828">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 18 Aug 2026 15:23:04 +0000</pubDate>
+      <pubDate>Wed, 02 Sep 2026 15:32:52 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260818/XKey.dmg" sparkle:version="20260818" sparkle:shortVersionString="1.2.25" length="11723537" type="application/octet-stream" sparkle:edSignature="DQtpd83HGEbOshyzcxROuUNB9A/hTsRJtGgctiJaRgUmq1cndmFhcJBV0ZctKyNvDrOMSMVmTgbs9mwFq4ILBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260828/XKey.dmg" sparkle:version="20260828" sparkle:shortVersionString="1.2.25" length="12262778" type="application/octet-stream" sparkle:edSignature="56q5fkZYhlceCL52S4wvL8WK3kR+BEcoiXrtxC25PE8aZMP3GMKNJm8zFcoNQxItR/DHEcFaVv3ckaDirU0EBg==" />
     </item>
   </channel>
 </rss>
