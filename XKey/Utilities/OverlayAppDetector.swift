@@ -248,9 +248,20 @@ class OverlayAppDetector {
         return PendingProbe(expired: expired, cachedVisibleAtBegin: cachedOverlayVisible)
     }
 
+    /// Stands in for the Accessibility read, for tests only. Nothing in production
+    /// assigns it.
+    ///
+    /// The real read asks whatever window happens to be focused while the suite runs, so
+    /// a test whose outcome depends on the answer passes or fails on the state of the
+    /// developer's screen — a launcher that happens to be open makes a chase find where
+    /// the test needed it to keep looking. Tests set this to script the answer; when it is
+    /// nil the read goes to Accessibility exactly as before.
+    var axReaderForTesting: (() -> String?)?
+
     /// The AX read half of a probe. Reads attributes and nothing else: no cache, no
     /// probe state, no callback — which is what makes it safe to call from any thread.
     func readOverlayNameViaAX() -> String? {
+        if let scripted = axReaderForTesting { return scripted() }
         return detectOverlayViaAXAttributes()
     }
 

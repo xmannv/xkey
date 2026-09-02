@@ -62,6 +62,10 @@ final class AXPassOffMainThreadTests: XCTestCase {
         // would otherwise keep the 0.5s monitor reading AX on its queue for the rest of
         // the run.
         detector.onOverlayReadNeeded = nil
+        // Every test in this class that lets a real AX read happen is at the mercy of
+        // whatever window is focused while the suite runs. Cleared here so a test that
+        // scripts it cannot leak that script into the next one.
+        detector.axReaderForTesting = nil
         detector.armProbe()
         guard let found = detector.beginProbe() else { return }
         detector.finishProbe(found, overlayName: "Spotlight")
@@ -375,6 +379,12 @@ final class AXPassOffMainThreadTests: XCTestCase {
         let detector = OverlayAppDetector.shared
         resetOverlayDetector()
 
+        // The chase must keep looking for the whole of both windows, which is only true
+        // while it finds nothing. Left to real Accessibility that depends on whatever is
+        // focused: a launcher open on the developer's screen ends the chain after one
+        // window, and `arms` never reaches 2.
+        detector.axReaderForTesting = { nil }
+
         let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: { true })
         source.start()
         defer { source.stop() }
@@ -396,10 +406,13 @@ final class AXPassOffMainThreadTests: XCTestCase {
         detector.armProbe()
         XCTAssertTrue(detector.isProbeArmed)
 
-        // arms == 2 rules out the first window's expiry, where the probe is also briefly
-        // disarmed; both together can only be the second window closing.
+        // At least two arms rules out the first window's expiry, where the probe is also
+        // briefly disarmed; that together with a spent probe can only be the second window
+        // closing. Not `== 2`: start() installs a real global mouse monitor, so a click
+        // landing anywhere on the machine while this runs arms one more and would other-
+        // wise hang the wait until it timed out.
         waitUntil("the chase spent the probe for good") {
-            arms == 2 && !detector.isProbeArmed
+            arms >= 2 && !detector.isProbeArmed
         }
 
         // Long enough for another chase step to have woken and read: the chain must be
@@ -408,8 +421,14 @@ final class AXPassOffMainThreadTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { settled.fulfill() }
         wait(for: [settled], timeout: 5)
 
-        XCTAssertEqual(arms, 2,
-                       "one window is not enough for a launcher that is still starting up, and a chase that kept re-arming would never stop")
+        // At least two, not exactly two, and for the same reason the wait above uses `>=`:
+        // start() installs a real global mouse monitor, so any click on the machine while
+        // this runs arms another probe. Two is what the behaviour under test needs — one
+        // window is not enough for a launcher that is still starting up — and the assertion
+        // below that the probe is spent is what proves a chase that kept re-arming would
+        // never stop.
+        XCTAssertGreaterThanOrEqual(arms, 2,
+                       "the chase must re-arm once so a slow launcher gets a second window — saw \(arms)")
         XCTAssertFalse(detector.isProbeArmed,
                        "an armed probe must be resolved off the keystroke path — nothing on it reads AX any more")
         XCTAssertFalse(detector.lastKnownOverlayVisible)
@@ -685,6 +704,10 @@ final class AXPassOffMainThreadTests: XCTestCase {
         guard let hostRead = detector.onOverlayReadNeeded else {
             return XCTFail("start() must give the monitor somewhere other than this thread to read")
         }
+        // The poll has to come back "gone" for the dismissal this waits on to happen. Real
+        // Accessibility answers about whatever is focused, so an overlay open on the
+        // developer's screen keeps the cache visible and no transition ever arrives.
+        detector.axReaderForTesting = { nil }
         var offThreadReads = 0
         detector.onOverlayReadNeeded = { completion in
             offThreadReads += 1
@@ -826,9 +849,13 @@ final class AXPassOffMainThreadTests: XCTestCase {
         XCTAssertNil(detector.confirmedInjectionMethod,
                      "the request must not have been answered on this thread")
 
-        let settled = expectation(description: "the requested detection landed")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { settled.fulfill() }
-        wait(for: [settled], timeout: 5)
+        // Polled rather than given a fixed second: the pass this waits on takes a real AX
+        // round-trip on a background queue, and a loaded machine can push that past any
+        // wall-clock budget. What the test is about is that the answer arrives off this
+        // thread, not how fast.
+        waitUntil("the requested detection landed") {
+            detector.confirmedInjectionMethod != nil
+        }
 
         XCTAssertNotNil(detector.confirmedInjectionMethod,
                         "nothing else would refill the cache — the request is what the tap has instead of detecting")
