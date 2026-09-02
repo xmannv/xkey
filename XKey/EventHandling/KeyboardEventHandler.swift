@@ -976,19 +976,22 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return false
         }
         
+        return isAppExcluded(bundleIdentifier: bundleId)
+    }
+    
+    /// Check if a specific bundle identifier is excluded from XKey processing.
+    /// Same policy as the per-keystroke check minus the overlay exemption, so the
+    /// Smart Switch paths in AppDelegate agree with the tap on which apps XKey stays
+    /// out of: an excluded app must neither restore nor record an E/V state.
+    func isAppExcluded(bundleIdentifier: String) -> Bool {
         // Exclude passthrough apps (iOS Simulator + remote desktop clients when
         // remoteDesktopInjectMode is disabled). Case-insensitive bundle ID match.
-        if isPassthroughApp(bundleId: bundleId) {
+        if isPassthroughApp(bundleId: bundleIdentifier) {
             return true
         }
         
         // Check user-defined excluded apps (respects master switch)
         guard exclusionRulesEnabled, !excludedBundleIds.isEmpty else { return false }
-        return excludedBundleIds.contains(bundleId)
-    }
-    
-    /// Check if a specific bundle identifier is excluded
-    func isAppExcluded(bundleIdentifier: String) -> Bool {
         return excludedBundleIds.contains(bundleIdentifier)
     }
 }

@@ -58,6 +58,78 @@ class ToggleExclusionRulesTests: XCTestCase {
     }
 }
 
+// MARK: - Excluded App Predicate Tests
+//
+// These assert only on in-memory state of a freshly built KeyboardEventHandler, so
+// unlike the tests above they never read the App Group store a live XKeyIM writes
+// and do not need skipIfXKeyIMIsRunning().
+
+class ExcludedAppPredicateTests: XCTestCase {
+
+    var handler: KeyboardEventHandler!
+
+    override func setUp() {
+        super.setUp()
+        handler = KeyboardEventHandler()
+    }
+
+    override func tearDown() {
+        handler = nil
+        super.tearDown()
+    }
+
+    // MARK: - isAppExcluded Tests
+    //
+    // isAppExcluded(bundleIdentifier:) is the predicate the Smart Switch paths in
+    // AppDelegate/StatusBarViewModel share with the per-keystroke tap check, so an
+    // excluded app neither restores nor records an E/V state (issue #321).
+
+    /// A bundle ID on the user list is excluded while the master switch is on
+    func testIsAppExcluded_ListedBundleId() {
+        handler.excludedApps = [ExcludedApp(bundleIdentifier: "com.microsoft.VSCode", appName: "Visual Studio Code")]
+
+        XCTAssertTrue(handler.isAppExcluded(bundleIdentifier: "com.microsoft.VSCode"),
+            "A bundle ID on the excluded list should be excluded")
+    }
+
+    /// A bundle ID that is not on the list is not excluded
+    func testIsAppExcluded_UnlistedBundleId() {
+        handler.excludedApps = [ExcludedApp(bundleIdentifier: "com.microsoft.VSCode", appName: "Visual Studio Code")]
+
+        XCTAssertFalse(handler.isAppExcluded(bundleIdentifier: "com.apple.Safari"),
+            "A bundle ID absent from the excluded list should not be excluded")
+    }
+
+    /// The master switch off means nothing on the user list is excluded
+    func testIsAppExcluded_RespectsMasterSwitch() {
+        handler.excludedApps = [ExcludedApp(bundleIdentifier: "com.microsoft.VSCode", appName: "Visual Studio Code")]
+        handler.exclusionRulesEnabled = false
+
+        XCTAssertFalse(handler.isAppExcluded(bundleIdentifier: "com.microsoft.VSCode"),
+            "exclusionRulesEnabled = false should disable user-defined exclusions")
+    }
+
+    /// Removing an app from the list clears its exclusion
+    func testIsAppExcluded_UpdatesWhenListChanges() {
+        handler.excludedApps = [ExcludedApp(bundleIdentifier: "com.microsoft.VSCode", appName: "Visual Studio Code")]
+        XCTAssertTrue(handler.isAppExcluded(bundleIdentifier: "com.microsoft.VSCode"))
+
+        handler.excludedApps = []
+        XCTAssertFalse(handler.isAppExcluded(bundleIdentifier: "com.microsoft.VSCode"),
+            "Clearing the excluded list should clear the exclusion")
+    }
+
+    /// Passthrough apps are excluded even when the user list is empty, and the
+    /// master switch governs only user-defined rules
+    func testIsAppExcluded_PassthroughAppIgnoresMasterSwitch() {
+        handler.excludedApps = []
+        handler.exclusionRulesEnabled = false
+
+        XCTAssertTrue(handler.isAppExcluded(bundleIdentifier: "com.apple.iphonesimulator"),
+            "Passthrough apps stay excluded regardless of the user-defined rules switch")
+    }
+}
+
 // MARK: - Toggle Window Title Rules Tests
 
 class ToggleWindowTitleRulesTests: XCTestCase {

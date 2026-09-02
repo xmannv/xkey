@@ -1263,6 +1263,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Smart Switch (if enabled)
         guard handler.smartSwitchEnabled else { return }
 
+        // Excluded apps do not participate in Smart Switch (see handleSmartSwitch)
+        guard !handler.isAppExcluded(bundleIdentifier: bundleId) else {
+            debugWindowController?.logEvent("Restore: Skipped (app '\(bundleId)' excluded)")
+            return
+        }
+
         // Get current language state
         let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
 
@@ -1369,6 +1375,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // PRIORITY 2: Smart Switch (if enabled)
         guard handler.smartSwitchEnabled else { return }
+        
+        // Excluded apps stay out of Smart Switch entirely. Keys pass through them
+        // untouched, so their E/V state must be neither restored nor recorded —
+        // otherwise the menu bar flips on activation and the state leaks to the
+        // next app that has no saved entry of its own.
+        if handler.isAppExcluded(bundleIdentifier: bundleId) {
+            debugWindowController?.logEvent("Smart Switch: Skipped (app '\(bundleId)' excluded)")
+            return
+        }
         
         // Get current language from UI (StatusBar) - this is the source of truth
         let currentLanguage = statusBarManager?.viewModel.isVietnameseEnabled == true ? 1 : 0
@@ -1572,6 +1587,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 manager.resume()
             } catch {
                 debugWindowController?.logEvent("Failed to start event tap: \(error)")
+            }
+
+            // An excluded app is frontmost: XKey does not manage its E/V state, so this
+            // notification must neither read the app's Smart Switch entry nor turn
+            // Vietnamese on for it. The tap keeps running — exclusion is decided per
+            // keystroke — and the next switch to a non-excluded app restores normally.
+            if let handler = self.keyboardHandler,
+               let frontmostBundle = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+               handler.isAppExcluded(bundleIdentifier: frontmostBundle) {
+                smartSwitchHandledBundleId = nil
+                debugWindowController?.logEvent("'\(source.displayName)' → Skipped (app '\(frontmostBundle)' excluded)")
+                return
             }
 
             // Determine effective engine state, considering Smart Switch per-app data.

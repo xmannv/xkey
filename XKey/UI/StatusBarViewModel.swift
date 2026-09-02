@@ -146,6 +146,13 @@ class StatusBarViewModel: ObservableObject {
 
         guard let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return }
 
+        // Excluded apps do not participate in Smart Switch: a toggle made while one is
+        // frontmost must not be recorded as that app's language (see handleSmartSwitch).
+        guard !handler.isAppExcluded(bundleIdentifier: bundleId) else {
+            log("Smart Switch: Skipped save, app '\(bundleId)' excluded")
+            return
+        }
+
         let language = isVietnameseEnabled ? 1 : 0
         handler.engine.saveAppLanguage(bundleId: bundleId, language: language)
         log("📝 Smart Switch: Saved '\(bundleId)' → \(isVietnameseEnabled ? "Vietnamese" : "English")")
