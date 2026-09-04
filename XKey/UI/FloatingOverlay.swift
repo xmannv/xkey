@@ -10,6 +10,28 @@
 import Cocoa
 import SwiftUI
 
+enum SecureInputWarningStyle {
+    static let iconName = "exclamationmark.triangle.fill"
+    static let layoutSpacing: CGFloat = 8
+    static let textSpacing: CGFloat = 2
+    static let iconSize: CGFloat = 13
+    static let titleSize: CGFloat = 12
+    static let subtitleSize: CGFloat = 10
+    static let horizontalPadding: CGFloat = 14
+    static let verticalPadding: CGFloat = 10
+    static let cornerRadius: CGFloat = 10
+    static let borderWidth: CGFloat = 1
+    static let borderOpacity = 0.4
+    static let backgroundOpacity = 0.9
+    static let subtitleOpacity = 0.7
+    static let fadeDuration: TimeInterval = 0.25
+}
+
+final class PassiveOverlayPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
 // MARK: - Overlay Position
 
 /// Where the overlay should appear on screen
@@ -84,19 +106,9 @@ class FloatingOverlay {
             let contentSize = hostingView.fittingSize
             let windowOrigin = self.calculateOrigin(for: position, contentSize: contentSize)
             
-            let newWindow = NSWindow(
-                contentRect: NSRect(origin: windowOrigin, size: contentSize),
-                styleMask: [.borderless],
-                backing: .buffered,
-                defer: false
+            let newWindow = Self.makePanel(
+                contentRect: NSRect(origin: windowOrigin, size: contentSize)
             )
-            
-            newWindow.isOpaque = false
-            newWindow.backgroundColor = .clear
-            newWindow.hasShadow = true
-            newWindow.level = .floating
-            newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary]
-            newWindow.ignoresMouseEvents = true
             newWindow.contentView = hostingView
             
             if animated {
@@ -109,7 +121,7 @@ class FloatingOverlay {
             // Fade in
             if animated {
                 NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.25
+                    context.duration = SecureInputWarningStyle.fadeDuration
                     newWindow.animator().alphaValue = 1
                 }
             }
@@ -147,7 +159,7 @@ class FloatingOverlay {
             
             if animated {
                 NSAnimationContext.runAnimationGroup({ context in
-                    context.duration = 0.25
+                    context.duration = SecureInputWarningStyle.fadeDuration
                     windowToDismiss.animator().alphaValue = 0
                 }, completionHandler: {
                     windowToDismiss.orderOut(nil)
@@ -227,6 +239,26 @@ class FloatingOverlay {
             DispatchQueue.main.async(execute: block)
         }
     }
+
+    static func makePanel(contentRect: NSRect) -> NSPanel {
+        let panel = PassiveOverlayPanel(
+            contentRect: contentRect,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        panel.ignoresMouseEvents = true
+        panel.hidesOnDeactivate = false
+        // This passive status toast must never steal VoiceOver focus. The same warning
+        // remains available through XKey's status/debug UI.
+        panel.setAccessibilityElement(false)
+        return panel
+    }
 }
 
 // MARK: - Shared SwiftUI Overlay Views
@@ -288,30 +320,31 @@ struct OverlayWarningView: View {
     let subtitle: String
     
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .semibold))
+        HStack(spacing: SecureInputWarningStyle.layoutSpacing) {
+            Image(systemName: SecureInputWarningStyle.iconName)
+                .font(.system(size: SecureInputWarningStyle.iconSize, weight: .semibold))
                 .foregroundColor(.orange)
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SecureInputWarningStyle.textSpacing) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: SecureInputWarningStyle.titleSize, weight: .semibold))
                     .foregroundColor(.white)
                 
                 Text(subtitle)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(.system(size: SecureInputWarningStyle.subtitleSize, weight: .regular))
+                    .foregroundColor(.white.opacity(SecureInputWarningStyle.subtitleOpacity))
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, SecureInputWarningStyle.horizontalPadding)
+        .padding(.vertical, SecureInputWarningStyle.verticalPadding)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.black.opacity(0.9))
+            RoundedRectangle(cornerRadius: SecureInputWarningStyle.cornerRadius)
+                .fill(Color.black.opacity(SecureInputWarningStyle.backgroundOpacity))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.orange.opacity(0.4), lineWidth: 1)
+            RoundedRectangle(cornerRadius: SecureInputWarningStyle.cornerRadius)
+                .stroke(Color.orange.opacity(SecureInputWarningStyle.borderOpacity),
+                        lineWidth: SecureInputWarningStyle.borderWidth)
         )
         .fixedSize()
     }

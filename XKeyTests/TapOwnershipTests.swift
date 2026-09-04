@@ -26,6 +26,424 @@ extension XCTestCase {
     }
 }
 
+final class InputOwnershipHandoffCoordinatorTests: XCTestCase {
+    func testMainPublishesAckOnlyAfterReleaseDrainCompletes() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let checker = FakeInputOwnershipProcessChecker(states: [10: .matching, 20: .matching])
+        let coordinator = InputOwnershipHandoffCoordinator(store: store, processChecker: checker)
+        let request = coordinator.beginRequest(requesterPID: 20)
+        store.events.removeAll()
+
+        XCTAssertTrue(coordinator.acknowledgePendingRequest {
+            store.events.append("release")
+        })
+
+        XCTAssertEqual(store.events, ["release", "ack"])
+        XCTAssertEqual(store.snapshot.acknowledgedGeneration, request.generation)
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: false) {
+            store.armCount += 1
+        }, .startAfterAcknowledgement)
+        XCTAssertEqual(store.armCount, 1)
+    }
+
+    func testClaimDoesNotStartBeforeMatchingAcknowledgement() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [10: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: false) {
+            store.armCount += 1
+        }, .wait)
+        XCTAssertEqual(store.armCount, 0)
+    }
+
+    func testStaleMainPIDAllowsSafeRecoveryWithoutAck() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [10: .absent])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: false) {
+            store.armCount += 1
+        }, .startWithoutMain)
+        XCTAssertEqual(store.armCount, 1)
+    }
+
+    func testTimeoutAndLateAckRemainFailSafe() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [10: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: false) {
+            store.armCount += 1
+        }, .wait)
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: true) {
+            store.armCount += 1
+        }, .failSafe)
+        XCTAssertTrue(coordinator.cancelRequest(request))
+        XCTAssertFalse(store.acknowledgeInputOwnershipHandoff(request))
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: true) {
+            store.armCount += 1
+        }, .failSafe)
+        XCTAssertEqual(store.armCount, 0)
+    }
+
+    func testDeactivateBeforeAckCancelsOnlyItsMatchingRequest() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [10: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertTrue(coordinator.cancelRequest(request))
+        XCTAssertEqual(store.snapshot.requesterPID, 0)
+        XCTAssertFalse(coordinator.acknowledgePendingRequest {})
+        XCTAssertEqual(coordinator.claimDecision(for: request, timedOut: false), .failSafe)
+    }
+
+    func testCancelAndAcknowledgeRaceHasOneAtomicWinner() {
+        let cancelledStore = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let cancelledCoordinator = InputOwnershipHandoffCoordinator(
+            store: cancelledStore,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        let cancelledRequest = cancelledCoordinator.beginRequest(requesterPID: 20)
+        XCTAssertTrue(cancelledCoordinator.cancelRequest(cancelledRequest))
+        XCTAssertFalse(cancelledStore.acknowledgeInputOwnershipHandoff(cancelledRequest))
+
+        let acknowledgedStore = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let acknowledgedCoordinator = InputOwnershipHandoffCoordinator(
+            store: acknowledgedStore,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        let acknowledgedRequest = acknowledgedCoordinator.beginRequest(requesterPID: 20)
+        XCTAssertTrue(acknowledgedStore.acknowledgeInputOwnershipHandoff(acknowledgedRequest))
+        XCTAssertFalse(acknowledgedCoordinator.cancelRequest(acknowledgedRequest))
+    }
+
+    func testMainDefersUnknownSourceUntilStaleRequestCancelsAndSourceResolvesOther() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.mainHostDecision(source: .unknown), .retry)
+        XCTAssertTrue(coordinator.cancelRequest(request))
+        XCTAssertEqual(coordinator.mainHostDecision(source: .unknown), .retry)
+        XCTAssertEqual(coordinator.mainHostDecision(source: .other), .startMain)
+    }
+
+    func testActiveRequestWithTransientUnknownSourceAcknowledgesOnlyAfterXKeyIMSelected() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.mainHostDecision(source: .unknown), .retry)
+        XCTAssertEqual(coordinator.mainHostDecision(source: .other), .retry)
+        XCTAssertEqual(coordinator.mainHostDecision(source: .xkeyIM), .acknowledge)
+        XCTAssertTrue(coordinator.acknowledgePendingRequest {})
+        XCTAssertEqual(store.snapshot.acknowledgedGeneration, request.generation)
+    }
+
+    func testPermissionGrantWhileXKeyIMSelectedDefersMainWithoutARequest() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [:])
+        )
+
+        XCTAssertEqual(coordinator.mainHostDecision(source: .xkeyIM), .deferMain)
+    }
+
+    func testLateMainAckPreservesOwnershipAlreadyArmedByRequester() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        store.tapArmed = true
+        store.tapPID = 20
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        _ = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertTrue(coordinator.acknowledgePendingRequest {})
+        XCTAssertTrue(store.tapArmed)
+        XCTAssertEqual(store.tapPID, 20)
+    }
+
+    func testMainDefersAllStartPathsWhilePhysicalXKeyIMOwnerIsStillLive() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        store.tapArmed = true
+        store.tapPID = 20
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+
+        XCTAssertEqual(coordinator.mainHostDecision(source: .other), .deferMain)
+    }
+
+    func testRequestBeforeManagerReadyIsAcknowledgedAfterRegistrationAndDrain() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 0)
+        let checker = FakeInputOwnershipProcessChecker(states: [20: .matching])
+        let coordinator = InputOwnershipHandoffCoordinator(store: store, processChecker: checker)
+        let lifecycle = MainInputOwnershipLifecycle(store: store)
+        let request = coordinator.beginRequest(requesterPID: 20)
+        store.events.removeAll()
+
+        lifecycle.managerBecameReady(pid: 10)
+        XCTAssertEqual(coordinator.mainHostDecision(source: .unknown), .retry)
+        XCTAssertEqual(coordinator.mainHostDecision(source: .xkeyIM), .acknowledge)
+        XCTAssertTrue(coordinator.acknowledgePendingRequest { store.events.append("drain") })
+
+        XCTAssertEqual(store.events, ["register", "drain", "ack"])
+        XCTAssertEqual(store.snapshot.acknowledgedGeneration, request.generation)
+    }
+
+    func testTerminationDrainsAndStopsBeforeUnregisteringMainProcess() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let lifecycle = MainInputOwnershipLifecycle(store: store)
+
+        lifecycle.terminate(pid: 10, suspendAndDrain: {
+            store.events.append("drain")
+        }, stop: {
+            store.events.append("stop")
+        })
+
+        XCTAssertEqual(store.events, ["drain", "stop", "unregister"])
+        XCTAssertEqual(store.snapshot.mainPID, 0)
+    }
+
+    func testMainSettingsChangeTrackerIgnoresUnrelatedSettingsNotification() {
+        var tracker = MainSettingsChangeTracker(vietnameseEnabled: true,
+                                                xkeyIMOwnsInput: false)
+
+        XCTAssertEqual(
+            tracker.update(vietnameseEnabled: true, xkeyIMOwnsInput: false),
+            .none
+        )
+    }
+
+    func testMainSettingsChangeTrackerAppliesChangedVietnameseSetting() {
+        var tracker = MainSettingsChangeTracker(vietnameseEnabled: true,
+                                                xkeyIMOwnsInput: false)
+
+        XCTAssertEqual(
+            tracker.update(vietnameseEnabled: false, xkeyIMOwnsInput: false),
+            .applyVietnamese(false)
+        )
+    }
+
+    func testMainSettingsChangeTrackerRestoresOnlyAfterXKeyIMReleasesOwnership() {
+        var tracker = MainSettingsChangeTracker(vietnameseEnabled: true,
+                                                xkeyIMOwnsInput: false)
+
+        XCTAssertEqual(
+            tracker.update(vietnameseEnabled: true, xkeyIMOwnsInput: true),
+            .deferToXKeyIM
+        )
+        XCTAssertEqual(
+            tracker.update(vietnameseEnabled: false, xkeyIMOwnsInput: true),
+            .none
+        )
+        XCTAssertEqual(
+            tracker.update(vietnameseEnabled: false, xkeyIMOwnsInput: false),
+            .restoreAfterXKeyIM
+        )
+    }
+
+    func testMainSettingsChangeTrackerDefersColdStartWithExistingXKeyIMOwner() {
+        let tracker = MainSettingsChangeTracker(vietnameseEnabled: true,
+                                                xkeyIMOwnsInput: true)
+
+        XCTAssertEqual(tracker.currentAction, .deferToXKeyIM)
+    }
+
+    func testSettingsExportFilterRemovesEveryTransientOwnershipKey() {
+        let durableKey = SharedSettingsKey.inputMethod.rawValue
+        var settings: [String: Any] = [
+            durableKey: InputMethod.telex.rawValue,
+            SharedSettingsKey.xkeyIMTapArmed.rawValue: true,
+            SharedSettingsKey.xkeyIMTapPID.rawValue: 20,
+            SharedSettingsKey.xkeyMainPID.rawValue: 10,
+            SharedSettingsKey.inputHandoffRequestGeneration.rawValue: 4,
+            SharedSettingsKey.inputHandoffRequesterPID.rawValue: 20,
+            SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue: 3,
+        ]
+
+        SharedSettings.removeTransientOwnershipState(from: &settings)
+
+        XCTAssertEqual(settings.count, 1)
+        XCTAssertEqual(settings[durableKey] as? Int, InputMethod.telex.rawValue)
+    }
+
+    func testFailedRequestPersistenceCannotBeMistakenForGenerationZeroAck() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        store.failBegin = true
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [10: .matching])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertEqual(coordinator.performClaim(for: request, timedOut: false) {
+            store.armCount += 1
+        }, .failSafe)
+        XCTAssertEqual(store.armCount, 0)
+    }
+
+    func testStaleRequesterIsNotAcknowledgedOrReleased() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let checker = FakeInputOwnershipProcessChecker(states: [20: .absent])
+        let coordinator = InputOwnershipHandoffCoordinator(store: store, processChecker: checker)
+        _ = coordinator.beginRequest(requesterPID: 20)
+        var released = false
+
+        XCTAssertFalse(coordinator.acknowledgePendingRequest { released = true })
+        XCTAssertFalse(released)
+        XCTAssertEqual(store.snapshot.acknowledgedGeneration, 0)
+    }
+
+    func testLiveRequesterWithUnavailableBundleIdentityCanStillBeAcknowledged() {
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .unknown])
+        )
+        let request = coordinator.beginRequest(requesterPID: 20)
+
+        XCTAssertTrue(coordinator.acknowledgePendingRequest {})
+        XCTAssertEqual(store.snapshot.acknowledgedGeneration, request.generation)
+    }
+}
+
+final class RemoteDesktopTargetLifecycleTests: XCTestCase {
+    func testTopologyRestartOccursExactlyOncePerChangedMode() {
+        let lifecycle = RemoteDesktopTargetLifecycle()
+        var restartedModes: [Bool] = []
+
+        lifecycle.apply(false) { restartedModes.append($0) }
+        lifecycle.apply(false) { restartedModes.append($0) }
+        lifecycle.apply(true) { restartedModes.append($0) }
+        lifecycle.apply(true) { restartedModes.append($0) }
+        lifecycle.apply(false) { restartedModes.append($0) }
+        lifecycle.apply(false) { restartedModes.append($0) }
+
+        XCTAssertEqual(restartedModes, [true, false])
+    }
+
+    func testChangedModeStillPassesThroughOwnershipGateWhileXKeyIMOwnsInput() {
+        let lifecycle = RemoteDesktopTargetLifecycle()
+        let store = FakeInputOwnershipHandoffStore(mainPID: 10)
+        store.tapArmed = true
+        store.tapPID = 20
+        let coordinator = InputOwnershipHandoffCoordinator(
+            store: store,
+            processChecker: FakeInputOwnershipProcessChecker(states: [20: .matching])
+        )
+        var decisions: [MainInputOwnershipDecision] = []
+
+        lifecycle.apply(false) { _ in XCTFail("Initial mode must only seed lifecycle") }
+        lifecycle.apply(true) { _ in
+            decisions.append(coordinator.mainHostDecision(source: .other))
+        }
+
+        XCTAssertEqual(decisions, [.deferMain])
+    }
+}
+
+private final class FakeInputOwnershipHandoffStore: InputOwnershipHandoffStore {
+    private(set) var requestGeneration = 0
+    private(set) var requesterPID = 0
+    var acknowledgedGeneration = 0
+    var mainPID: Int
+    var events: [String] = []
+    var armCount = 0
+    var failBegin = false
+    var tapArmed = false
+    var tapPID = 0
+
+    init(mainPID: Int) {
+        self.mainPID = mainPID
+    }
+
+    var snapshot: InputOwnershipHandoffSnapshot {
+        InputOwnershipHandoffSnapshot(
+            requestGeneration: requestGeneration,
+            requesterPID: requesterPID,
+            acknowledgedGeneration: acknowledgedGeneration,
+            mainPID: mainPID,
+            xkeyIMTapArmed: tapArmed,
+            xkeyIMTapPID: tapPID
+        )
+    }
+
+    func beginInputOwnershipHandoff(requesterPID: Int) -> InputOwnershipHandoffRequest {
+        guard !failBegin else {
+            return InputOwnershipHandoffRequest(generation: 0, requesterPID: requesterPID)
+        }
+        requestGeneration = max(requestGeneration, acknowledgedGeneration) + 1
+        self.requesterPID = requesterPID
+        return InputOwnershipHandoffRequest(generation: requestGeneration,
+                                            requesterPID: requesterPID)
+    }
+
+    func acknowledgeInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool {
+        guard requestGeneration == request.generation,
+              requesterPID == request.requesterPID,
+              request.requesterPID > 0,
+              acknowledgedGeneration < request.generation else { return false }
+        events.append("ack")
+        if tapPID != request.requesterPID {
+            tapArmed = false
+            tapPID = 0
+        }
+        acknowledgedGeneration = request.generation
+        return true
+    }
+
+    func cancelInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool {
+        guard requestGeneration == request.generation,
+              requesterPID == request.requesterPID,
+              acknowledgedGeneration < request.generation else { return false }
+        events.append("cancel")
+        requesterPID = 0
+        return true
+    }
+
+    func registerXKeyMainProcess(pid: Int) {
+        events.append("register")
+        mainPID = pid
+    }
+
+    func unregisterXKeyMainProcess(pid: Int) {
+        guard mainPID == pid else { return }
+        events.append("unregister")
+        mainPID = 0
+    }
+}
+
+private struct FakeInputOwnershipProcessChecker: InputOwnershipProcessChecking {
+    let states: [Int: InputOwnershipProcessState]
+
+    func state(of pid: Int, expectedBundleIdentifier: String) -> InputOwnershipProcessState {
+        states[pid] ?? .unknown
+    }
+}
+
 final class TapOwnershipTests: XCTestCase {
 
     override func setUpWithError() throws {
@@ -40,16 +458,22 @@ final class TapOwnershipTests: XCTestCase {
     /// on a second run.
     private var originalVietnameseEnabledValue: Any?
     private var originalVietnameseEnabledKeyWasPresent = false
+    private var originalHandoffValues: [String: Any] = [:]
 
     override func setUp() {
         super.setUp()
         let (value, present) = Self.readRawVietnameseEnabled()
         originalVietnameseEnabledValue = value
         originalVietnameseEnabledKeyWasPresent = present
+        let dict = Self.readPlistDict()
+        originalHandoffValues = Dictionary(uniqueKeysWithValues: Self.handoffKeys.compactMap { key in
+            dict[key].map { (key, $0) }
+        })
     }
 
     override func tearDown() {
         SharedSettings.shared.disarmXKeyIMTap()
+        Self.restoreHandoffValues(originalHandoffValues)
         Self.restoreRawVietnameseEnabled(originalVietnameseEnabledValue,
                                           present: originalVietnameseEnabledKeyWasPresent)
         Self.deleteKey(Self.otherProcessProbeKey)
@@ -511,6 +935,8 @@ final class TapOwnershipTests: XCTestCase {
     /// yield the keyboard to whatever local process happens to hold that PID.
     func testTapOwnershipKeysAreNotSyncedAcrossMachines() throws {
         SharedSettings.shared.armXKeyIMTap(pid: Int(getpid()))
+        SharedSettings.shared.registerXKeyMainProcess(pid: Int(getpid()))
+        _ = SharedSettings.shared.beginInputOwnershipHandoff(requesterPID: Int(getpid()))
 
         let data = try XCTUnwrap(SharedSettings.shared.exportScalarsForSync())
         let exported = try XCTUnwrap(
@@ -520,6 +946,28 @@ final class TapOwnershipTests: XCTestCase {
                      "the tap-ownership flag is device-specific and must not leave this machine")
         XCTAssertNil(exported[SharedSettingsKey.xkeyIMTapPID.rawValue],
                      "a PID from another machine is meaningless here and dangerous to act on")
+        XCTAssertNil(exported[SharedSettingsKey.xkeyMainPID.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffRequestGeneration.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffRequesterPID.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue])
+    }
+
+    func testSettingsBackupExcludesTransientOwnershipAndHandoffState() throws {
+        SharedSettings.shared.armXKeyIMTap(pid: Int(getpid()))
+        SharedSettings.shared.registerXKeyMainProcess(pid: Int(getpid()))
+        _ = SharedSettings.shared.beginInputOwnershipHandoff(requesterPID: Int(getpid()))
+
+        let data = try XCTUnwrap(SharedSettings.shared.exportSettings())
+        let exported = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+
+        XCTAssertNil(exported[SharedSettingsKey.xkeyIMTapArmed.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.xkeyIMTapPID.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.xkeyMainPID.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffRequestGeneration.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffRequesterPID.rawValue])
+        XCTAssertNil(exported[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue])
+        XCTAssertNotNil(exported["_exportVersion"])
     }
 
     /// Vietnamese on/off is momentary device state — bound to a hotkey and to each
@@ -577,6 +1025,12 @@ final class TapOwnershipTests: XCTestCase {
     /// key of our own is removed in tearDown() instead of overwriting a real setting.
     private static let otherProcessProbeKey = "XKey.test.otherProcessProbe"
     private static let otherProcessProbeValue = "written-by-the-other-process"
+    private static let handoffKeys = [
+        SharedSettingsKey.xkeyMainPID.rawValue,
+        SharedSettingsKey.inputHandoffRequestGeneration.rawValue,
+        SharedSettingsKey.inputHandoffRequesterPID.rawValue,
+        SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue,
+    ]
 
     /// Write one key straight to the shared file, bypassing SharedSettings entirely —
     /// this is what a write from the other process looks like from in here: the bytes
@@ -590,6 +1044,13 @@ final class TapOwnershipTests: XCTestCase {
     private static func deleteKey(_ key: String) {
         var dict = readPlistDict()
         dict.removeValue(forKey: key)
+        writePlistDict(dict)
+    }
+
+    private static func restoreHandoffValues(_ values: [String: Any]) {
+        var dict = readPlistDict()
+        handoffKeys.forEach { dict.removeValue(forKey: $0) }
+        values.forEach { dict[$0.key] = $0.value }
         writePlistDict(dict)
     }
 

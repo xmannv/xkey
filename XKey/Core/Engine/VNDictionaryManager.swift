@@ -1,9 +1,19 @@
 import Foundation
 
+struct DictionaryFileSignature: Equatable {
+    let modificationTime: TimeInterval
+    let fileSize: UInt64
+    let fileIdentifier: UInt64?
+}
+
 /// Manager for Vietnamese dictionary files for spell checking
 /// Stores dictionaries in App Group container for sharing between XKey and XKeyIM
-class VNDictionaryManager {
+class VNDictionaryManager: DictionaryLoading {
     static let shared = VNDictionaryManager()
+
+    typealias AvailabilityProvider = (URL) -> Bool
+    typealias SignatureProvider = (URL) throws -> DictionaryFileSignature?
+    typealias ContentReader = (URL) throws -> String
 
     // Dictionary URLs from hunspell-vi repository
     private let dictionaryURLs = [
@@ -13,13 +23,22 @@ class VNDictionaryManager {
 
     // In-memory dictionary cache
     private var wordSets: [String: Set<String>] = [:]
-    private var isLoading = false
+    private var loadedSignatures: [String: DictionaryFileSignature] = [:]
+    private let cacheLock = NSLock()
+    private let dictionaryDirectoryOverride: URL?
+    private let availabilityProvider: AvailabilityProvider
+    private let signatureProvider: SignatureProvider
+    private let contentReader: ContentReader
 
     // App Group identifier (same as SharedSettings)
     private let appGroupIdentifier = "7E6Z9B4F2H.com.codetay.inputmethod.XKey"
 
     // Local storage path in App Group (shared between XKey and XKeyIM)
     private var dictionaryDirectory: URL {
+        if let dictionaryDirectoryOverride {
+            return dictionaryDirectoryOverride
+        }
+
         // Use the same App Group as SharedSettings for cross-app dictionary sharing
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
             // Fallback to Application Support if App Group is not available
@@ -34,7 +53,15 @@ class VNDictionaryManager {
         return dictDir
     }
 
-    private init() {}
+    init(dictionaryDirectory: URL? = nil,
+         availabilityProvider: @escaping AvailabilityProvider = { FileManager.default.fileExists(atPath: $0.path) },
+         signatureProvider: @escaping SignatureProvider = VNDictionaryManager.fileSignature,
+         contentReader: @escaping ContentReader = VNDictionaryManager.readDictionary) {
+        dictionaryDirectoryOverride = dictionaryDirectory
+        self.availabilityProvider = availabilityProvider
+        self.signatureProvider = signatureProvider
+        self.contentReader = contentReader
+    }
 
     // MARK: - Public API
 
@@ -49,7 +76,10 @@ class VNDictionaryManager {
         }
         
         // Then check hunspell dictionary
-        guard let wordSet = wordSets[style.rawValue] else {
+        cacheLock.lock()
+        let wordSet = wordSets[style.rawValue]
+        cacheLock.unlock()
+        guard let wordSet else {
             return false // Dictionary not loaded
         }
 
@@ -59,12 +89,18 @@ class VNDictionaryManager {
     /// Check if dictionaries are available locally
     func isDictionaryAvailable(style: DictionaryStyle = .dauMoi) -> Bool {
         let localPath = dictionaryDirectory.appendingPathComponent("vi-\(style.rawValue).dic")
-        return FileManager.default.fileExists(atPath: localPath.path)
+        return availabilityProvider(localPath)
     }
 
     /// Check if dictionary is loaded in memory
     func isDictionaryLoaded(style: DictionaryStyle = .dauMoi) -> Bool {
-        return wordSets[style.rawValue] != nil
+        let localPath = dictionaryDirectory.appendingPathComponent("vi-\(style.rawValue).dic")
+        guard let currentSignature = try? signatureProvider(localPath) else { return false }
+
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        let key = style.rawValue
+        return wordSets[key] != nil && loadedSignatures[key] == currentSignature
     }
 
     /// Get the directory where dictionaries are stored
@@ -118,7 +154,7 @@ class VNDictionaryManager {
             DebugLogger.shared.log("[VNDict] Saving to: \(localPath.path)")
 
             do {
-                try data.write(to: localPath)
+                try data.write(to: localPath, options: .atomic)
                 // Verify file was written
                 let exists = FileManager.default.fileExists(atPath: localPath.path)
                 DebugLogger.shared.log("[VNDict] File saved, exists: \(exists)")
@@ -136,39 +172,61 @@ class VNDictionaryManager {
         let localPath = dictionaryDirectory.appendingPathComponent("vi-\(style.rawValue).dic")
         DebugLogger.shared.log("[VNDict] Loading from: \(localPath.path)")
 
-        guard FileManager.default.fileExists(atPath: localPath.path) else {
-            DebugLogger.shared.log("[VNDict] File not found at: \(localPath.path)")
-            throw DictionaryError.fileNotFound
+        for _ in 0..<3 {
+            guard let signatureBeforeRead = try signatureProvider(localPath) else {
+                DebugLogger.shared.log("[VNDict] File not found at: \(localPath.path)")
+                throw DictionaryError.fileNotFound
+            }
+            let words = parseDictionary(content: try contentReader(localPath))
+            guard let signatureAfterRead = try signatureProvider(localPath),
+                  signatureBeforeRead == signatureAfterRead else {
+                continue
+            }
+
+            guard try signatureProvider(localPath) == signatureAfterRead else {
+                continue
+            }
+
+            cacheLock.lock()
+            wordSets[style.rawValue] = words
+            loadedSignatures[style.rawValue] = signatureAfterRead
+            cacheLock.unlock()
+
+            DebugLogger.shared.log("Loaded \(words.count) words from \(style.rawValue) dictionary")
+            return
         }
 
-        let content = try String(contentsOf: localPath, encoding: .utf8)
-        let lines = content.components(separatedBy: .newlines)
-
-        // First line is word count, skip it
-        var words = Set<String>()
-        for (index, line) in lines.enumerated() {
-            guard index > 0, !line.isEmpty else { continue }
-
-            // Some entries may have flags (e.g., "word/flags"), we only need the word part
-            let word = line.components(separatedBy: "/").first ?? line
-            words.insert(word.lowercased().trimmingCharacters(in: .whitespaces))
-        }
-
-        wordSets[style.rawValue] = words
-        DebugLogger.shared.log("Loaded \(words.count) words from \(style.rawValue) dictionary")
+        throw DictionaryError.fileChangedDuringLoad
     }
 
     /// Download and load dictionary in one go
     func downloadAndLoad(style: DictionaryStyle = .dauMoi, completion: @escaping (Result<Void, Error>) -> Void) {
         downloadDictionary(style: style) { [weak self] result in
+            guard let self else { return }
             switch result {
             case .success:
-                do {
-                    try self?.loadDictionary(style: style)
-                    completion(.success(()))
-                } catch {
-                    completion(.failure(error))
+                let preferences = SharedSettings.shared.loadPreferences()
+                let selectedStyle: DictionaryStyle = preferences.modernStyle ? .dauMoi : .dauCu
+                if Self.shouldLoadDownloadedDictionary(
+                    style: style,
+                    spellCheckEnabled: preferences.spellCheckEnabled,
+                    selectedStyle: selectedStyle
+                ) {
+                    let refreshResult = DictionaryRuntime.shared.refresh(enabled: true, style: style)
+                    guard self.isDictionaryLoaded(style: style) else {
+                        completion(.failure(DictionaryError.loadFailed(
+                            refreshResult.diagnostic ?? "Current dictionary file was not loaded"
+                        )))
+                        return
+                    }
                 }
+                DistributedNotificationCenter.default().postNotificationName(
+                    .xkeySettingsDidChange,
+                    object: nil,
+                    userInfo: nil,
+                    deliverImmediately: true
+                )
+                completion(.success(()))
             case .failure(let error):
                 completion(.failure(error))
             }
@@ -177,33 +235,22 @@ class VNDictionaryManager {
 
     /// Load dictionary if available locally, otherwise do nothing
     func loadIfAvailable(style: DictionaryStyle = .dauMoi) {
-        guard isDictionaryAvailable(style: style), !isDictionaryLoaded(style: style) else {
-            return
-        }
-
-        try? loadDictionary(style: style)
+        _ = DictionaryRuntime.shared.refresh(enabled: true, style: style)
     }
 
     /// Get dictionary statistics
     func getDictionaryStats() -> [String: Int] {
-        var stats: [String: Int] = [:]
-        for (key, wordSet) in wordSets {
-            stats[key] = wordSet.count
-        }
-        return stats
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return wordSets.mapValues(\.count)
     }
     
     /// Estimate memory usage of loaded dictionaries in bytes
     /// Each Vietnamese word averages ~10 characters × 2 bytes (UTF-16) + Set overhead
     func getEstimatedMemoryUsage() -> Int {
-        var totalBytes = 0
-        for (_, wordSet) in wordSets {
-            // Estimate: average word length × 2 bytes (UTF-16) + 24 bytes overhead per word
-            let avgWordLength = 10
-            let bytesPerWord = avgWordLength * 2 + 24  // UTF-16 + String/Set overhead
-            totalBytes += wordSet.count * bytesPerWord
-        }
-        return totalBytes
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return estimatedMemoryUsage(for: wordSets)
     }
     
     /// Human-readable memory usage string
@@ -220,12 +267,15 @@ class VNDictionaryManager {
 
     /// Clear loaded dictionaries from memory
     func clearCache() {
-        if !wordSets.isEmpty {
-            let memoryBefore = getMemoryUsageString()
-            let wordCount = wordSets.values.reduce(0) { $0 + $1.count }
-            wordSets.removeAll()
-            DebugLogger.shared.log("[VNDict] Cleared dictionary cache: \(wordCount) words, freed ~\(memoryBefore)")
-        }
+        cacheLock.lock()
+        let wordCount = wordSets.values.reduce(0) { $0 + $1.count }
+        let memoryBefore = estimatedMemoryUsage(for: wordSets)
+        wordSets.removeAll()
+        loadedSignatures.removeAll()
+        cacheLock.unlock()
+
+        guard wordCount > 0 else { return }
+        DebugLogger.shared.log("[VNDict] Cleared dictionary cache: \(wordCount) words, freed ~\(formatMemoryUsage(memoryBefore))")
     }
 
     /// Delete local dictionary files
@@ -236,6 +286,61 @@ class VNDictionaryManager {
             try fileManager.removeItem(at: url)
         }
         clearCache()
+    }
+
+    private func parseDictionary(content: String) -> Set<String> {
+        var words = Set<String>()
+        for (index, line) in content.components(separatedBy: .newlines).enumerated() {
+            guard index > 0, !line.isEmpty else { continue }
+            let word = line.components(separatedBy: "/").first ?? line
+            words.insert(word.lowercased().trimmingCharacters(in: .whitespaces))
+        }
+        return words
+    }
+
+    private func estimatedMemoryUsage(for dictionaries: [String: Set<String>]) -> Int {
+        let avgWordLength = 10
+        let bytesPerWord = avgWordLength * 2 + 24
+        return dictionaries.values.reduce(0) { $0 + $1.count * bytesPerWord }
+    }
+
+    private func formatMemoryUsage(_ bytes: Int) -> String {
+        if bytes == 0 {
+            return "0 KB"
+        } else if bytes < 1024 * 1024 {
+            return String(format: "%.1f KB", Double(bytes) / 1024)
+        } else {
+            return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
+        }
+    }
+
+    nonisolated static func fileSignature(at url: URL) throws -> DictionaryFileSignature? {
+        let attributes: [FileAttributeKey: Any]
+        do {
+            attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        } catch {
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            throw error
+        }
+        guard let modificationDate = attributes[.modificationDate] as? Date,
+              let fileSize = attributes[.size] as? NSNumber else {
+            throw DictionaryError.fileAttributesUnavailable
+        }
+        return DictionaryFileSignature(
+            modificationTime: modificationDate.timeIntervalSinceReferenceDate,
+            fileSize: fileSize.uint64Value,
+            fileIdentifier: (attributes[.systemFileNumber] as? NSNumber)?.uint64Value
+        )
+    }
+
+    nonisolated static func readDictionary(at url: URL) throws -> String {
+        try String(contentsOf: url, encoding: .utf8)
+    }
+
+    static func shouldLoadDownloadedDictionary(style: DictionaryStyle,
+                                               spellCheckEnabled: Bool,
+                                               selectedStyle: DictionaryStyle) -> Bool {
+        spellCheckEnabled && style == selectedStyle
     }
 }
 
@@ -252,6 +357,9 @@ extension VNDictionaryManager {
         case noData
         case fileNotFound
         case parseError
+        case loadFailed(String)
+        case fileChangedDuringLoad
+        case fileAttributesUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -263,6 +371,12 @@ extension VNDictionaryManager {
                 return "Dictionary file not found locally"
             case .parseError:
                 return "Failed to parse dictionary file"
+            case .loadFailed(let message):
+                return message
+            case .fileChangedDuringLoad:
+                return "Dictionary file kept changing while loading"
+            case .fileAttributesUnavailable:
+                return "Dictionary file attributes are unavailable"
             }
         }
     }

@@ -28,6 +28,7 @@ final class KeystrokePerfTests: XCTestCase {
         var best = Double.infinity
         for _ in 0..<5 {
             let engine = VNEngine()
+            engine.spellCheckVerdictOverride = { _ in true }
             let n = 20_000
             let t0 = ContinuousClock.now
             for i in 0..<n {

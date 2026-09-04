@@ -9,6 +9,49 @@
 
 import Darwin
 
+enum SecureInputTransition: Equatable, Sendable {
+    case becameActive(SecureInputObservation)
+    case holderChanged(SecureInputObservation)
+    case becameInactive
+}
+
+struct SecureInputStateMachine {
+    private var state: SecureInputState
+    private var observation: SecureInputObservation
+
+    init(initialObservation: SecureInputObservation = .inactive) {
+        state = SecureInputState(pid: initialObservation.statePID, vietnamese: true)
+        observation = initialObservation
+    }
+
+    var isActive: Bool {
+        state.pid != 0
+    }
+
+    mutating func evaluate(_ observation: SecureInputObservation) -> SecureInputTransition? {
+        let previous = state
+        let previousObservation = self.observation
+        let next = SecureInputState(pid: observation.statePID, vietnamese: true)
+        let actions = secureInputActions(from: previous,
+                                         to: next,
+                                         appName: observation.holderAppName)
+        state = next
+        self.observation = observation
+        if actions.contains(.logReleased) {
+            return .becameInactive
+        }
+        if actions.contains(where: { if case .logHeld = $0 { return true }; return false }) {
+            return previous.pid == 0
+                ? .becameActive(observation)
+                : .holderChanged(observation)
+        }
+        if observation.isEnabled && observation != previousObservation {
+            return .holderChanged(observation)
+        }
+        return nil
+    }
+}
+
 /// Everything that decides whether a Secure Input warning is warranted.
 struct SecureInputState: Equatable {
     /// PID of the process holding Secure Input; 0 when Secure Input is off.

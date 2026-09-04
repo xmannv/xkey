@@ -40,6 +40,19 @@ class SmartSwitchManager {
     func setAppLanguage(bundleId: String, language: Int) {
         appLanguageMap[bundleId] = language
     }
+
+    /// Persist one entry by merging against the latest shared map, then adopt that
+    /// merged map locally so subsequent reads see writes from the other process.
+    func setAndSaveAppLanguage(bundleId: String, language: Int) {
+        guard let data = SharedSettings.shared.updateSmartSwitchLanguage(
+            bundleIdentifier: bundleId,
+            language: language
+        ), let map = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            setAppLanguage(bundleId: bundleId, language: language)
+            return
+        }
+        appLanguageMap = map
+    }
     
     /// Remove app from map
     func removeApp(bundleId: String) {

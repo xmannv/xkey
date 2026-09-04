@@ -17,8 +17,7 @@
 import Foundation
 
 struct TapEnvironment {
-    /// Everything KeyboardEventHandler.applyAllSettings needs: input method, code
-    /// table, macro, spell-check, custom consonants, excluded apps, undo.
+    /// Everything RuntimePreferences needs from persisted user settings.
     let preferences: Preferences
 
     /// Name of the visible overlay launcher (Spotlight/Raycast/Alfred), or nil.
@@ -65,38 +64,19 @@ extension TapEnvironment {
         // Bound every AX call the tap thread makes before anything can make one.
         AXHelper.setGlobalMessagingTimeout(Float(axMessagingTimeout))
 
+        let runtimePreferences = RuntimePreferences(
+            preferences: preferences,
+            vietnameseEnabled: vietnameseEnabled,
+            windowTitleRulesEnabled: windowTitleRulesEnabled,
+            remoteDesktopInjectMode: remoteDesktopInjectMode()
+        )
+
         let detector = AppBehaviorDetector.shared
         detector.overlayAppNameProvider = overlayAppName
         detector.remoteDesktopInjectModeProvider = remoteDesktopInjectMode
-        detector.windowTitleRulesEnabled = windowTitleRulesEnabled
+        detector.windowTitleRulesEnabled = runtimePreferences.windowTitleRulesEnabled
         detector.loadCustomRules()
 
-        handler.applyAllSettings(
-            inputMethod: preferences.inputMethod,
-            codeTable: preferences.codeTable,
-            modernStyle: preferences.modernStyle,
-            spellCheckEnabled: preferences.spellCheckEnabled,
-            quickTelexEnabled: preferences.quickTelexEnabled,
-            quickStartConsonantEnabled: preferences.quickStartConsonantEnabled,
-            quickEndConsonantEnabled: preferences.quickEndConsonantEnabled,
-            upperCaseFirstChar: preferences.upperCaseFirstChar,
-            capitalizeOnlyAfterSpace: preferences.capitalizeOnlyAfterSpace,
-            restoreIfWrongSpelling: preferences.restoreIfWrongSpelling,
-            skipRestoreForUppercaseVietnameseAbbreviations: preferences.skipRestoreForUppercaseVietnameseAbbreviations,
-            // Empty string (not the stored list) is how applyAllSettings/VietnameseData
-            // encode "custom consonants off" — there is no separate enabled flag on the
-            // call. Matches AppDelegate.applyPreferences; passing the raw string here
-            // would silently turn custom consonants on for users who disabled them.
-            customConsonants: preferences.customConsonantEnabled ? preferences.customConsonants : "",
-            macroEnabled: preferences.macroEnabled,
-            macroInEnglishMode: preferences.macroInEnglishMode,
-            autoCapsMacro: preferences.autoCapsMacro,
-            addSpaceAfterMacro: preferences.addSpaceAfterMacro,
-            yieldMacroToSystemReplacement: preferences.yieldMacroToSystemReplacement,
-            smartSwitchEnabled: preferences.smartSwitchEnabled,
-            excludedApps: preferences.excludedApps,
-            undoTypingEnabled: preferences.undoTypingEnabled
-        )
-        handler.setVietnamese(vietnameseEnabled)
+        handler.apply(runtimePreferences)
     }
 }

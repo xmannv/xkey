@@ -17,6 +17,22 @@
 import XCTest
 @testable import XKey
 
+private final class AXPassSecureInputDetector: SecureInputDetecting {
+    private(set) var readCount = 0
+
+    var observation: SecureInputObservation {
+        readCount += 1
+        return SecureInputObservation(isEnabled: true,
+                                      holderPID: 1,
+                                      holderAppName: "Test")
+    }
+}
+
+private final class AXPassSecureInputPresenter: SecureInputPresenting {
+    func show(appName: String) {}
+    func hide() {}
+}
+
 final class AXPassOffMainThreadTests: XCTestCase {
 
     override func setUpWithError() throws {
@@ -259,21 +275,28 @@ final class AXPassOffMainThreadTests: XCTestCase {
     ///
     /// What this pins is the property that makes them undroppable: they complete before
     /// the app-switch block returns, i.e. before the pass can even reach its main-thread
-    /// stage. The checkpoint is enqueued from onSmartSwitch, which the block calls on its
-    /// first line — before scheduleAXPass exists to hand anything to axPassQueue — so the
-    /// main queue runs it strictly ahead of anything that pass enqueues.
-    func testAppSwitchInstallsItsObserverAndChecksSecureInputBeforeTheAXPass() {
-        let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: { true })
-        var secureInputChecks = 0
-        source.onEvaluateSecureInput = { secureInputChecks += 1 }
+    /// stage. App policy now needs the title from that pass, while Secure Input evaluation
+    /// still happens before policy publication.
+    func testAppSwitchChecksSecureInputAndPublishesContextFromTheAXPass() {
+        let detector = AXPassSecureInputDetector()
+        let secureInputMonitor = SecureInputMonitor(
+            detector: detector,
+            capabilities: XKey.HostCapabilities(supported: []),
+            presenter: AXPassSecureInputPresenter(),
+            ownsPresentation: { false },
+            onTransition: { _ in }
+        )
+        let source = TapEventSource(handler: KeyboardEventHandler(),
+                                    isActiveHost: { true },
+                                    secureInputMonitor: secureInputMonitor)
 
         var checksWhenBlockReturned = -1
-        var methodConfirmedWhenBlockReturned = true
+        var publishedBundleIdentifier: String?
         let blockReturned = expectation(description: "the app-switch block returned")
-        source.onSmartSwitch = { _ in
+        source.onAppContext = { context in
             DispatchQueue.main.async {
-                checksWhenBlockReturned = secureInputChecks
-                methodConfirmedWhenBlockReturned = AppBehaviorDetector.shared.confirmedInjectionMethod != nil
+                checksWhenBlockReturned = detector.readCount
+                publishedBundleIdentifier = context.bundleIdentifier
                 blockReturned.fulfill()
             }
         }
@@ -291,10 +314,9 @@ final class AXPassOffMainThreadTests: XCTestCase {
 
         wait(for: [blockReturned], timeout: 5)
 
-        XCTAssertFalse(methodConfirmedWhenBlockReturned,
-                       "the checkpoint must land before the pass applies, or it proves nothing")
         XCTAssertEqual(checksWhenBlockReturned, 1,
-                       "Secure Input must be re-evaluated by the app-switch block itself — inside the pass it is lost every time the pass is dropped")
+                       "Secure Input must be re-evaluated before policy context is published")
+        XCTAssertEqual(publishedBundleIdentifier, NSRunningApplication.current.bundleIdentifier)
     }
 
     // MARK: - No AX on the tap thread
@@ -620,9 +642,8 @@ final class AXPassOffMainThreadTests: XCTestCase {
     /// clearInjectionMethodFallback() itself and so says nothing about whether anything in
     /// production does.
     ///
-    /// Read from onSmartSwitch, which the block reaches after both clears and before the
-    /// AX pass it schedules can refill anything — that pass hops to axPassQueue first, so
-    /// none of it can run while this callback is on the main thread.
+    /// Read from onAppContext after the app-switch pass. The result may already be the new
+    /// app's detected method, but it must never be the old fallback marker.
     func testTheAppSwitchBlockDropsTheInjectionMethodFallback() {
         let detector = AppBehaviorDetector.shared
         let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: { true })
@@ -634,7 +655,7 @@ final class AXPassOffMainThreadTests: XCTestCase {
 
         var answerAtSwitch: String?
         let switched = expectation(description: "the app-switch block reached Smart Switch")
-        source.onSmartSwitch = { _ in
+        source.onAppContext = { _ in
             answerAtSwitch = detector.getConfirmedInjectionMethod().description
             switched.fulfill()
         }
@@ -651,8 +672,8 @@ final class AXPassOffMainThreadTests: XCTestCase {
 
         wait(for: [switched], timeout: 5)
 
-        XCTAssertEqual(answerAtSwitch, InjectionMethodInfo.defaultFast.description,
-                       "the app the user just left must stop answering for the one they switched to — the block has to drop the fallback, not only the confirmed slot")
+        XCTAssertNotEqual(answerAtSwitch, marker.description,
+                          "the app the user just left must stop answering for the one they switched to")
     }
 
     /// One request per cleared-cache episode, not one per keystroke.

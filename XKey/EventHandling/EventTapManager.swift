@@ -7,7 +7,6 @@
 
 import Cocoa
 import Carbon
-import IOKit
 
 class EventTapManager {
 
@@ -46,55 +45,38 @@ class EventTapManager {
 
     weak var delegate: EventTapDelegate?
     var debugLogCallback: ((String) -> Void)?
+    var eventPermissionCheck: (() -> Bool)?
+    var onEventTapPermissionLost: (() -> Void)?
+    var onHostCommand: ((HostCommand, CGEvent, CGEventTapProxy) -> HostCommandResult)?
     
     // Toggle hotkey configuration
     var toggleHotkey: Hotkey?
-    var onToggleHotkey: (() -> Void)?
     
     // Toolbar hotkey configuration (for temp off toolbar)
     var toolbarHotkey: Hotkey?
-    var onToolbarHotkey: (() -> Void)?
 
     // Convert tool hotkey configuration
     var convertToolHotkey: Hotkey?
-    var onConvertToolHotkey: (() -> Void)?
 
     // Undo typing hotkey configuration
-    // Returns true if event should be consumed (undo was performed)
     var undoTypingHotkey: Hotkey?
-    var onUndoTypingHotkey: (() -> Bool)?
     
     // Translation hotkey configuration
     var translationHotkey: Hotkey?
-    var onTranslationHotkey: (() -> Void)?
     
     // Translate to source language hotkey configuration
     var translateToSourceHotkey: Hotkey?
-    var onTranslateToSourceHotkey: (() -> Void)?
     
     // Debug hotkey configuration
     var debugHotkey: Hotkey?
-    var onDebugHotkey: (() -> Void)?
     
     // Toggle exclusion rules hotkey configuration
     var toggleExclusionHotkey: Hotkey?
-    var onToggleExclusionHotkey: (() -> Void)?
     
     // Toggle window title rules hotkey configuration
     var toggleWindowRulesHotkey: Hotkey?
-    var onToggleWindowRulesHotkey: (() -> Void)?
     
-    // Modifier-only hotkey tracking (for toggle hotkey)
-    private var modifierOnlyState: ModifierOnlyState = ModifierOnlyState()
-    
-    // Modifier-only hotkey tracking (for undo typing hotkey)
-    private var undoModifierOnlyState: ModifierOnlyState = ModifierOnlyState()
-    
-    private struct ModifierOnlyState {
-        var currentModifiers: ModifierFlags = []
-        var targetModifiersReached: Bool = false  // True when all required modifiers were pressed
-        var hasTriggered: Bool = false
-    }
+    private var modifierOnlyCommandResolver = ModifierOnlyHostCommandResolver()
     
     // MARK: - Method Reprobe Chords
 
@@ -128,6 +110,17 @@ class EventTapManager {
         case accessibilityPermissionDenied
         case alreadyRunning
         case notRunning
+    }
+
+    enum DisabledTapRecoveryAction: Equatable {
+        case reenable
+        case stop
+    }
+
+    static func disabledTapRecoveryAction(
+        hasEventPermission: Bool
+    ) -> DisabledTapRecoveryAction {
+        hasEventPermission ? .reenable : .stop
     }
     
     // MARK: - Initialization
@@ -167,7 +160,7 @@ class EventTapManager {
         }
 
         // Check accessibility permission
-        guard checkAccessibilityPermission() else {
+        guard hasEventTapPermission() else {
             debugLogCallback?("No accessibility permission")
             throw EventTapError.accessibilityPermissionDenied
         }
@@ -337,6 +330,11 @@ class EventTapManager {
         debugLogCallback?("Event tap suspended (IMKit active)")
     }
 
+    func suspendAndDrainPendingInjection() {
+        suspend()
+        delegate?.waitForPendingInjection()
+    }
+
     /// Resume event tap (when leaving IMKit mode)
     func resume() {
         guard isEnabled else { return }
@@ -346,18 +344,93 @@ class EventTapManager {
     }
 
     // MARK: - Event Callback
+
+    private func routeHostCommand(_ command: HostCommand,
+                                  event: CGEvent,
+                                  proxy: CGEventTapProxy) -> HostCommandResult {
+        guard let onHostCommand else {
+            debugLogCallback?("Host command unavailable: \(command.rawValue)")
+            return .unavailable
+        }
+        return onHostCommand(command, event, proxy)
+    }
+
+    private func additionalHostCommand(for event: CGEvent) -> HostCommand? {
+        let eventModifiers = ModifierFlags(from: event.flags)
+        let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
+        let bindings: [(Hotkey?, HostCommand, Bool)] = [
+            (toolbarHotkey, .showToolbar, true),
+            (convertToolHotkey, .showConvertTool, true),
+            (translationHotkey, .showTranslation, false),
+            (translateToSourceHotkey, .translateToSource, false),
+            (debugHotkey, .showDebugWindow, false),
+            (toggleExclusionHotkey, .toggleExclusionRules, false),
+            (toggleWindowRulesHotkey, .toggleWindowTitleRules, false),
+            (undoTypingHotkey, .undoTyping, false),
+        ]
+        for (hotkey, command, requiresExactModifiers) in bindings {
+            guard let hotkey, !hotkey.isModifierOnly else { continue }
+            let modifiers = requiresExactModifiers ? eventModifiers : relevantModifiers
+            if event.keyCode == hotkey.keyCode, modifiers == hotkey.modifiers {
+                return command
+            }
+        }
+        return nil
+    }
+
+    private func modifierOnlyHostCommandBindings() -> [(hotkey: Hotkey, command: HostCommand)] {
+        var bindings: [(hotkey: Hotkey, command: HostCommand)] = []
+        if let toggleHotkey, toggleHotkey.isModifierOnly {
+            bindings.append((toggleHotkey, .toggleVietnamese))
+        }
+        if !isHotkeyRecording,
+           let undoTypingHotkey,
+           undoTypingHotkey.isModifierOnly {
+            bindings.append((undoTypingHotkey, .undoTyping))
+        }
+        return bindings
+    }
+
+    private func routeModifierOnlyHostCommand(
+        type: CGEventType,
+        event: CGEvent,
+        proxy: CGEventTapProxy
+    ) {
+        if type == .flagsChanged {
+            if let command = modifierOnlyCommandResolver.update(
+                modifiers: ModifierFlags(from: event.flags),
+                bindings: modifierOnlyHostCommandBindings()
+            ) {
+                _ = routeHostCommand(command, event: event, proxy: proxy)
+            }
+        } else if type == .keyDown {
+            modifierOnlyCommandResolver.cancel()
+        }
+    }
     
     private func eventCallback(
         proxy: CGEventTapProxy,
         type: CGEventType,
         event: CGEvent
     ) -> Unmanaged<CGEvent>? {
-        // Handle tap disabled event FIRST — unconditionally, regardless of session state.
-        // If the system auto-disables our tap (timeout/user input), we must re-enable it
-        // even when off-console, otherwise XKey will stop working when the user returns.
+        // Handle tap disabled events before session state. A timeout is recoverable, but
+        // a revoked permission must fail open: repeatedly re-enabling a no-longer-authorized
+        // tap can block physical input until this process exits.
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap = eventTap {
-                CGEvent.tapEnable(tap: tap, enable: true)
+            switch Self.disabledTapRecoveryAction(hasEventPermission: hasEventTapPermission()) {
+            case .reenable:
+                if let tap = eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+            case .stop:
+                if let tap = eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: false)
+                }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.stop()
+                    self.onEventTapPermissionLost?()
+                }
             }
             return Unmanaged.passUnretained(event)
         }
@@ -430,68 +503,16 @@ class EventTapManager {
         }
 
         debugLogCallback?("EventTapManager.eventCallback: type=\(type.rawValue), delegate=\(delegate != nil)")
+        routeModifierOnlyHostCommand(type: type, event: event, proxy: proxy)
 
         // Check for toggle hotkey FIRST (before delegate processing)
         // This ensures the hotkey is consumed and doesn't reach other apps
-        if let hotkey = toggleHotkey {
-            // Handle modifier-only hotkey (e.g., Ctrl+Shift)
-            if hotkey.isModifierOnly {
-                if type == .flagsChanged {
-                    let eventModifiers = ModifierFlags(from: event.flags)
-                    
-                    debugLogCallback?(" → flagsChanged: eventModifiers=\(eventModifiers.rawValue), hotkey.modifiers=\(hotkey.modifiers.rawValue)")
-                    
-                    // Check if all required modifiers are currently pressed
-                    // Use "contains" to allow for additional modifiers like CapsLock
-                    // Include .function for Fn key support
-                    let hasAllRequiredModifiers = hotkey.modifiers.isSubset(of: eventModifiers) &&
-                                                   eventModifiers.intersection([.control, .shift, .option, .command, .function]) == hotkey.modifiers
-                    
-                    if hasAllRequiredModifiers {
-                        // All required modifiers are pressed
-                        if !modifierOnlyState.targetModifiersReached {
-                            modifierOnlyState.targetModifiersReached = true
-                            modifierOnlyState.hasTriggered = false
-                            debugLogCallback?(" → Target modifiers REACHED: \(hotkey.displayString)")
-                        }
-                        modifierOnlyState.currentModifiers = eventModifiers
-                    } else {
-                        // Modifiers changed
-                        if modifierOnlyState.targetModifiersReached && !modifierOnlyState.hasTriggered {
-                            // Was holding target modifiers, now released - TRIGGER!
-                            modifierOnlyState.hasTriggered = true
-                            debugLogCallback?(" → MODIFIER-ONLY HOTKEY TRIGGERED on release: \(hotkey.displayString)")
-                            DispatchQueue.main.async { [weak self] in
-                                self?.onToggleHotkey?()
-                            }
-                        }
-                        // Reset state
-                        modifierOnlyState.targetModifiersReached = false
-                        modifierOnlyState.currentModifiers = eventModifiers
-                    }
-                } else if type == .keyDown {
-                    // If user presses any key while holding modifiers, cancel the modifier-only hotkey
-                    if modifierOnlyState.targetModifiersReached {
-                        debugLogCallback?(" → Key pressed while holding modifiers - canceling modifier-only hotkey")
-                        modifierOnlyState.targetModifiersReached = false
-                        modifierOnlyState.hasTriggered = true  // Prevent trigger on release
-                    }
-                }
-                // Don't consume flagsChanged events - let them pass through
-            } else {
-                // Handle regular hotkey (e.g., Cmd+Shift+V)
-                if type == .keyDown {
-                    let eventModifiers = ModifierFlags(from: event.flags)
-                    if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                        debugLogCallback?(" → TOGGLE HOTKEY DETECTED - consuming event")
-                        // Call toggle callback on main thread
-                        DispatchQueue.main.async { [weak self] in
-                            self?.onToggleHotkey?()
-                        }
-                        // Consume the event completely - don't pass to other apps
-                        return nil
-                    }
-                }
+        if let hotkey = toggleHotkey, !hotkey.isModifierOnly, type == .keyDown {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
+                debugLogCallback?(" → TOGGLE HOTKEY DETECTED")
+                let result = routeHostCommand(.toggleVietnamese, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
         
@@ -500,13 +521,9 @@ class EventTapManager {
         if let hotkey = toolbarHotkey, type == .keyDown, !isHotkeyRecording {
             let eventModifiers = ModifierFlags(from: event.flags)
             if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TOOLBAR HOTKEY DETECTED - consuming event")
-                // Call toolbar callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onToolbarHotkey?()
-                }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                debugLogCallback?("  → TOOLBAR HOTKEY DETECTED")
+                let result = routeHostCommand(.showToolbar, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -515,13 +532,9 @@ class EventTapManager {
         if let hotkey = convertToolHotkey, type == .keyDown, !isHotkeyRecording {
             let eventModifiers = ModifierFlags(from: event.flags)
             if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                debugLogCallback?("  → CONVERT TOOL HOTKEY DETECTED - consuming event")
-                // Call convert tool callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onConvertToolHotkey?()
-                }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                debugLogCallback?("  → CONVERT TOOL HOTKEY DETECTED")
+                let result = routeHostCommand(.showConvertTool, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -532,13 +545,9 @@ class EventTapManager {
             // Compare only relevant modifiers (ignore CapsLock etc.)
             let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
             if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TRANSLATION HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
-                // Call translation callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onTranslationHotkey?()
-                }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                debugLogCallback?("  → TRANSLATION HOTKEY DETECTED (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                let result = routeHostCommand(.showTranslation, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -549,13 +558,9 @@ class EventTapManager {
             // Compare only relevant modifiers (ignore CapsLock etc.)
             let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
             if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TRANSLATE-TO-SOURCE HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
-                // Call callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onTranslateToSourceHotkey?()
-                }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                debugLogCallback?("  → TRANSLATE-TO-SOURCE HOTKEY DETECTED (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                let result = routeHostCommand(.translateToSource, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -566,13 +571,9 @@ class EventTapManager {
             // Compare only relevant modifiers (ignore CapsLock etc.)
             let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
             if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
-                debugLogCallback?("  → DEBUG HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
-                // Call debug callback on main thread
-                DispatchQueue.main.async { [weak self] in
-                    self?.onDebugHotkey?()
-                }
-                // Consume the event completely - don't pass to other apps
-                return nil
+                debugLogCallback?("  → DEBUG HOTKEY DETECTED (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                let result = routeHostCommand(.showDebugWindow, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -582,11 +583,9 @@ class EventTapManager {
             let eventModifiers = ModifierFlags(from: event.flags)
             let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
             if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TOGGLE EXCLUSION HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
-                DispatchQueue.main.async { [weak self] in
-                    self?.onToggleExclusionHotkey?()
-                }
-                return nil
+                debugLogCallback?("  → TOGGLE EXCLUSION HOTKEY DETECTED (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                let result = routeHostCommand(.toggleExclusionRules, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
@@ -596,61 +595,15 @@ class EventTapManager {
             let eventModifiers = ModifierFlags(from: event.flags)
             let relevantModifiers = eventModifiers.intersection([.control, .shift, .option, .command])
             if event.keyCode == hotkey.keyCode && relevantModifiers == hotkey.modifiers {
-                debugLogCallback?("  → TOGGLE WINDOW RULES HOTKEY DETECTED - consuming event (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
-                DispatchQueue.main.async { [weak self] in
-                    self?.onToggleWindowRulesHotkey?()
-                }
-                return nil
+                debugLogCallback?("  → TOGGLE WINDOW RULES HOTKEY DETECTED (keyCode=\(event.keyCode), mods=\(relevantModifiers.rawValue))")
+                let result = routeHostCommand(.toggleWindowTitleRules, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }
 
         // Check for undo typing hotkey
         // Skip if user is recording a new hotkey
-        if let hotkey = undoTypingHotkey, !isHotkeyRecording {
-            if hotkey.isModifierOnly {
-                // Handle modifier-only undo hotkey (e.g., Ctrl+Shift)
-                if type == .flagsChanged {
-                    let eventModifiers = ModifierFlags(from: event.flags)
-                    
-                    // Check if all required modifiers are currently pressed
-                    let hasAllRequiredModifiers = hotkey.modifiers.isSubset(of: eventModifiers) &&
-                                                   eventModifiers.intersection([.control, .shift, .option, .command, .function]) == hotkey.modifiers
-                    
-                    if hasAllRequiredModifiers {
-                        // All required modifiers are pressed
-                        if !undoModifierOnlyState.targetModifiersReached {
-                            undoModifierOnlyState.targetModifiersReached = true
-                            undoModifierOnlyState.hasTriggered = false
-                            debugLogCallback?(" → Undo target modifiers REACHED: \(hotkey.displayString)")
-                        }
-                        undoModifierOnlyState.currentModifiers = eventModifiers
-                    } else {
-                        // Modifiers changed (released)
-                        if undoModifierOnlyState.targetModifiersReached && !undoModifierOnlyState.hasTriggered {
-                            // Was holding target modifiers, now released - TRIGGER!
-                            debugLogCallback?(" → UNDO MODIFIER-ONLY HOTKEY TRIGGERED on release: \(hotkey.displayString)")
-                            // Call callback synchronously and check result
-                            if let callback = onUndoTypingHotkey, callback() {
-                                undoModifierOnlyState.hasTriggered = true
-                                debugLogCallback?(" → Undo performed successfully")
-                            } else {
-                                debugLogCallback?(" → Nothing to undo, pass through")
-                            }
-                        }
-                        // Reset state
-                        undoModifierOnlyState.targetModifiersReached = false
-                        undoModifierOnlyState.currentModifiers = eventModifiers
-                    }
-                } else if type == .keyDown {
-                    // If user presses any key while holding modifiers, cancel the modifier-only hotkey
-                    if undoModifierOnlyState.targetModifiersReached {
-                        debugLogCallback?(" → Key pressed while holding modifiers - canceling undo modifier-only hotkey")
-                        undoModifierOnlyState.targetModifiersReached = false
-                        undoModifierOnlyState.hasTriggered = true  // Prevent trigger on release
-                    }
-                }
-                // Don't consume flagsChanged events - let them pass through
-            } else {
+        if let hotkey = undoTypingHotkey, !isHotkeyRecording, !hotkey.isModifierOnly {
                 // Handle regular undo hotkey (e.g., Esc or any key+modifiers)
                 if type == .keyDown {
                     let eventModifiers = ModifierFlags(from: event.flags)
@@ -662,8 +615,8 @@ class EventTapManager {
                     
                     if event.keyCode == hotkey.keyCode && modifiersMatch {
                         debugLogCallback?(" → UNDO TYPING HOTKEY DETECTED: \(hotkey.displayString)")
-                        // Call callback synchronously and check result
-                        if let callback = onUndoTypingHotkey, callback() {
+                        let result = routeHostCommand(.undoTyping, event: event, proxy: proxy)
+                        if result.shouldConsumeEvent {
                             debugLogCallback?(" → Undo performed - consuming event")
                             return nil  // Consume the event
                         }
@@ -671,7 +624,6 @@ class EventTapManager {
                         // Fall through to delegate processing
                     }
                 }
-            }
         }
 
         // MARK: Overlay Probe Arming
@@ -789,48 +741,25 @@ class EventTapManager {
                 return Unmanaged.passUnretained(event)
             }
         }
+        routeModifierOnlyHostCommand(type: type, event: event, proxy: proxy)
         
         // Check for toggle hotkey (allow remote users to toggle Vietnamese)
-        if let hotkey = toggleHotkey {
-            if hotkey.isModifierOnly {
-                if type == .flagsChanged {
-                    let eventModifiers = ModifierFlags(from: event.flags)
-                    let hasAllRequiredModifiers = hotkey.modifiers.isSubset(of: eventModifiers) &&
-                                                   eventModifiers.intersection([.control, .shift, .option, .command, .function]) == hotkey.modifiers
-                    
-                    if hasAllRequiredModifiers {
-                        if !modifierOnlyState.targetModifiersReached {
-                            modifierOnlyState.targetModifiersReached = true
-                            modifierOnlyState.hasTriggered = false
-                        }
-                        modifierOnlyState.currentModifiers = eventModifiers
-                    } else {
-                        if modifierOnlyState.targetModifiersReached && !modifierOnlyState.hasTriggered {
-                            modifierOnlyState.hasTriggered = true
-                            DispatchQueue.main.async { [weak self] in
-                                self?.onToggleHotkey?()
-                            }
-                        }
-                        modifierOnlyState.targetModifiersReached = false
-                        modifierOnlyState.currentModifiers = eventModifiers
-                    }
-                } else if type == .keyDown {
-                    if modifierOnlyState.targetModifiersReached {
-                        modifierOnlyState.targetModifiersReached = false
-                        modifierOnlyState.hasTriggered = true
-                    }
-                }
-            } else {
-                if type == .keyDown {
-                    let eventModifiers = ModifierFlags(from: event.flags)
-                    if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.onToggleHotkey?()
-                        }
-                        return nil
-                    }
-                }
+        if let hotkey = toggleHotkey, !hotkey.isModifierOnly, type == .keyDown {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
+                let result = routeHostCommand(.toggleVietnamese, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
+        }
+
+        if type == .keyDown,
+           !isHotkeyRecording,
+           let command = additionalHostCommand(for: event) {
+            let result = routeHostCommand(command, event: event, proxy: proxy)
+            if result.shouldConsumeEvent { return nil }
+            if command != .undoTyping {
+                return Unmanaged.passUnretained(event)
+                }
         }
         
         // Overlay probe arming (same as HID tap)
@@ -870,6 +799,10 @@ class EventTapManager {
     }
     
     // MARK: - Permission Check
+
+    private func hasEventTapPermission() -> Bool {
+        eventPermissionCheck?() ?? checkAccessibilityPermission()
+    }
     
     func checkAccessibilityPermission() -> Bool {
         // Don't prompt - just check silently
@@ -889,60 +822,6 @@ class EventTapManager {
     
     var isRunning: Bool {
         return isEnabled
-    }
-    
-    // MARK: - Secure Input Detection
-    
-    /// Check if macOS Secure Input mode is active.
-    ///
-    /// When Secure Input is ON (typically enabled by password managers like 1Password,
-    /// Terminal, or browser password fields), macOS blocks ALL CGEvent taps from
-    /// receiving keyDown/keyUp events. Only flagsChanged (modifier keys) pass through.
-    /// This makes XKey and ALL third-party input methods completely non-functional.
-    ///
-    /// Uses IOKit IOConsoleUsers (same source as `ioreg`) instead of
-    /// CGSessionCopyCurrentDictionary, which can return the wrong PID.
-    ///
-    /// - Returns: Tuple with (isSecure, pid of app holding it, app name)
-    func checkSecureInput() -> (isSecure: Bool, pid: pid_t?, appName: String?) {
-        // Read IOConsoleUsers from IOKit registry (same data source as `ioreg -l | grep SecureInput`)
-        let root = IORegistryGetRootEntry(kIOMainPortDefault)
-        guard root != IO_OBJECT_NULL else { return (false, nil, nil) }
-        defer { IOObjectRelease(root) }
-        
-        guard let ref = IORegistryEntryCreateCFProperty(
-            root,
-            "IOConsoleUsers" as CFString,
-            kCFAllocatorDefault,
-            0
-        ) else {
-            return (false, nil, nil)
-        }
-        
-        let consoleUsers = ref.takeRetainedValue()
-        guard let users = consoleUsers as? [[String: Any]] else {
-            return (false, nil, nil)
-        }
-        
-        // Find the current session's Secure Input PID
-        for user in users {
-            // Only check sessions that are on console (active)
-            guard let onConsole = user["kCGSSessionOnConsoleKey"] as? Bool,
-                  onConsole else { continue }
-            
-            guard let securePIDValue = user["kCGSSessionSecureInputPID"] as? Int,
-                  securePIDValue != 0 else { continue }
-            
-            let securePID = pid_t(securePIDValue)
-            
-            // Resolve app name from PID
-            let app = NSRunningApplication(processIdentifier: securePID)
-            let appName = app?.localizedName ?? app?.bundleIdentifier ?? "PID \(securePID)"
-            
-            return (true, securePID, appName)
-        }
-        
-        return (false, nil, nil)
     }
     
     // MARK: - Multi-User Session Monitoring
@@ -1203,4 +1082,3 @@ extension CGEvent {
         return getIntegerValueField(.keyboardEventAutorepeat) != 0
     }
 }
-

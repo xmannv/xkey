@@ -56,9 +56,7 @@ extension VNEngine {
     func saveAppLanguage(bundleId: String, language: Int) {
         guard vUseSmartSwitchKey == 1 else { return }
         
-        smartSwitchManager.setAppLanguage(bundleId: bundleId, language: language)
-        
-        smartSwitchManager.saveToPlist()
+        smartSwitchManager.setAndSaveAppLanguage(bundleId: bundleId, language: language)
         
         logCallback?("Smart Switch: Saved '\(bundleId)' → Language \(language == 1 ? "Vietnamese" : "English")")
     }

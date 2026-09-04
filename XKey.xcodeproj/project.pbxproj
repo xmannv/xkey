@@ -114,6 +114,34 @@
 		AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD332F79A00100FACADE /* AXHelper.swift */; };
 		TAPENV0002 /* TapEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0001 /* TapEnvironment.swift */; };
 		TAPENV0003 /* TapEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0001 /* TapEnvironment.swift */; };
+		HOSTCAP0002 /* HostCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCAP0001 /* HostCapabilities.swift */; };
+		HOSTCAP0003 /* HostCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCAP0001 /* HostCapabilities.swift */; };
+		HOSTCAP0004 /* HostCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCAP0001 /* HostCapabilities.swift */; };
+		HOSTCMD0001 /* HostCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCMD0005 /* HostCommand.swift */; };
+		HOSTCMD0002 /* HostCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCMD0005 /* HostCommand.swift */; };
+		HOSTCMD0006 /* HostCommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCMD0007 /* HostCommandRouter.swift */; };
+		HOSTCMD0008 /* HostCommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCMD0007 /* HostCommandRouter.swift */; };
+		RUNPREF0002 /* RuntimePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = RUNPREF0001 /* RuntimePreferences.swift */; };
+		RUNPREF0003 /* RuntimePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = RUNPREF0001 /* RuntimePreferences.swift */; };
+		APPPOL00002 /* AppPolicyRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPPOL00001 /* AppPolicyRuntime.swift */; };
+		APPPOL00003 /* AppPolicyRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPPOL00001 /* AppPolicyRuntime.swift */; };
+		APPPOL00005 /* AppPolicyRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPPOL00004 /* AppPolicyRuntimeTests.swift */; };
+		HOSTCMD0004 /* HostCommandRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HOSTCMD0003 /* HostCommandRouterTests.swift */; };
+		ARCHTEST0002 /* InputArchitectureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ARCHTEST0001 /* InputArchitectureTests.swift */; };
+		INPEVT00002 /* InputEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPEVT00001 /* InputEvent.swift */; };
+		INPEVT00003 /* InputEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPEVT00001 /* InputEvent.swift */; };
+		INPACT00002 /* InputAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPACT00001 /* InputAction.swift */; };
+		INPACT00003 /* InputAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPACT00001 /* InputAction.swift */; };
+		INPSES00002 /* InputSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPSES00001 /* InputSession.swift */; };
+		INPSES00003 /* InputSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPSES00001 /* InputSession.swift */; };
+		RUNPREF0005 /* RuntimePreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = RUNPREF0004 /* RuntimePreferencesTests.swift */; };
+		DICTRUNT004 /* DictionaryRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DICTRUNT003 /* DictionaryRuntimeTests.swift */; };
+		DICTRUNT001 /* DictionaryRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = DICTRUNT000 /* DictionaryRuntime.swift */; };
+		DICTRUNT002 /* DictionaryRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = DICTRUNT000 /* DictionaryRuntime.swift */; };
+		SETDEB0004 /* SettingsReloadDebouncerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SETDEB0003 /* SettingsReloadDebouncerTests.swift */; };
+		SETDEB0001 /* SettingsReloadDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = SETDEB0000 /* SettingsReloadDebouncer.swift */; };
+		SETDEB0002 /* SettingsReloadDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = SETDEB0000 /* SettingsReloadDebouncer.swift */; };
+		VNDICTT002 /* VNDictionaryManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = VNDICTT001 /* VNDictionaryManagerTests.swift */; };
 		TAPSRC0002 /* TapEventSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPSRC0001 /* TapEventSource.swift */; };
 		TAPSRC0003 /* TapEventSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPSRC0001 /* TapEventSource.swift */; };
 		APPVERSION001 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = APPVERSION002 /* AppVersion.swift */; };
@@ -149,10 +177,25 @@
 		DBGLOG0001 /* DebugLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBGLOG0002 /* DebugLoggerTests.swift */; };
 		INJROUTE0001 /* InjectionRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = INJROUTE0002 /* InjectionRoutingTests.swift */; };
 		SECINP0003 /* SecureInputStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECINP0004 /* SecureInputStateMachineTests.swift */; };
+		SECMTEST001 /* SecureInputMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECMTEST002 /* SecureInputMonitorTests.swift */; };
+		SECDET002 /* SecureInputDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECDET001 /* SecureInputDetector.swift */; };
+		SECDET003 /* SecureInputDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECDET001 /* SecureInputDetector.swift */; };
+		SECMON002 /* SecureInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECMON001 /* SecureInputMonitor.swift */; };
+		SECMON003 /* SecureInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = SECMON001 /* SecureInputMonitor.swift */; };
+		IMSECOVER001 /* SecureInputOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21F7194071724EF688135E9E /* SecureInputOverlay.swift */; };
+		IMFLOAT001 /* FloatingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AE133FC7897416BBCED985C /* FloatingOverlay.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
 		TEST00001 /* VNEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00002 /* VNEngineTests.swift */; };
 		TAPENV0005 /* TapEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TAPENV0004 /* TapEnvironmentTests.swift */; };
+		PARITY0001 /* InputSessionParityContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PARITY0002 /* InputSessionParityContractTests.swift */; };
+		INPUTSEST001 /* InputSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPUTSEST002 /* InputSessionTests.swift */; };
+		CGEVTTRN001 /* CGEventTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGEVTTRN002 /* CGEventTransportTests.swift */; };
+		IMKITTRT001 /* IMKitTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMKITTRT002 /* IMKitTransportTests.swift */; };
+		INPACTST001 /* InputActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = INPACTST002 /* InputActionTests.swift */; };
+		CGEVTSRC001 /* CGEventTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGEVTSRC003 /* CGEventTransport.swift */; };
+		CGEVTSRC002 /* CGEventTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CGEVTSRC003 /* CGEventTransport.swift */; };
+		IMKITTRS001 /* IMKitTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = IMKITTRS002 /* IMKitTransport.swift */; };
 		TEST00003 /* KeyCodeToCharacterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00004 /* KeyCodeToCharacterTests.swift */; };
 		TEST00019 /* TypingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00020 /* TypingBufferTests.swift */; };
 		TEST00021 /* VNEngineBufferIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00022 /* VNEngineBufferIntegrationTests.swift */; };
@@ -274,6 +317,23 @@
 		A7801294053CCB45DE7232D2 /* VNEngineSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VNEngineSettings.swift; sourceTree = "<group>"; };
 		AB12CD332F79A00100FACADE /* AXHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXHelper.swift; sourceTree = "<group>"; };
 		TAPENV0001 /* TapEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEnvironment.swift; sourceTree = "<group>"; };
+		HOSTCAP0001 /* HostCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCapabilities.swift; sourceTree = "<group>"; };
+		HOSTCMD0005 /* HostCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCommand.swift; sourceTree = "<group>"; };
+		HOSTCMD0007 /* HostCommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCommandRouter.swift; sourceTree = "<group>"; };
+		RUNPREF0001 /* RuntimePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePreferences.swift; sourceTree = "<group>"; };
+		APPPOL00001 /* AppPolicyRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPolicyRuntime.swift; sourceTree = "<group>"; };
+		APPPOL00004 /* AppPolicyRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPolicyRuntimeTests.swift; sourceTree = "<group>"; };
+		HOSTCMD0003 /* HostCommandRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCommandRouterTests.swift; sourceTree = "<group>"; };
+		ARCHTEST0001 /* InputArchitectureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputArchitectureTests.swift; sourceTree = "<group>"; };
+		INPEVT00001 /* InputEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEvent.swift; sourceTree = "<group>"; };
+		INPACT00001 /* InputAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputAction.swift; sourceTree = "<group>"; };
+		INPSES00001 /* InputSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSession.swift; sourceTree = "<group>"; };
+		RUNPREF0004 /* RuntimePreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePreferencesTests.swift; sourceTree = "<group>"; };
+		DICTRUNT003 /* DictionaryRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryRuntimeTests.swift; sourceTree = "<group>"; };
+		DICTRUNT000 /* DictionaryRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictionaryRuntime.swift; sourceTree = "<group>"; };
+		SETDEB0003 /* SettingsReloadDebouncerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsReloadDebouncerTests.swift; sourceTree = "<group>"; };
+		SETDEB0000 /* SettingsReloadDebouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsReloadDebouncer.swift; sourceTree = "<group>"; };
+		VNDICTT001 /* VNDictionaryManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNDictionaryManagerTests.swift; sourceTree = "<group>"; };
 		TAPSRC0001 /* TapEventSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEventSource.swift; sourceTree = "<group>"; };
 		APPVERSION002 /* AppVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVersion.swift; sourceTree = "<group>"; };
 		B65F5E57423E05ADF4033DCD /* TempOffToolbarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TempOffToolbarView.swift; sourceTree = "<group>"; };
@@ -299,10 +359,20 @@
 		DBGLOG0002 /* DebugLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLoggerTests.swift; sourceTree = "<group>"; };
 		INJROUTE0002 /* InjectionRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InjectionRoutingTests.swift; sourceTree = "<group>"; };
 		SECINP0004 /* SecureInputStateMachineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputStateMachineTests.swift; sourceTree = "<group>"; };
+		SECMTEST002 /* SecureInputMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputMonitorTests.swift; sourceTree = "<group>"; };
+		SECDET001 /* SecureInputDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputDetector.swift; sourceTree = "<group>"; };
+		SECMON001 /* SecureInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureInputMonitor.swift; sourceTree = "<group>"; };
 		MACROVM002 /* MacroManagementViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagementViewModel.swift; sourceTree = "<group>"; };
 		STATUSBARVM002 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
 		TEST00002 /* VNEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VNEngineTests.swift; sourceTree = "<group>"; };
 		TAPENV0004 /* TapEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapEnvironmentTests.swift; sourceTree = "<group>"; };
+		PARITY0002 /* InputSessionParityContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSessionParityContractTests.swift; sourceTree = "<group>"; };
+		INPUTSEST002 /* InputSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSessionTests.swift; sourceTree = "<group>"; };
+		CGEVTTRN002 /* CGEventTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGEventTransportTests.swift; sourceTree = "<group>"; };
+		IMKITTRT002 /* IMKitTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMKitTransportTests.swift; sourceTree = "<group>"; };
+		INPACTST002 /* InputActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputActionTests.swift; sourceTree = "<group>"; };
+		CGEVTSRC003 /* CGEventTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGEventTransport.swift; sourceTree = "<group>"; };
+		IMKITTRS002 /* IMKitTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XKeyIM/IMKitTransport.swift; sourceTree = SOURCE_ROOT; };
 		TEST00004 /* KeyCodeToCharacterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCodeToCharacterTests.swift; sourceTree = "<group>"; };
 		TEST00005 /* XKeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XKeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		TEST00020 /* TypingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBufferTests.swift; sourceTree = "<group>"; };
@@ -425,6 +495,7 @@
 		10FDCC182EF5885200B2D9AC /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				INPUTSESSION001 /* InputSession */,
 				102986BB2F25317A00B4DEEE /* TranslationLanguage.swift */,
 				10FDCC172EF5885200B2D9AC /* AppBehaviorDetector.swift */,
 				AB12CD332F79A00100FACADE /* AXHelper.swift */,
@@ -433,6 +504,25 @@
 				TAPSRC0001 /* TapEventSource.swift */,
 			);
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		INPUTSESSION001 /* InputSession */ = {
+			isa = PBXGroup;
+			children = (
+				HOSTCAP0001 /* HostCapabilities.swift */,
+				HOSTCMD0005 /* HostCommand.swift */,
+				HOSTCMD0007 /* HostCommandRouter.swift */,
+				RUNPREF0001 /* RuntimePreferences.swift */,
+				APPPOL00001 /* AppPolicyRuntime.swift */,
+				INPEVT00001 /* InputEvent.swift */,
+				INPACT00001 /* InputAction.swift */,
+				INPSES00001 /* InputSession.swift */,
+				DICTRUNT000 /* DictionaryRuntime.swift */,
+				SETDEB0000 /* SettingsReloadDebouncer.swift */,
+				SECDET001 /* SecureInputDetector.swift */,
+				SECMON001 /* SecureInputMonitor.swift */,
+			);
+			path = InputSession;
 			sourceTree = "<group>";
 		};
 		53FD9B0D641FE6019C3870E0 /* TempOffToolbar */ = {
@@ -520,6 +610,8 @@
 				SECINP0002 /* SecureInputStateMachine.swift */,
 				A200000A /* CharacterInjector.swift */,
 				A200000B /* KeyboardEventHandler.swift */,
+				CGEVTSRC003 /* CGEventTransport.swift */,
+				IMKITTRS002 /* IMKitTransport.swift */,
 				A200000C /* AdvancedInjectionMethods.swift */,
 				4EE4B88BB1709FA867C406CE /* KeyCodeToCharacter.swift */,
 			);
@@ -611,6 +703,9 @@
 				FELAZY0002 /* FocusedElementInfoLazyTests.swift */,
 				WTRES00002 /* WindowTitleResolutionTests.swift */,
 				AXOFFM0002 /* AXPassOffMainThreadTests.swift */,
+				APPPOL00004 /* AppPolicyRuntimeTests.swift */,
+				HOSTCMD0003 /* HostCommandRouterTests.swift */,
+				ARCHTEST0001 /* InputArchitectureTests.swift */,
 				LANG0002 /* AppLanguageTests.swift */,
 				ICLOUDSYNCTEST002 /* iCloudSyncManagerTests.swift */,
 				MACR0002 /* MacroManagerTests.swift */,
@@ -621,12 +716,22 @@
 				DBGLOG0002 /* DebugLoggerTests.swift */,
 				INJROUTE0002 /* InjectionRoutingTests.swift */,
 				SECINP0004 /* SecureInputStateMachineTests.swift */,
+				SECMTEST002 /* SecureInputMonitorTests.swift */,
 				CORPUS0002 /* CorpusRegressionTests.swift */,
 				CORPUS0004 /* telex_test_suite.csv */,
 				KSPERF0002 /* KeystrokePerfTests.swift */,
 				IMEACT0002 /* IMEActivation.swift */,
 				IMEACT0004 /* IMEActivationTests.swift */,
 				TAPENV0004 /* TapEnvironmentTests.swift */,
+				RUNPREF0004 /* RuntimePreferencesTests.swift */,
+				DICTRUNT003 /* DictionaryRuntimeTests.swift */,
+				SETDEB0003 /* SettingsReloadDebouncerTests.swift */,
+				VNDICTT001 /* VNDictionaryManagerTests.swift */,
+				PARITY0002 /* InputSessionParityContractTests.swift */,
+				INPUTSEST002 /* InputSessionTests.swift */,
+				CGEVTTRN002 /* CGEventTransportTests.swift */,
+				IMKITTRT002 /* IMKitTransportTests.swift */,
+				INPACTST002 /* InputActionTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -796,7 +901,21 @@
 				10FDCC192EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				AB12CD342F79A00100FACADE /* AXHelper.swift in Sources */,
 				TAPENV0002 /* TapEnvironment.swift in Sources */,
+				HOSTCAP0002 /* HostCapabilities.swift in Sources */,
+				HOSTCMD0001 /* HostCommand.swift in Sources */,
+				HOSTCMD0006 /* HostCommandRouter.swift in Sources */,
+				RUNPREF0002 /* RuntimePreferences.swift in Sources */,
+				APPPOL00002 /* AppPolicyRuntime.swift in Sources */,
+				INPEVT00002 /* InputEvent.swift in Sources */,
+				INPACT00002 /* InputAction.swift in Sources */,
+				INPSES00002 /* InputSession.swift in Sources */,
+				DICTRUNT001 /* DictionaryRuntime.swift in Sources */,
+				SETDEB0001 /* SettingsReloadDebouncer.swift in Sources */,
+				SECDET002 /* SecureInputDetector.swift in Sources */,
+				SECMON002 /* SecureInputMonitor.swift in Sources */,
 				TAPSRC0002 /* TapEventSource.swift in Sources */,
+				IMSECOVER001 /* SecureInputOverlay.swift in Sources */,
+				IMFLOAT001 /* FloatingOverlay.swift in Sources */,
 				3C23BFF9E89A48B2A4AB7CED /* AXErrorExtension.swift in Sources */,
 				E52C8374BDB6409AA627DBCF /* ForceAccessibilityManager.swift in Sources */,
 				102986BC2F25317A00B4DEEE /* TranslationLanguage.swift in Sources */,
@@ -812,6 +931,7 @@
 				TYPBUF003 /* TypingBuffer.swift in Sources */,
 				IMTAP01 /* EventTapManager.swift in Sources */,
 				IMTAP02 /* KeyboardEventHandler.swift in Sources */,
+				CGEVTSRC002 /* CGEventTransport.swift in Sources */,
 				IMTAP03 /* CharacterInjector.swift in Sources */,
 				IMTAP04 /* AdvancedInjectionMethods.swift in Sources */,
 				IMTAP05 /* SecureInputStateMachine.swift in Sources */,
@@ -833,6 +953,18 @@
 				10FDCC1A2EF5885200B2D9AC /* AppBehaviorDetector.swift in Sources */,
 				AB12CD352F79A00100FACADE /* AXHelper.swift in Sources */,
 				TAPENV0003 /* TapEnvironment.swift in Sources */,
+				HOSTCAP0003 /* HostCapabilities.swift in Sources */,
+				HOSTCMD0002 /* HostCommand.swift in Sources */,
+				HOSTCMD0008 /* HostCommandRouter.swift in Sources */,
+				RUNPREF0003 /* RuntimePreferences.swift in Sources */,
+				APPPOL00003 /* AppPolicyRuntime.swift in Sources */,
+				INPEVT00003 /* InputEvent.swift in Sources */,
+				INPACT00003 /* InputAction.swift in Sources */,
+				INPSES00003 /* InputSession.swift in Sources */,
+				DICTRUNT002 /* DictionaryRuntime.swift in Sources */,
+				SETDEB0002 /* SettingsReloadDebouncer.swift in Sources */,
+				SECDET003 /* SecureInputDetector.swift in Sources */,
+				SECMON003 /* SecureInputMonitor.swift in Sources */,
 				TAPSRC0003 /* TapEventSource.swift in Sources */,
 				A1000003 /* VNCharacter.swift in Sources */,
 				A1000004 /* VNCharacterMap.swift in Sources */,
@@ -857,6 +989,8 @@
 				1095C4D72EFB016B00C03826 /* VNDictionaryManager.swift in Sources */,
 				A100000A /* CharacterInjector.swift in Sources */,
 				A100000B /* KeyboardEventHandler.swift in Sources */,
+				CGEVTSRC001 /* CGEventTransport.swift in Sources */,
+				IMKITTRS001 /* IMKitTransport.swift in Sources */,
 				A100000C /* AdvancedInjectionMethods.swift in Sources */,
 				101A44482ED419AE003F9D05 /* Preferences.swift in Sources */,
 				105B93912F38848D0018DC12 /* WindowPinManager.swift in Sources */,
@@ -942,6 +1076,9 @@
 				FELAZY0001 /* FocusedElementInfoLazyTests.swift in Sources */,
 				WTRES00001 /* WindowTitleResolutionTests.swift in Sources */,
 				AXOFFM0001 /* AXPassOffMainThreadTests.swift in Sources */,
+				APPPOL00005 /* AppPolicyRuntimeTests.swift in Sources */,
+				HOSTCMD0004 /* HostCommandRouterTests.swift in Sources */,
+				ARCHTEST0002 /* InputArchitectureTests.swift in Sources */,
 				LANG0001 /* AppLanguageTests.swift in Sources */,
 				ICLOUDSYNCTEST001 /* iCloudSyncManagerTests.swift in Sources */,
 				MACR0001 /* MacroManagerTests.swift in Sources */,
@@ -952,11 +1089,22 @@
 				DBGLOG0001 /* DebugLoggerTests.swift in Sources */,
 				INJROUTE0001 /* InjectionRoutingTests.swift in Sources */,
 				SECINP0003 /* SecureInputStateMachineTests.swift in Sources */,
+				SECMTEST001 /* SecureInputMonitorTests.swift in Sources */,
 				CORPUS0001 /* CorpusRegressionTests.swift in Sources */,
 				KSPERF0001 /* KeystrokePerfTests.swift in Sources */,
 				IMEACT0001 /* IMEActivation.swift in Sources */,
 				IMEACT0003 /* IMEActivationTests.swift in Sources */,
 				TAPENV0005 /* TapEnvironmentTests.swift in Sources */,
+				HOSTCAP0004 /* HostCapabilities.swift in Sources */,
+				RUNPREF0005 /* RuntimePreferencesTests.swift in Sources */,
+				DICTRUNT004 /* DictionaryRuntimeTests.swift in Sources */,
+				SETDEB0004 /* SettingsReloadDebouncerTests.swift in Sources */,
+				VNDICTT002 /* VNDictionaryManagerTests.swift in Sources */,
+				PARITY0001 /* InputSessionParityContractTests.swift in Sources */,
+				INPUTSEST001 /* InputSessionTests.swift in Sources */,
+				CGEVTTRN001 /* CGEventTransportTests.swift in Sources */,
+				IMKITTRT001 /* IMKitTransportTests.swift in Sources */,
+				INPACTST001 /* InputActionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

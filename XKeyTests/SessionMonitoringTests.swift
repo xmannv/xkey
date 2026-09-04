@@ -16,6 +16,11 @@ import XCTest
 class MockEventTapDelegate: EventTapManager.EventTapDelegate {
     var sessionDidBecomeActiveCalled = false
     var sessionDidBecomeActiveCallCount = 0
+    var waitForPendingInjectionHandler: (() -> Void)?
+
+    func waitForPendingInjection() {
+        waitForPendingInjectionHandler?()
+    }
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
         return true
@@ -63,6 +68,34 @@ class SessionMonitoringTests: XCTestCase {
             "Session observers should be registered during init")
         XCTAssertEqual(eventTapManager.sessionObservers.count, 2,
             "Should have exactly 2 observers (resign + become active)")
+    }
+
+    func testDisabledTapStopsInsteadOfReenablingAfterPermissionRevocation() {
+        XCTAssertEqual(
+            EventTapManager.disabledTapRecoveryAction(hasEventPermission: false),
+            .stop
+        )
+        XCTAssertEqual(
+            EventTapManager.disabledTapRecoveryAction(hasEventPermission: true),
+            .reenable
+        )
+    }
+
+    func testSuspendAndDrainDoesNotReleaseCallerBeforePendingInjectionCompletes() {
+        let delegate = MockEventTapDelegate()
+        let injectionFinished = DispatchSemaphore(value: 0)
+        delegate.waitForPendingInjectionHandler = { injectionFinished.wait() }
+        eventTapManager.delegate = delegate
+        let handoffFinished = DispatchSemaphore(value: 0)
+
+        DispatchQueue.global().async {
+            self.eventTapManager.suspendAndDrainPendingInjection()
+            handoffFinished.signal()
+        }
+
+        XCTAssertEqual(handoffFinished.wait(timeout: .now() + 0.05), .timedOut)
+        injectionFinished.signal()
+        XCTAssertEqual(handoffFinished.wait(timeout: .now() + 1), .success)
     }
     
     // MARK: - Notification Response Tests

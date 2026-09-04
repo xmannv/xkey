@@ -55,7 +55,8 @@ struct AdvancedSection: View {
                             .onChange(of: viewModel.preferences.spellCheckEnabled) { newValue in
                                 if newValue {
                                     // Auto-load dictionary if available
-                                    VNDictionaryManager.shared.loadIfAvailable()
+                                    let style: VNDictionaryManager.DictionaryStyle = viewModel.preferences.modernStyle ? .dauMoi : .dauCu
+                                    VNDictionaryManager.shared.loadIfAvailable(style: style)
                                 } else {
                                     // Cascade disable: turn off child settings when spell check is disabled
                                     viewModel.preferences.restoreIfWrongSpelling = false
@@ -380,7 +381,8 @@ struct AdvancedSection: View {
                     .font(.caption)
 
                 Button("Nạp") {
-                    try? VNDictionaryManager.shared.loadDictionary()
+                    let style: VNDictionaryManager.DictionaryStyle = viewModel.preferences.modernStyle ? .dauMoi : .dauCu
+                    VNDictionaryManager.shared.loadIfAvailable(style: style)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

@@ -62,6 +62,9 @@ class VNEngine {
     var vUpperCaseRequireSpace = 1 // 0: cap right after . ? ! even with no space; 1: require a space after . ? ! (newline always caps)
     var vTempOffSpelling = 0       // 0: No, 1: Yes (temp off spell check via toolbar)
     var vTempOffEngine = 0         // 0: No, 1: Yes (temp off engine via toolbar)
+    /// Optional instance-level final spelling provider. Nil preserves the shared
+    /// dictionary/NSSpellChecker production path; alternate runtimes and tests may inject one.
+    var spellCheckVerdictOverride: ((String) -> Bool)?
     var vCustomConsonants: Set<UInt16> = [] { // Custom consonants allowed (e.g., Z, F, W, J, K)
         didSet {
             // Cache the Character form so the per-keystroke English-detection path

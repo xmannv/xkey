@@ -8,6 +8,7 @@
 
 import Foundation
 import AppKit
+import Darwin
 
 /// App Group identifier for sharing data between XKey and XKeyIM
 /// Note: macOS Sequoia+ requires TeamID prefix for native apps distributed outside App Store
@@ -90,9 +91,13 @@ enum SharedSettingsKey: String {
     // Remote desktop injection mode
     case remoteDesktopInjectMode = "XKey.remoteDesktopInjectMode"
 
-    // XKeyIM event tap ownership (one-way: XKeyIM arms, XKey.app yields)
+    // Cross-process event tap ownership and request/ack handoff barrier
     case xkeyIMTapArmed = "XKey.xkeyIMTapArmed"
     case xkeyIMTapPID = "XKey.xkeyIMTapPID"
+    case xkeyMainPID = "XKey.xkeyMainPID"
+    case inputHandoffRequestGeneration = "XKey.inputHandoffRequestGeneration"
+    case inputHandoffRequesterPID = "XKey.inputHandoffRequesterPID"
+    case inputHandoffAcknowledgedGeneration = "XKey.inputHandoffAcknowledgedGeneration"
 
     // Global Vietnamese on/off, shared by both processes
     case vietnameseEnabled = "XKey.vietnameseEnabled"
@@ -137,6 +142,218 @@ enum SharedSettingsKey: String {
     
     // Translation provider configs
     case translationProviderConfigs = "XKey.translationProviderConfigs"  // JSON-encoded [TranslationProviderConfig]
+}
+
+struct InputOwnershipHandoffRequest: Equatable {
+    let generation: Int
+    let requesterPID: Int
+}
+
+struct InputOwnershipHandoffSnapshot: Equatable {
+    let requestGeneration: Int
+    let requesterPID: Int
+    let acknowledgedGeneration: Int
+    let mainPID: Int
+    let xkeyIMTapArmed: Bool
+    let xkeyIMTapPID: Int
+}
+
+protocol InputOwnershipHandoffStore: AnyObject {
+    var snapshot: InputOwnershipHandoffSnapshot { get }
+    func beginInputOwnershipHandoff(requesterPID: Int) -> InputOwnershipHandoffRequest
+    func acknowledgeInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool
+    func cancelInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool
+    func registerXKeyMainProcess(pid: Int)
+    func unregisterXKeyMainProcess(pid: Int)
+}
+
+enum InputOwnershipProcessState {
+    case matching
+    case absent
+    case unknown
+}
+
+protocol InputOwnershipProcessChecking {
+    func state(of pid: Int, expectedBundleIdentifier: String) -> InputOwnershipProcessState
+}
+
+struct SystemInputOwnershipProcessChecker: InputOwnershipProcessChecking {
+    func state(of pid: Int, expectedBundleIdentifier: String) -> InputOwnershipProcessState {
+        guard pid > 0, kill(pid_t(pid), 0) == 0 else { return .absent }
+        guard let application = NSRunningApplication(processIdentifier: pid_t(pid)) else {
+            return .unknown
+        }
+        return application.bundleIdentifier == expectedBundleIdentifier ? .matching : .absent
+    }
+}
+
+enum InputOwnershipClaimDecision: Equatable {
+    case wait
+    case startAfterAcknowledgement
+    case startWithoutMain
+    case failSafe
+}
+
+enum MainInputSourceState: Equatable {
+    case xkeyIM
+    case other
+    case unknown
+}
+
+enum MainInputOwnershipDecision: Equatable {
+    case acknowledge
+    case startMain
+    case deferMain
+    case retry
+}
+
+struct InputOwnershipHandoffCoordinator {
+    static let mainBundleIdentifier = "com.codetay.XKey"
+
+    let store: InputOwnershipHandoffStore
+    let processChecker: InputOwnershipProcessChecking
+
+    func beginRequest(requesterPID: Int) -> InputOwnershipHandoffRequest {
+        store.beginInputOwnershipHandoff(requesterPID: requesterPID)
+    }
+
+    @discardableResult
+    func cancelRequest(_ request: InputOwnershipHandoffRequest) -> Bool {
+        store.cancelInputOwnershipHandoff(request)
+    }
+
+    func mainHostDecision(source: MainInputSourceState) -> MainInputOwnershipDecision {
+        let snapshot = store.snapshot
+        let hasPendingRequest = snapshot.requestGeneration > snapshot.acknowledgedGeneration
+            && snapshot.requesterPID > 0
+            && processChecker.state(
+                of: snapshot.requesterPID,
+                expectedBundleIdentifier: SharedSettings.xkeyIMBundleIdentifier
+            ) != .absent
+        if hasPendingRequest {
+            return source == .xkeyIM ? .acknowledge : .retry
+        }
+        let hasLiveXKeyIMOwner = snapshot.xkeyIMTapArmed
+            && snapshot.xkeyIMTapPID > 0
+            && processChecker.state(
+                of: snapshot.xkeyIMTapPID,
+                expectedBundleIdentifier: SharedSettings.xkeyIMBundleIdentifier
+            ) != .absent
+        if hasLiveXKeyIMOwner { return .deferMain }
+        switch source {
+        case .xkeyIM: return .deferMain
+        case .other: return .startMain
+        case .unknown: return .retry
+        }
+    }
+
+    func claimDecision(for request: InputOwnershipHandoffRequest,
+                       timedOut: Bool) -> InputOwnershipClaimDecision {
+        guard !timedOut, request.generation > 0 else { return .failSafe }
+        let snapshot = store.snapshot
+        guard snapshot.requestGeneration == request.generation,
+              snapshot.requesterPID == request.requesterPID else { return .failSafe }
+        if snapshot.acknowledgedGeneration == request.generation {
+            return .startAfterAcknowledgement
+        }
+        switch processChecker.state(of: snapshot.mainPID,
+                                    expectedBundleIdentifier: Self.mainBundleIdentifier) {
+        case .absent:
+            return .startWithoutMain
+        case .matching, .unknown:
+            return .wait
+        }
+    }
+
+    @discardableResult
+    func performClaim(for request: InputOwnershipHandoffRequest,
+                      timedOut: Bool,
+                      start: () -> Void) -> InputOwnershipClaimDecision {
+        let decision = claimDecision(for: request, timedOut: timedOut)
+        if decision == .startAfterAcknowledgement || decision == .startWithoutMain {
+            start()
+        }
+        return decision
+    }
+
+    @discardableResult
+    func acknowledgePendingRequest(releaseAndDrain: () -> Void) -> Bool {
+        let snapshot = store.snapshot
+        guard snapshot.requestGeneration > snapshot.acknowledgedGeneration,
+              snapshot.requesterPID > 0 else { return false }
+        let request = InputOwnershipHandoffRequest(generation: snapshot.requestGeneration,
+                                                    requesterPID: snapshot.requesterPID)
+        guard processChecker.state(of: request.requesterPID,
+                                   expectedBundleIdentifier: SharedSettings.xkeyIMBundleIdentifier) != .absent
+        else { return false }
+        releaseAndDrain()
+        return store.acknowledgeInputOwnershipHandoff(request)
+    }
+}
+
+struct MainInputOwnershipLifecycle {
+    let store: InputOwnershipHandoffStore
+
+    func managerBecameReady(pid: Int) {
+        store.registerXKeyMainProcess(pid: pid)
+    }
+
+    func terminate(pid: Int,
+                   suspendAndDrain: () -> Void,
+                   stop: () -> Void) {
+        suspendAndDrain()
+        stop()
+        store.unregisterXKeyMainProcess(pid: pid)
+    }
+}
+
+enum MainSettingsChangeAction: Equatable {
+    case none
+    case applyVietnamese(Bool)
+    case deferToXKeyIM
+    case restoreAfterXKeyIM
+}
+
+struct MainSettingsChangeTracker {
+    private var vietnameseEnabled: Bool
+    private var xkeyIMOwnsInput: Bool
+
+    init(vietnameseEnabled: Bool, xkeyIMOwnsInput: Bool) {
+        self.vietnameseEnabled = vietnameseEnabled
+        self.xkeyIMOwnsInput = xkeyIMOwnsInput
+    }
+
+    var currentAction: MainSettingsChangeAction {
+        xkeyIMOwnsInput ? .deferToXKeyIM : .none
+    }
+
+    mutating func update(vietnameseEnabled: Bool,
+                         xkeyIMOwnsInput: Bool) -> MainSettingsChangeAction {
+        let ownershipChanged = self.xkeyIMOwnsInput != xkeyIMOwnsInput
+        let vietnameseChanged = self.vietnameseEnabled != vietnameseEnabled
+        self.vietnameseEnabled = vietnameseEnabled
+        self.xkeyIMOwnsInput = xkeyIMOwnsInput
+
+        if ownershipChanged {
+            return xkeyIMOwnsInput ? .deferToXKeyIM : .restoreAfterXKeyIM
+        }
+        guard !xkeyIMOwnsInput, vietnameseChanged else { return .none }
+        return .applyVietnamese(vietnameseEnabled)
+    }
+}
+
+final class RemoteDesktopTargetLifecycle {
+    private var appliedMode: Bool?
+
+    func apply(_ mode: Bool, onTopologyChange: (Bool) -> Void) {
+        guard let previousMode = appliedMode else {
+            appliedMode = mode
+            return
+        }
+        guard previousMode != mode else { return }
+        appliedMode = mode
+        onTopologyChange(mode)
+    }
 }
 
 // Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
@@ -277,15 +494,23 @@ class SharedSettings {
     /// reverts whatever the other process wrote since that cache was filled — including
     /// the tap-ownership flag, which would put both processes in the keystroke path.
     ///
-    /// ponytail: no cross-process file lock, so two writes that interleave inside this
-    /// hold can still lose one. Window is a single write, not a cache lifetime. Upgrade
-    /// to an flock on the plist if a report ever shows a lost write.
     private func mutatePlist(_ body: (inout [String: Any]) -> Void) {
         guard let url = plistURL else { return }
 
         do {
             cacheLock.lock()
             defer { cacheLock.unlock() }
+
+            let lockURL = url.appendingPathExtension("lock")
+            let lockFD = Darwin.open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+            guard lockFD >= 0 else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            defer { Darwin.close(lockFD) }
+            guard flock(lockFD, LOCK_EX) == 0 else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            defer { flock(lockFD, LOCK_UN) }
 
             var dict: [String: Any]
             if let data = try? Data(contentsOf: url),
@@ -640,6 +865,25 @@ class SharedSettings {
         writeData(data, forKey: SharedSettingsKey.smartSwitchData.rawValue)
     }
 
+    /// Merge one app into the latest on-disk Smart Switch map. Both processes write
+    /// this value, so replacing it from either process's cached manager loses entries.
+    func updateSmartSwitchLanguage(bundleIdentifier: String, language: Int) -> Data? {
+        var updatedData: Data?
+        mutatePlist { dict in
+            let key = SharedSettingsKey.smartSwitchData.rawValue
+            var map = (dict[key] as? Data)
+                .flatMap { try? JSONDecoder().decode([String: Int].self, from: $0) }
+                ?? [:]
+            map[bundleIdentifier] = language
+            guard let data = try? JSONEncoder().encode(map) else { return }
+            dict[key] = data
+            updatedData = data
+        }
+        guard updatedData != nil else { return nil }
+        notifySettingsChanged()
+        return updatedData
+    }
+
     // MARK: - Debug Settings
 
     var debugModeEnabled: Bool {
@@ -959,6 +1203,19 @@ class SharedSettings {
         mutatePlist {
             $0[SharedSettingsKey.xkeyIMTapArmed.rawValue] = false
             $0[SharedSettingsKey.xkeyIMTapPID.rawValue] = 0
+        }
+        notifySettingsChanged()
+    }
+
+    func registerXKeyMainProcess(pid: Int) {
+        mutatePlist { $0[SharedSettingsKey.xkeyMainPID.rawValue] = pid }
+        notifySettingsChanged()
+    }
+
+    func unregisterXKeyMainProcess(pid: Int) {
+        mutatePlist { dict in
+            guard (dict[SharedSettingsKey.xkeyMainPID.rawValue] as? Int) == pid else { return }
+            dict[SharedSettingsKey.xkeyMainPID.rawValue] = 0
         }
         notifySettingsChanged()
     }
@@ -1394,12 +1651,29 @@ class SharedSettings {
         // machine's XKey.app yield to whatever local process holds that number.
         SharedSettingsKey.xkeyIMTapArmed.rawValue,
         SharedSettingsKey.xkeyIMTapPID.rawValue,
+        SharedSettingsKey.xkeyMainPID.rawValue,
+        SharedSettingsKey.inputHandoffRequestGeneration.rawValue,
+        SharedSettingsKey.inputHandoffRequesterPID.rawValue,
+        SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue,
         // Device-specific: Vietnamese on/off is momentary state bound to a hotkey and to
         // each machine's own menu, the same family as isRemoteDesktopTarget rather than a
         // durable preference like input method or code table. Syncing it means the toggle
         // hotkey on one machine turns the others off too.
         SharedSettingsKey.vietnameseEnabled.rawValue,
     ]
+
+    private static let localOwnershipKeys: Set<String> = [
+        SharedSettingsKey.xkeyIMTapArmed.rawValue,
+        SharedSettingsKey.xkeyIMTapPID.rawValue,
+        SharedSettingsKey.xkeyMainPID.rawValue,
+        SharedSettingsKey.inputHandoffRequestGeneration.rawValue,
+        SharedSettingsKey.inputHandoffRequesterPID.rawValue,
+        SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue,
+    ]
+
+    static func removeTransientOwnershipState(from dict: inout [String: Any]) {
+        for key in localOwnershipKeys { dict.removeValue(forKey: key) }
+    }
 
     /// Sensitive keys that must never leave the device. Currently empty — translation providers
     /// do not store API keys in the shared plist — but kept as a defensive scaffold.
@@ -1571,6 +1845,7 @@ class SharedSettings {
     /// - Returns: The exported plist data (XML format for human readability), or nil if export failed
     func exportSettings() -> Data? {
         var exportDict = readPlistDict()
+        Self.removeTransientOwnershipState(from: &exportDict)
         
         // Add metadata for version tracking
         exportDict["_exportVersion"] = 1
@@ -1610,17 +1885,15 @@ class SharedSettings {
             // reads armed. The current values come out of the on-disk dictionary
             // mutatePlist hands us, not out of this process's cache.
             //
-            // Only the tap keys, deliberately: this is a shorter list than scalarsExcludedKeys,
+            // Only the local ownership/handoff keys, deliberately: this is a shorter list than scalarsExcludedKeys,
             // which additionally holds back vietnameseEnabled, isRemoteDesktopTarget, and the
             // four list-data keys macrosData, excludedApps, windowTitleRules and
             // userDictionaryWords. The list-data keys are excluded there because they sync as
             // their own per-entry categories rather than inside the scalars blob; the two
             // device-specific ones must not cross machines over iCloud, but they are the user's
             // own saved state here and a restore should bring them back. Do not unify the lists.
-            let tapKeys = [SharedSettingsKey.xkeyIMTapArmed.rawValue,
-                           SharedSettingsKey.xkeyIMTapPID.rawValue]
             mutatePlist { dict in
-                let preserved = tapKeys.map { ($0, dict[$0]) }
+                let preserved = Self.localOwnershipKeys.map { ($0, dict[$0]) }
                 dict = importDict
                 for (key, value) in preserved { dict[key] = value }
             }
@@ -2021,6 +2294,69 @@ class SharedSettings {
 
         // Also notify debug settings changed
         notifyDebugSettingsChanged()
+    }
+}
+
+extension SharedSettings: InputOwnershipHandoffStore {
+    var snapshot: InputOwnershipHandoffSnapshot {
+        invalidateCache()
+        let dict = readPlistDict()
+        return InputOwnershipHandoffSnapshot(
+            requestGeneration: dict[SharedSettingsKey.inputHandoffRequestGeneration.rawValue] as? Int ?? 0,
+            requesterPID: dict[SharedSettingsKey.inputHandoffRequesterPID.rawValue] as? Int ?? 0,
+            acknowledgedGeneration: dict[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue] as? Int ?? 0,
+            mainPID: dict[SharedSettingsKey.xkeyMainPID.rawValue] as? Int ?? 0,
+            xkeyIMTapArmed: dict[SharedSettingsKey.xkeyIMTapArmed.rawValue] as? Bool ?? false,
+            xkeyIMTapPID: dict[SharedSettingsKey.xkeyIMTapPID.rawValue] as? Int ?? 0
+        )
+    }
+
+    func beginInputOwnershipHandoff(requesterPID: Int) -> InputOwnershipHandoffRequest {
+        var request = InputOwnershipHandoffRequest(generation: 0, requesterPID: requesterPID)
+        mutatePlist { dict in
+            let requested = dict[SharedSettingsKey.inputHandoffRequestGeneration.rawValue] as? Int ?? 0
+            let acknowledged = dict[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue] as? Int ?? 0
+            request = InputOwnershipHandoffRequest(generation: max(requested, acknowledged) + 1,
+                                                    requesterPID: requesterPID)
+            dict[SharedSettingsKey.inputHandoffRequestGeneration.rawValue] = request.generation
+            dict[SharedSettingsKey.inputHandoffRequesterPID.rawValue] = requesterPID
+        }
+        notifySettingsChanged()
+        return request
+    }
+
+    func acknowledgeInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool {
+        var acknowledged = false
+        mutatePlist { dict in
+            guard (dict[SharedSettingsKey.inputHandoffRequestGeneration.rawValue] as? Int) == request.generation,
+                  (dict[SharedSettingsKey.inputHandoffRequesterPID.rawValue] as? Int) == request.requesterPID,
+                  request.requesterPID > 0,
+                  (dict[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue] as? Int ?? 0) < request.generation
+            else { return }
+            if (dict[SharedSettingsKey.xkeyIMTapPID.rawValue] as? Int) != request.requesterPID {
+                dict[SharedSettingsKey.xkeyIMTapArmed.rawValue] = false
+                dict[SharedSettingsKey.xkeyIMTapPID.rawValue] = 0
+            }
+            dict[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue] = request.generation
+            acknowledged = true
+        }
+        if acknowledged { notifySettingsChanged() }
+        return acknowledged
+    }
+
+    func cancelInputOwnershipHandoff(_ request: InputOwnershipHandoffRequest) -> Bool {
+        var cancelled = false
+        mutatePlist { dict in
+            guard (dict[SharedSettingsKey.inputHandoffRequestGeneration.rawValue] as? Int) == request.generation,
+                  (dict[SharedSettingsKey.inputHandoffRequesterPID.rawValue] as? Int) == request.requesterPID,
+                  request.requesterPID > 0,
+                  (dict[SharedSettingsKey.inputHandoffAcknowledgedGeneration.rawValue] as? Int ?? 0) < request.generation
+            else { return }
+            dict[SharedSettingsKey.inputHandoffRequesterPID.rawValue] = 0
+            cancelled = true
+        }
+        if cancelled { notifySettingsChanged() }
+        return cancelled
     }
 }
 

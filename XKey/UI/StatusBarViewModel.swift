@@ -21,7 +21,6 @@ class StatusBarViewModel: ObservableObject {
     @Published var isRemoteDesktopTarget = false
 
     private weak var keyboardHandler: KeyboardEventHandler?
-    private weak var eventTapManager: EventTapManager?
     private var remoteDesktopWorkspaceObservers: [NSObjectProtocol] = []
     private var settingsObserver: NSObjectProtocol?
     
@@ -33,10 +32,10 @@ class StatusBarViewModel: ObservableObject {
     var onOpenConvertTool: (() -> Void)?
     var onOpenDebugWindow: (() -> Void)?
     var onToggleDebugWindow: (() -> Void)?  // Toggle open/close debug window
+    var onRemoteDesktopTargetChanged: ((Bool) -> Void)?
     
-    init(keyboardHandler: KeyboardEventHandler?, eventTapManager: EventTapManager?) {
+    init(keyboardHandler: KeyboardEventHandler?, eventTapManager _: EventTapManager?) {
         self.keyboardHandler = keyboardHandler
-        self.eventTapManager = eventTapManager
         
         // Seed from the App Group before syncing: XKeyIM writes this flag too, and
         // setupKeyboardHandling() has already applied the shared value to the handler
@@ -93,9 +92,7 @@ class StatusBarViewModel: ObservableObject {
     func setRemoteDesktopTarget(_ enabled: Bool) {
         isRemoteDesktopTarget = enabled
         SharedSettings.shared.isRemoteDesktopTarget = enabled
-        if eventTapManager?.isRunning == true {
-            try? eventTapManager?.restart()
-        }
+        onRemoteDesktopTargetChanged?(enabled)
         log("Remote desktop target mode: \(enabled ? "ON" : "OFF")")
     }
     

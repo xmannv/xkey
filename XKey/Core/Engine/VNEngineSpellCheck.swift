@@ -91,7 +91,7 @@ extension VNEngine {
     /// Validate if a given word string is a valid Vietnamese word
     /// This is used for checking words from Accessibility API
     func checkWordSpelling(word: String) -> Bool {
-        guard SharedSettings.shared.spellCheckEnabled else {
+        guard vCheckSpelling == 1 else {
             logCallback?("📖 checkWordSpelling: DISABLED (spellCheckEnabled=false)")
             return true // Spell checking disabled
         }
@@ -136,6 +136,10 @@ extension VNEngine {
            isUppercaseVietnameseMarkedAbbreviation(word) {
             logCallback?("📖 checkWordSpelling: SKIPPED (uppercase Vietnamese abbreviation), word='\(word)'")
             return true
+        }
+
+        if let spellCheckVerdictOverride {
+            return spellCheckVerdictOverride(word)
         }
 
         // Check user dictionary

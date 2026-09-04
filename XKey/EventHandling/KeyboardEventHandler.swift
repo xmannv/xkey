@@ -12,9 +12,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     // MARK: - Properties
 
-    let engine: VNEngine  // Made public for debug access
-    private let injector: CharacterInjector
+    private let session: InputSession
+    private let transport: CGEventTransport
+    var engine: VNEngine { session.engine }
     private var isVietnameseEnabled = true
+    var durableVietnameseEnabled: Bool { isVietnameseEnabled }
+    private var appPolicyDecision: AppPolicyDecision = .keepCurrentLanguage
 
     // Debug logging callback
     var debugLogCallback: ((String) -> Void)?
@@ -89,7 +92,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
-    @Published var customConsonants: String = "" {
+    @Published var customConsonants: Set<UInt16> = [] {
         didSet { updateEngineSettings() }
     }
     
@@ -131,23 +134,43 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     @Published var exclusionRulesEnabled: Bool = true  // Master switch for user-defined exclusion rules
 
     // Undo typing with Esc key
-    @Published var undoTypingEnabled: Bool = false
+    @Published var undoTypingEnabled: Bool = false {
+        didSet { updateEngineSettings() }
+    }
 
     // Managers
-    private let macroManager = MacroManager()
-    private let smartSwitchManager = SmartSwitchManager()
+    private let macroManager: MacroManager
+    private let smartSwitchManager: SmartSwitchManager
     
     // MARK: - Initialization
     
-    init() {
-        self.engine = VNEngine()
-        self.injector = CharacterInjector()
+    init(session: InputSession? = nil, transport: CGEventTransport? = nil) {
+        let macroManager = MacroManager()
+        let smartSwitchManager = SmartSwitchManager()
+        VNEngine.setSharedMacroManager(macroManager)
+        VNEngine.setSharedSmartSwitchManager(smartSwitchManager)
+
+        let defaultPreferences = RuntimePreferences(
+            preferences: Preferences(),
+            vietnameseEnabled: true,
+            windowTitleRulesEnabled: true,
+            remoteDesktopInjectMode: false
+        )
+        if let session {
+            self.session = session
+            session.apply(session.preferences)
+        } else {
+            self.session = InputSession(preferences: defaultPreferences)
+        }
+        self.transport = transport ?? CGEventTransport()
+        self.macroManager = macroManager
+        self.smartSwitchManager = smartSwitchManager
 
         // Set up engine/injector logging (callbacks stay nil while verbose
         // logging is off — see updateEngineLogWiring)
         updateEngineLogWiring()
 
-        // Share managers with VNEngine. These are process-wide statics (see
+        // The managers shared with VNEngine above are process-wide statics (see
         // VNEngineMacro.swift / VNEngineSmartSwitch.swift), so this write is
         // visible to every VNEngine instance in the process — including one
         // created before this handler existed, e.g. XKeyIMController's own
@@ -162,25 +185,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // stops processing keys while TapController.isArmed), so this never
         // races two engines against each other.
         //
-        // Today this rebind is a no-op for XKeyIM's marked-text channel:
-        // XKeyIMController.applySettings() never sets macroEnabled, so its
-        // engine's vUseMacro stays 0 and it never calls into macroManager;
-        // smart-switch's app-language checks (checkSmartSwitchForApp /
-        // handleAppSwitch) are only ever driven by XKey.app's AppDelegate,
-        // never by XKeyIMController or this handler's own tap pipeline. If
-        // marked-text macro support is ever wired up, this shared instance
-        // is what makes it see the exact same macros the tap uses — see
-        // EngineManagerSharingTests for the guard on that convergence.
-        VNEngine.setSharedMacroManager(macroManager)
-        VNEngine.setSharedSmartSwitchManager(smartSwitchManager)
-
+        // Both physical and marked-text paths use this manager through InputSession;
+        // see EngineManagerSharingTests for the convergence guard.
         // Macro manager logging disabled for cleaner output
         // macroManager.logCallback = { [weak self] message in
         //     self?.debugLogCallback?("📦 Macro: \(message)")
         // }
-        
-        // Load macro data from plist
-        loadMacrosFromPlist()
         
         // Load smart switch data from file
         loadSmartSwitchData()
@@ -195,18 +205,18 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         
 
     }
-    
+
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
     
     @objc private func handleMacrosDidChange() {
-        loadMacrosFromPlist()
+        session.reloadMacros()
         
         // Reset engine to clear buffer when macros change
         // This prevents stale buffer from interfering with new macro matching
-        engine.reset()
-        injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state when macros change
+        session.reset()
+        transport.reset(cursorMoved: false, preserveMidSentence: true)
     }
     
     // MARK: - Smart Switch Data Loading
@@ -215,53 +225,38 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         smartSwitchManager.loadFromPlist()
     }
     
-    // MARK: - Macro Data Loading
-    
-    private func loadMacrosFromPlist() {
-        // Clear existing macros first to avoid duplicates
-        macroManager.clearAll()
-        
-        if let data = SharedSettings.shared.getMacrosData(),
-           let macros = try? JSONDecoder().decode([MacroItemData].self, from: data) {
-            for macro in macros where macro.isEnabled {
-                _ = macroManager.addMacro(text: macro.text, content: macro.content)
-            }
-        }
-    }
-    
-    /// Struct for decoding macro data (includes isEnabled for filtering)
-    private struct MacroItemData: Codable {
-        let id: UUID
-        let text: String
-        let content: String
-        let isEnabled: Bool
-        
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(UUID.self, forKey: .id)
-            text = try container.decode(String.self, forKey: .text)
-            content = try container.decode(String.self, forKey: .content)
-            // Default to true
-            isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-        }
-    }    
     // MARK: - Vietnamese Toggle
     
     func toggleVietnamese() {
         isVietnameseEnabled.toggle()
-        // Update engine's vLanguage to match
-        engine.vLanguage = isVietnameseEnabled ? 1 : 0
+        session.setEffectiveVietnameseEnabled(isVietnameseEnabled)
         if !isVietnameseEnabled {
-            engine.reset()
+            session.reset()
         }
     }
     
     func setVietnamese(_ enabled: Bool) {
         isVietnameseEnabled = enabled
-        // Update engine's vLanguage to match
-        engine.vLanguage = enabled ? 1 : 0
+        session.setEffectiveVietnameseEnabled(enabled)
         if !enabled {
-            engine.reset()
+            session.reset()
+        }
+    }
+
+    func applyAppPolicyDecision(_ decision: AppPolicyDecision,
+                                currentVietnameseEnabled: Bool) {
+        appPolicyDecision = decision
+        switch decision {
+        case .keepCurrentLanguage:
+            session.setEffectiveVietnameseEnabled(currentVietnameseEnabled)
+        case .overrideVietnamese(let enabled):
+            session.setEffectiveVietnameseEnabled(enabled)
+            if !enabled { session.reset() }
+        case .restoreVietnamese(let enabled):
+            setVietnamese(enabled)
+        case .disableTransformation:
+            session.setEffectiveVietnameseEnabled(false)
+            session.reset()
         }
     }
 
@@ -270,13 +265,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// The policy lookup is O(1) (cached in AppBehaviorDetector, refreshed on focus/title/app
     /// changes), so it is safe to call multiple times per keystroke.
     private func effectiveVietnameseEnabled() -> Bool {
-        switch AppBehaviorDetector.shared.getInputMethodPolicyOverride().policy {
-        case .enable:
-            return true
-        case .disable:
-            return false
-        case .none:
+        switch appPolicyDecision {
+        case .keepCurrentLanguage:
             return isVietnameseEnabled
+        case .overrideVietnamese(let enabled), .restoreVietnamese(let enabled):
+            return enabled
+        case .disableTransformation:
+            return false
         }
     }
     
@@ -284,78 +279,45 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     /// Perform undo typing operation when triggered by EventTapManager hotkey callback
     /// Returns true if undo was performed (event should be consumed), false otherwise
-    func performUndoTyping() -> Bool {
-        guard undoTypingEnabled else { return false }
-        guard engine.canUndoTyping() else { return false }
-        
-        let result = engine.undoTyping()
-        guard result.shouldConsume else { return false }
-        
-        // Build the replacement text
-        var replacementText = ""
-        for vnChar in result.newCharacters {
-            replacementText += vnChar.unicode(codeTable: codeTable)
-        }
-        
-        debugLogCallback?("🔙 Undo typing: backspaces=\(result.backspaceCount), text=\"\(replacementText)\"")
-        
-        // Use privateState to isolate from system event state (same as CharacterInjector)
-        guard let source = CGEventSource(stateID: .privateState) else {
-            debugLogCallback?("🔙 Failed to create event source")
-            return false
-        }
-        
-        // Step 1: Send backspaces
-        if result.backspaceCount > 0 {
-            for i in 0..<result.backspaceCount {
-                if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: true),
-                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: VietnameseData.KEY_DELETE, keyDown: false) {
-                    keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-                    keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-                    keyDown.post(tap: .cgSessionEventTap)
-                    keyUp.post(tap: .cgSessionEventTap)
-                    debugLogCallback?("🔙   Backspace \(i + 1)/\(result.backspaceCount)")
-                }
-                // Small delay between backspaces
-                usleep(3000)  // 3ms
-            }
-            // Wait after backspaces
-            usleep(10000)  // 10ms
-        }
-        
-        // Step 2: Send replacement characters
-        if !replacementText.isEmpty {
-            // Send text in one chunk using keyboardSetUnicodeString
-            var utf16Chars = Array(replacementText.utf16)
-            
-            if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
-                keyDown.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: &utf16Chars)
-                keyUp.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: &utf16Chars)
-                
-                keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-                keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-                
-                keyDown.post(tap: .cgSessionEventTap)
-                keyUp.post(tap: .cgSessionEventTap)
-                
-                debugLogCallback?("🔙   Sent text: \"\(replacementText)\"")
-            }
-        }
-        
-        // Mark new session after undo, preserve mid-sentence state
-        injector.markNewSession(preserveMidSentence: true)
-        
+    func performUndoTyping(event: CGEvent, proxy: CGEventTapProxy) -> Bool {
+        guard let effectiveVietnameseEnabled = activeInputContext() else { return false }
+        session.setEffectiveVietnameseEnabled(effectiveVietnameseEnabled)
+        let inputEvent = InputEvent(kind: .undo,
+                                    keyCode: nil,
+                                    characters: nil,
+                                    modifiers: [],
+                                    isRepeat: false)
+        let action = session.handle(inputEvent)
+        guard case .replacement(let replacement) = action else { return false }
+        debugLogCallback?("🔙 Undo typing: backspaces=\(replacement.backspaces), text=\"\(replacement.text)\"")
+        _ = transport.apply(action,
+                            event: inputEvent,
+                            originalEvent: event,
+                            proxy: proxy)
         return true
     }
     
     // MARK: - EventTapDelegate
 
     func waitForPendingInjection() {
-        injector.waitForInjectionComplete()
+        transport.waitForPendingInjection()
+    }
+
+    func releaseOwnership(afterPendingInjection release: () -> Void) {
+        waitForPendingInjection()
+        release()
     }
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
+        guard let effectiveVietnameseEnabled = activeInputContext() else { return false }
+        guard type == .keyDown || type == .flagsChanged else { return false }
+
+        session.setEffectiveVietnameseEnabled(effectiveVietnameseEnabled)
+        return true
+    }
+
+    /// Resolve every host/app/injection gate before InputSession can mutate.
+    private func activeInputContext() -> Bool? {
         // Another process's XKeyIM tap is armed for the app in front. Two taps must
         // never both transform one keystroke. This is per-app-accurate: the flag
         // only exists while XKeyIM is the active IME, so switching to an ABC app
@@ -363,100 +325,26 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // do that). isXKeyIMTapOwningInput is PID-relative, so this is never true
         // inside XKeyIM's own handler for its own tap.
         if SharedSettings.shared.isXKeyIMTapOwningInput {
-            return false
+            return nil
         }
 
-        // Check if current app is in excluded list
-        if isCurrentAppExcluded() {
-            return false
+        if appPolicyDecision == .disableTransformation || isCurrentAppExcluded() {
+            return nil
+        }
+
+        // Confirm passthrough before any session mutation. Inactive/excluded hosts must
+        // never accumulate typing state for events owned by another pipeline.
+        let confirmedMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
+        if confirmedMethod.method == .passthrough {
+            return nil
         }
 
         let effectiveVietnameseEnabled = effectiveVietnameseEnabled()
-        // Sync the engine's language flag to the effective state so the engine's macro
-        // decision (shouldUseMacro reads vLanguage) matches a policy override. Letter
-        // processing is gated below, but macro mode is read from vLanguage inside the engine.
-        // Recomputed every keystroke, so it never goes stale; Smart Switch reads the StatusBar
-        // state (not vLanguage), so this does not interfere with it.
-        engine.vLanguage = effectiveVietnameseEnabled ? 1 : 0
-
-        // The injection-method reprobe that used to be consumed here is now scheduled by
-        // armMethodReprobe() itself, off this thread, 50ms and again 250ms after the chord
-        // — see AppBehaviorDetector.methodReprobeDelays. Consuming it here meant a full AX
-        // snapshot inside the tap callback on the first character after every Cmd+L/Cmd+T.
-
-        // Check if injection method is passthrough - bypass all XKey processing.
-        let confirmedMethod = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
-        if confirmedMethod.method == .passthrough {
-            return false
-        }
-
-        // Key repeat events are filtered by EventTapManager.eventCallback():
-        // - All non-backspace repeats are bypassed immediately (Adobe spring-loaded tools etc.)
-        // - Only backspace repeats pass through to here for engine buffer sync
-        // No additional filtering needed here.
-
-        // Check if we should process in English mode (for macro support)
         let shouldProcessInEnglishMode = !effectiveVietnameseEnabled && macroEnabled && macroInEnglishMode
-
-        // Only process key down events when Vietnamese is enabled OR macro in English mode is enabled
         guard effectiveVietnameseEnabled || shouldProcessInEnglishMode else {
-            return false
+            return nil
         }
-
-        // For keyDown events, check modifier keys and skip processing if pressed
-        // IMPORTANT: Only reset engine for keyDown events, NOT for flagsChanged events
-        // For flagsChanged (modifier-only hotkeys like Ctrl+Shift for undo), we don't want
-        // to reset the engine because that would clear the undo buffer
-        if type == .keyDown {
-            // Count active modifiers (excluding Shift for letter uppercase)
-            let hasCommand = event.isCommandPressed
-            let hasControl = event.isControlPressed
-            let hasOption = event.isOptionPressed
-            let hasShift = event.flags.contains(.maskShift)
-            
-            // Calculate number of modifiers pressed
-            let modifierCount = (hasCommand ? 1 : 0) + (hasControl ? 1 : 0) + 
-                               (hasOption ? 1 : 0) + (hasShift ? 1 : 0)
-            
-            // Reset engine if there's a key combination:
-            // 1. Cmd/Ctrl/Alt + any key (common shortcuts like Cmd+Z, Ctrl+K, Alt+Arrow)
-            // 2. 2+ modifiers pressed (like Ctrl+Shift, Cmd+Shift+Z, etc.)
-            //
-            // This handles all hotkey patterns consistently:
-            // - Cmd+C/V/X (copy/paste/cut)
-            // - Cmd+Z (undo) - text changes
-            // - Cmd+Arrow (word/line navigation)
-            // - Ctrl+K (delete line in some editors)
-            // - Alt+Arrow (word navigation)
-            // - Ctrl+Shift+* (various custom hotkeys)
-            //
-            // Shift alone with letter is NOT reset (for uppercase typing)
-            let hasModifierCombo = hasCommand || hasControl || hasOption || modifierCount >= 2
-            
-            if hasModifierCombo {
-                // Check if this is a cursor movement key
-                let keyCode = event.keyCode
-                let isCursorMovement = VietnameseData.cursorMovementKeys.contains(keyCode)
-                
-                if isCursorMovement {
-                    // CRITICAL FIX: Use resetWithCursorMoved() to properly set the flag
-                    // This ensures history is cleared and restore logic is skipped
-                    // Previously, engine.reset() was called which didn't set cursorMovedSinceReset
-                    engine.resetWithCursorMoved()
-                    injector.markNewSession(cursorMoved: true)
-                } else {
-                    // Other combos (Cmd+C/V/Z, Ctrl+K, etc.) → preserve mid-sentence state
-                    // These don't move cursor position, so keep existing flag value
-                    engine.reset()
-                    injector.markNewSession(preserveMidSentence: true)
-                }
-                return false
-            }
-        }
-
-
-
-        return true
+        return effectiveVietnameseEnabled
     }
     
     /// Wire or unwire engine/injector log closures.
@@ -467,12 +355,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             engine.logCallback = { [weak self] message in
                 self?.debugLogCallback?("Engine: \(message)")
             }
-            injector.debugCallback = { [weak self] message in
+            transport.debugCallback = { [weak self] message in
                 self?.debugLogCallback?("Injector: \(message)")
             }
         } else {
             engine.logCallback = nil
-            injector.debugCallback = nil
+            transport.debugCallback = nil
             // Drop the stale copy CharacterInjector forwarded before verbose was
             // turned off (it is only refreshed right before each AX injection).
             AdvancedInjectionMethods.shared.debugCallback = nil
@@ -493,273 +381,22 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     func processKeyEvent(_ event: CGEvent, type: CGEventType, proxy: CGEventTapProxy) -> CGEvent? {
-        guard type == .keyDown else {
+        // Modifier-only hotkeys trigger on release. Physical flagsChanged events must
+        // not clear undo state before EventTapManager observes that release.
+        guard type == .keyDown else { return event }
+        guard let inputEvent = transport.normalize(event, type: type) else {
             return event
         }
 
-        // Get physical key code
-        let keyCode = event.keyCode
-
-        // Handle special keys BEFORE qwertyCharacter mapping
-        // These keys need special handling and don't need character conversion
-
-        // Handle Backspace/Delete
-        if keyCode == VietnameseData.KEY_DELETE {
-            debugLogCallback?("[\(getTimestamp())] ⌫ BACKSPACE received (keyCode=0x\(String(format: "%02X", VietnameseData.KEY_DELETE)))")
-            return handleBackspace(event: event, proxy: proxy)
+        let action = session.handle(inputEvent)
+        if case .replacement(let replacement) = action {
+            debugLogCallback?("[\(getTimestamp())] CONSUME: bs=\(replacement.backspaces), text=\"\(replacement.text)\"")
         }
-
-        // Handle cursor movement keys - reset engine as focus might have changed
-        if VietnameseData.cursorMovementKeys.contains(keyCode) {
-            let keyName: String
-            switch keyCode {
-            case VietnameseData.KEY_LEFT: keyName = "←"
-            case VietnameseData.KEY_RIGHT: keyName = "→"
-            case VietnameseData.KEY_DOWN: keyName = "↓"
-            case VietnameseData.KEY_UP: keyName = "↑"
-            case VietnameseData.KEY_HOME: keyName = "Home"
-            case VietnameseData.KEY_END: keyName = "End"
-            case VietnameseData.KEY_PAGE_UP: keyName = "PgUp"
-            case VietnameseData.KEY_PAGE_DOWN: keyName = "PgDn"
-            default: keyName = "?"
-            }
-            debugLogCallback?("[\(getTimestamp())] \(keyName) Arrow/Nav key received (keyCode=0x\(String(format: "%02X", keyCode)))")
-            engine.resetWithCursorMoved()  // Use new method that sets cursor moved flag
-            injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
-            return event
-        }
-
-        // Handle Tab key - reset engine but preserve mid-sentence state
-        // Tab adds indentation/whitespace, it doesn't move to a new field
-        // When user types Enter + Tab (e.g., starting a new indented line in code),
-        // they may still have text on the right side. Forward Delete must be blocked.
-        // NOTE: Only real field switches (like Tab in a form) should reset mid-sentence,
-        // but we can't distinguish that from regular Tab, so preserve state to be safe.
-        if keyCode == VietnameseData.KEY_TAB { // Tab
-            engine.reset()
-            injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state
-            return event
-        }
-
-        // NOTE: Escape key undo is now handled by EventTapManager (via undoTypingHotkey)
-        // This allows both default Esc and custom hotkeys (like Ctrl+Shift) to work consistently
-        // through the same code path (performUndoTyping callback)
-
-        // Handle Forward Delete (Fn+Delete)
-        if keyCode == VietnameseData.KEY_FORWARD_DELETE { // Forward Delete
-            engine.reset()
-            injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state after Forward Delete
-            return event  // Pass through
-        }
-
-        // CRITICAL: Get character directly from the event
-        // When using Input Sources like Swiss French, macOS already handles the layout conversion
-        // The character we receive is what the user expects to type
-        // For example, with Swiss French QWERTZ:
-        //   - User presses physical 'Z' key (where Y is on QWERTZ)
-        //   - macOS sends: keyCode=0x10 (QWERTY Y position), character='z' (Swiss French mapping)
-        //   - We should use character='z' for Telex processing
-
-        // Get character from event (respects current Input Source)
-        guard let characters = event.characters,
-              let character = characters.first else {
-            return event
-        }
-
-        // Determine if Shift/CapsLock is pressed
-        let hasShiftModifier = event.flags.contains(.maskShift)
-        let hasCapsLock = event.flags.contains(.maskAlphaShift)
-
-        // Determine if uppercase:
-        // - For letters: Shift XOR Caps Lock (standard behavior)
-        // - For bracket keys [/]: respect Caps Lock since engine converts them to Vietnamese vowels ơ/ư
-        // - For other non-letters: use the character as-is
-        let isLetter = character.isLetter
-        let isBracketForVietnamese = (character == "[" || character == "]")
-        let isUppercase: Bool
-        if isLetter || isBracketForVietnamese {
-            isUppercase = hasShiftModifier != hasCapsLock
-        } else {
-            isUppercase = character.isUppercase
-        }
-
-        // Convert character to QWERTY keyCode for engine processing
-        // Engine expects keyCode based on QWERTY layout (e.g., 'z' → 0x06)
-        // This ensures Vietnamese processing works correctly regardless of Input Source
-        let engineKeyCode: CGKeyCode
-        if let convertedKeyCode = KeyCodeToCharacter.keyCode(forCharacter: character) {
-            engineKeyCode = convertedKeyCode
-        } else {
-            // Fallback to physical keyCode if character not found in mapping
-            engineKeyCode = keyCode
-        }
-
-        // Check if we're in English mode with macro support
-        let vietnameseEnabledForContext = effectiveVietnameseEnabled()
-        let isEnglishModeWithMacro = !vietnameseEnabledForContext && macroEnabled && macroInEnglishMode
-
-        if isWordBreakKey(character) {
-            // Pending injection was already synchronized at the HID/session tap boundary.
-            // Keeping the barrier there covers pass-through shortcuts and avoids a second
-            // semaphore round-trip on this handler path.
-
-            // Log word break key
-            let keyName: String
-            switch character {
-            case " ": keyName = "SPACE"
-            case "\n", "\r": keyName = "ENTER"
-            default: keyName = "'\(character)'"
-            }
-            debugLogCallback?("[\(getTimestamp())] \(keyName) Word-break received (index=\(engine.index), spaceCount=\(engine.spaceCount))")
-            
-            // IMPORTANT: Check if engine has buffer OR macroKey before processing word break
-            // If engine buffer is empty (index == 0) AND no macroKey, it means:
-            // 1. User just started typing, OR
-            // 2. Editor autocompleted characters (e.g., ":d" → emoji)
-            // In both cases, we should NOT process word break with spell check
-            // because it would restore/delete the autocompleted text
-            //
-            // HOWEVER, if macroKey has content (even with index == 0), we still need to
-            // call processWordBreak to trigger macro replacement. This happens when user
-            // types a macro ending with a special character like "you@" - after typing "@",
-            // the index is reset to 0 but macroKey still has [y, o, u, @].
-            //
-            // ALSO, if the character could be part of a macro (like "@", "!", etc.),
-            // we should call processWordBreak to add it to macroKey, even if buffer is empty.
-            // This supports macros starting with special characters like "@gmail" → "email@gmail.com".
-            let hasMacroKey = macroEnabled && !engine.hookState.macroKey.isEmpty
-            
-            // Check if this is a non-space character that could be part of a macro
-            // These characters should be added to macroKey via processWordBreak
-            let isMacroableChar = macroEnabled && character != " " && 
-                ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", 
-                 "~", "`", "-", "_", "=", "+", "{", "}", "|", ":", "\"", 
-                 "<", ">", "?", ";", "'", ",", ".", "/", "\\", "[", "]"].contains(character)
-            
-            if engine.index > 0 || hasMacroKey || isMacroableChar {
-                // Engine has buffer OR pending macro OR macroable character - process word break
-                let result = engine.processWordBreak(character: character)
-                
-                // Check if macro was found and replaced, or restore happened
-                if result.shouldConsume {
-                    // Atomic backspace + replacement in one operation (consistent with
-                    // handleCharacter/handleBackspace). This prevents a keystroke from
-                    // interleaving between the deletion and the re-type, and routes overlay
-                    // launchers (Spotlight/Raycast/Alfred) through the AX atomic path.
-                    //
-                    // newCharacters already includes the trailing space/newline for
-                    // restore/macro, so we consume the original event to avoid a double space.
-                    injector.inject(
-                        backspaceCount: result.backspaceCount,
-                        characters: result.newCharacters,
-                        codeTable: codeTable,
-                        proxy: proxy
-                    )
-
-                    return nil
-                }
-            } else {
-                // No buffer, no macroKey, and not a macroable character
-                // Just reset engine and let word break pass through
-                // This prevents restoring autocompleted text (like emojis)
-                
-                // IMPORTANT: Update uppercase status BEFORE reset
-                // When Enter is pressed with empty buffer, we still need to track
-                // that a sentence-ending event occurred for auto-capitalize feature
-                engine.updateUpperCaseStatus(character: character)
-                engine.reset()
-            }
-            
-            // CRITICAL FIX: When Enter/Return is pressed, set isTypingMidSentence = true
-            // After inserting a newline, cursor will be at the start of a new line.
-            // If there are any lines below, Forward Delete would pull up the next line.
-            // By setting isTypingMidSentence = true, we prevent Forward Delete from being sent.
-            // This is essential for multi-line editing scenarios like:
-            // - User is at end of line 1 of 3 lines, presses Enter to create new line
-            // - New line is between line 1 and old line 2
-            // - When typing Vietnamese on new line, Forward Delete must be blocked
-            if character == "\n" || character == "\r" {
-                injector.markNewSession(cursorMoved: true)  // Treat Enter as cursor movement
-                // History is now cleared in processWordBreak() for ALL apps after Enter,
-                // so terminal-specific clearHistory() is no longer needed here.
-            }
-            
-            return event
-        }
-
-        // In English mode with macro, only accumulate macro keys without Vietnamese processing
-        if isEnglishModeWithMacro {
-            engine.addKeyToMacroBuffer(keyCode: engineKeyCode, isCaps: isUppercase)
-            return event  // Pass through without Vietnamese processing
-        }
-
-        // Pending injection was already synchronized at the HID/session tap boundary.
-
-        // Process through engine (Vietnamese mode)
-        let result = engine.processKey(
-            character: character,
-            keyCode: engineKeyCode,
-            isUppercase: isUppercase
-        )
-
-        if result.shouldConsume {
-            // Route injection through the minimal async optimization. Proxy-based methods
-            // remain synchronized; only plain slow direct-post methods run on the queue.
-            injector.inject(
-                backspaceCount: result.backspaceCount,
-                characters: result.newCharacters,
-                codeTable: codeTable,
-                proxy: proxy
-            )
-
-            // Consume original event
-            return nil
-        }
-
-
-        // Pass through - engine may have buffered this character
-        // If editor autocompletes it (e.g., \":d\" → emoji), the word break handler
-        // will check engine.index and skip processing to avoid deleting the autocompleted text
-        return event
+        return transport.apply(action,
+                               event: inputEvent,
+                               originalEvent: event,
+                               proxy: proxy)
     }
-    
-    // MARK: - Special Key Handling
-
-    private func handleBackspace(event: CGEvent, proxy: CGEventTapProxy) -> CGEvent? {
-        // In English mode with macro, only update macro buffer
-        let vietnameseEnabledForContext = effectiveVietnameseEnabled()
-        let isEnglishModeWithMacro = !vietnameseEnabledForContext && macroEnabled && macroInEnglishMode
-        if isEnglishModeWithMacro {
-            debugLogCallback?("[\(getTimestamp())] ⌫ Backspace in English+Macro mode - pass through")
-            engine.updateMacroBufferOnBackspace()
-            return event  // Pass through
-        }
-
-        // Pending injection was already synchronized at the HID/session tap boundary.
-
-        debugLogCallback?("[\(getTimestamp())] ⌫ Processing backspace (index=\(engine.index), spaceCount=\(engine.spaceCount))")
-        let result = engine.processBackspace()
-
-        if result.shouldConsume {
-            // Route through the same proxy-preserving injection policy.
-            injector.inject(
-                backspaceCount: result.backspaceCount,
-                characters: result.newCharacters,
-                codeTable: codeTable,
-                proxy: proxy
-            )
-
-            return nil
-        }
-
-        return event
-    }
-    
-    private func isWordBreakKey(_ character: Character) -> Bool {
-        // Use centralized logic from VNEngine to ensure consistency with XKeyIM
-        return VNEngine.isWordBreak(character: character, inputMethod: inputMethod)
-    }
-    
     // MARK: - Settings Update
     
     private func updateEngineSettings() {
@@ -781,7 +418,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.restoreIfWrongSpelling = restoreIfWrongSpelling
         settings.skipRestoreForUppercaseVietnameseAbbreviations = skipRestoreForUppercaseVietnameseAbbreviations
 
-        settings.customConsonants = VietnameseData.parseCustomConsonants(customConsonants)
+        settings.customConsonants = customConsonants
         
         // Macro settings
         settings.macroEnabled = macroEnabled
@@ -792,71 +429,64 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Smart switch
         settings.smartSwitchEnabled = smartSwitchEnabled
         
-        engine.updateSettings(settings)
+        session.update(engineSettings: settings,
+                       yieldMacroToSystemReplacement: yieldMacroToSystemReplacement,
+                       undoTypingEnabled: undoTypingEnabled)
         
         // Debug: Log spell check setting sync
         debugLogCallback?("⚙️ Settings sync: spellCheckEnabled=\(spellCheckEnabled) → vCheckSpelling=\(engine.vCheckSpelling)")
-        
-        // Update macro manager
-        macroManager.setCodeTable(codeTable.rawValue)
-        macroManager.setAutoCapsMacro(autoCapsMacro)
-        macroManager.setYieldToSystemReplacement(yieldMacroToSystemReplacement)
+
     }
-    
-    /// Apply all settings at once (batch update) - only calls updateEngineSettings() once at the end
-    /// This prevents multiple redundant log messages when applying preferences at startup
-    func applyAllSettings(
-        inputMethod: InputMethod,
-        codeTable: CodeTable,
-        modernStyle: Bool,
-        spellCheckEnabled: Bool,
-        quickTelexEnabled: Bool,
-        quickStartConsonantEnabled: Bool,
-        quickEndConsonantEnabled: Bool,
-        upperCaseFirstChar: Bool,
-        capitalizeOnlyAfterSpace: Bool,
-        restoreIfWrongSpelling: Bool,
-        skipRestoreForUppercaseVietnameseAbbreviations: Bool,
-        customConsonants: String,
-        macroEnabled: Bool,
-        macroInEnglishMode: Bool,
-        autoCapsMacro: Bool,
-        addSpaceAfterMacro: Bool,
-        yieldMacroToSystemReplacement: Bool,
-        smartSwitchEnabled: Bool,
-        excludedApps: [ExcludedApp],
-        undoTypingEnabled: Bool
-    ) {
-        // Enable batch mode to skip individual updateEngineSettings() calls
+
+    func apply(_ runtimePreferences: RuntimePreferences) {
+        let settings = runtimePreferences.engineSettings
+        refreshDictionary(for: settings)
         isBatchUpdating = true
-        
-        // Set all properties (didSet won't trigger updateEngineSettings due to flag)
-        self.inputMethod = inputMethod
-        self.codeTable = codeTable
-        self.modernStyle = modernStyle
-        self.spellCheckEnabled = spellCheckEnabled
-        self.quickTelexEnabled = quickTelexEnabled
-        self.quickStartConsonantEnabled = quickStartConsonantEnabled
-        self.quickEndConsonantEnabled = quickEndConsonantEnabled
-        self.upperCaseFirstChar = upperCaseFirstChar
-        self.capitalizeOnlyAfterSpace = capitalizeOnlyAfterSpace
-        self.restoreIfWrongSpelling = restoreIfWrongSpelling
-        self.skipRestoreForUppercaseVietnameseAbbreviations = skipRestoreForUppercaseVietnameseAbbreviations
-        self.customConsonants = customConsonants
-        self.macroEnabled = macroEnabled
-        self.macroInEnglishMode = macroInEnglishMode
-        self.autoCapsMacro = autoCapsMacro
-        self.addSpaceAfterMacro = addSpaceAfterMacro
-        self.yieldMacroToSystemReplacement = yieldMacroToSystemReplacement
-        self.smartSwitchEnabled = smartSwitchEnabled
-        self.excludedApps = excludedApps
-        self.undoTypingEnabled = undoTypingEnabled
-        
-        // Disable batch mode
+
+        inputMethod = settings.inputMethod
+        codeTable = settings.codeTable
+        modernStyle = settings.modernStyle
+        spellCheckEnabled = settings.spellCheckEnabled
+        quickTelexEnabled = settings.quickTelexEnabled
+        quickStartConsonantEnabled = settings.quickStartConsonantEnabled
+        quickEndConsonantEnabled = settings.quickEndConsonantEnabled
+        upperCaseFirstChar = settings.upperCaseFirstChar
+        capitalizeOnlyAfterSpace = settings.capitalizeOnlyAfterSpace
+        restoreIfWrongSpelling = settings.restoreIfWrongSpelling
+        skipRestoreForUppercaseVietnameseAbbreviations = settings.skipRestoreForUppercaseVietnameseAbbreviations
+        customConsonants = settings.customConsonants
+        macroEnabled = settings.macroEnabled
+        macroInEnglishMode = settings.macroInEnglishMode
+        autoCapsMacro = settings.autoCapsMacro
+        addSpaceAfterMacro = settings.addSpaceAfterMacro
+        yieldMacroToSystemReplacement = runtimePreferences.yieldMacroToSystemReplacement
+        smartSwitchEnabled = settings.smartSwitchEnabled
+        excludedApps = runtimePreferences.excludedApps
+        exclusionRulesEnabled = runtimePreferences.exclusionRulesEnabled
+        undoTypingEnabled = runtimePreferences.undoTypingEnabled
+
         isBatchUpdating = false
-        
-        // Now call updateEngineSettings() once
-        updateEngineSettings()
+        session.apply(runtimePreferences)
+        debugLogCallback?("⚙️ Settings sync: spellCheckEnabled=\(spellCheckEnabled) → vCheckSpelling=\(engine.vCheckSpelling)")
+        if isVietnameseEnabled != runtimePreferences.vietnameseEnabled {
+            setVietnamese(runtimePreferences.vietnameseEnabled)
+        }
+    }
+
+    private func refreshDictionary(for settings: VNEngine.EngineSettings) {
+        let style: VNDictionaryManager.DictionaryStyle = settings.modernStyle ? .dauMoi : .dauCu
+        let result = DictionaryRuntime.shared.refresh(enabled: settings.spellCheckEnabled, style: style)
+        guard result.didChange else { return }
+
+        switch result.newState {
+        case .unavailable(let style):
+            debugLogCallback?("Dictionary unavailable: \(style.rawValue)")
+        case .failed(let style):
+            let diagnostic = result.diagnostic.map { ": \($0)" } ?? ""
+            debugLogCallback?("Dictionary load failed: \(style.rawValue)\(diagnostic)")
+        case .disabled, .loaded:
+            break
+        }
     }
     
     // MARK: - Macro Management
@@ -865,34 +495,35 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         return macroManager
     }
 
-    func getSmartSwitchManager() -> SmartSwitchManager {
-        return smartSwitchManager
-    }
-    
     // MARK: - Reset
     
     func reset() {
-        engine.reset()
-        injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state to avoid Forward Delete in wrong context
-        injector.clearMethodCache()  // Clear injection method cache
+        session.reset()
+        transport.reset(cursorMoved: false, preserveMidSentence: true)
     }
     
     /// Reset engine and mark that cursor was moved (by mouse click or arrow keys)
     /// This disables autocomplete fix to avoid deleting text on the right of cursor
     /// Also sets engine flag to skip restore logic (user may be editing mid-word)
     func resetWithCursorMoved() {
-        engine.resetWithCursorMoved()  // Use new method that sets cursor moved flag
-        injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
-        injector.clearMethodCache()  // Clear injection method cache
+        _ = session.handle(InputEvent(kind: .focusChanged,
+                                      keyCode: nil,
+                                      characters: nil,
+                                      modifiers: [],
+                                      isRepeat: false))
+        transport.reset(cursorMoved: true, preserveMidSentence: false)
     }
 
     /// Reset engine when app switches
     /// Assumes user will likely click into middle of text, so enables mid-sentence mode
     /// This prevents Forward Delete from deleting text on the right of cursor
     func resetForAppSwitch() {
-        engine.resetWithCursorMoved()  // Use new method that sets cursor moved flag
-        injector.markNewSession(cursorMoved: true)  // Assume typing mid-sentence after app switch
-        injector.clearMethodCache()
+        _ = session.handle(InputEvent(kind: .focusChanged,
+                                      keyCode: nil,
+                                      characters: nil,
+                                      modifiers: [],
+                                      isRepeat: false))
+        transport.reset(cursorMoved: true, preserveMidSentence: false)
     }
     
     /// Reset engine state when user session becomes active after Fast User Switch.
@@ -900,9 +531,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// but the engine buffer may have accumulated stale state. This ensures a
     /// clean slate when the user returns to this session.
     func sessionDidBecomeActive() {
-        engine.resetWithCursorMoved()
-        injector.markNewSession(cursorMoved: true)
-        injector.clearMethodCache()
+        _ = session.handle(InputEvent(kind: .focusChanged,
+                                      keyCode: nil,
+                                      characters: nil,
+                                      modifiers: [],
+                                      isRepeat: false))
+        transport.reset(cursorMoved: true, preserveMidSentence: false)
         debugLogCallback?("🖥️ Session active — engine/injector reset for clean Vietnamese input")
     }
 
@@ -910,7 +544,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     /// Used when clicking into overlay app (Spotlight/Raycast/Alfred) with empty input field
     /// Since the field is empty, Forward Delete is safe (nothing to delete on right)
     func resetMidSentenceFlag() {
-        injector.resetMidSentenceFlag()
+        transport.resetMidSentenceFlag()
     }
 
     // MARK: - Excluded Apps Check
@@ -995,4 +629,3 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         return excludedBundleIds.contains(bundleIdentifier)
     }
 }
-

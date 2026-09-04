@@ -16,6 +16,11 @@ import Sparkle
 /// to avoid redundant struct definitions and AX queries
 private typealias FocusedElementInfo = AppBehaviorDetector.FocusedElementInfo
 
+private struct AppHostCommandContext {
+    let event: CGEvent
+    let proxy: CGEventTapProxy
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Shared Instance
@@ -39,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var readWordHotKeyMonitor: Any?
     private var readWordGlobalHotKeyMonitor: Any?
     private var tapEventSource: TapEventSource?
+    private var secureInputOwnershipObserver: NSObjectProtocol?
     private var permissionAlertShown = false
     private var permissionCheckTimer: Timer?
     private var inputSourceManager: InputSourceManager?
@@ -47,6 +53,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var tempOffToolbarHotkeyMonitor: Any?
     private var tempOffToolbarGlobalHotkeyMonitor: Any?
     private var lastFocusedElement: AXUIElement?
+    private lazy var hostCommandRouter = HostCommandRouter<AppHostCommandContext>(
+        capabilities: .xkeyApp,
+        handler: { [weak self] command, context in
+            self?.handleHostCommand(command, context: context) ?? .unavailable
+        },
+        log: { [weak self] message in self?.debugWindowController?.logEvent(message) }
+    )
+    private lazy var inputOwnershipHandoffCoordinator = InputOwnershipHandoffCoordinator(
+        store: SharedSettings.shared,
+        processChecker: SystemInputOwnershipProcessChecker()
+    )
+    private lazy var mainInputOwnershipLifecycle = MainInputOwnershipLifecycle(
+        store: SharedSettings.shared
+    )
+    private var mainSettingsChangeTracker: MainSettingsChangeTracker?
+    private let remoteDesktopTargetLifecycle = RemoteDesktopTargetLifecycle()
+    private var mainTapOwnershipRecheckGeneration: UInt64 = 0
+    private static let mainTapOwnershipRecheckDelay: TimeInterval = 0.05
+    private static let mainTapOwnershipMaxRechecks = 15
+    private static let mainTapOwnershipSlowRecheckDelay: TimeInterval = 1
+
+    private lazy var secureInputMonitor = SecureInputMonitor(
+        detector: SystemSecureInputDetector(),
+        capabilities: .xkeyApp,
+        presenter: SecureInputOverlay.shared,
+        ownsPresentation: { !SystemSecureInputDetector.isXKeyIMSelectedInputSource },
+        presentationEnabled: { [weak self] in
+            self?.statusBarManager?.viewModel.isVietnameseEnabled ?? false
+        },
+        onTransition: { [weak self] transition in
+            guard let self else { return }
+            switch transition {
+            case .becameActive(let observation), .holderChanged(let observation):
+                let appName = observation.holderAppName
+                self.debugWindowController?.logEvent("⚠️ Secure Input đang BẬT bởi '\(appName)' — XKey không thể nhận phím!")
+                self.debugWindowController?.updateStatus("⚠️ Secure Input: \(appName)")
+            case .becameInactive:
+                self.debugWindowController?.logEvent("✅ Secure Input đã TẮT — XKey hoạt động bình thường")
+                self.debugWindowController?.updateStatus("Ready")
+            }
+        }
+    )
     private var updaterController: SPUStandardUpdaterController?
     private var sparkleUpdateDelegate: SparkleUpdateDelegate?
     
@@ -134,6 +182,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Observe requests before publishing our PID, so a request cannot land in a
+        // startup gap with no notification consumer. The initial input-source check
+        // later catches a request that arrives before EventTapManager exists.
+        setupSharedSettingsObserver()
+
         // Create debug window first
         setupDebugWindow()
 
@@ -179,6 +232,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup input source manager
         setupInputSourceManager()
+        applyInitialMainSettingsState()
 
         // Setup temp off toolbar (also handles focus change monitoring for injection detection)
         setupTempOffToolbar()
@@ -226,7 +280,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         debugWindowController?.logEvent("👋 XKey terminating...")
-        eventTapManager?.stop()
+        mainInputOwnershipLifecycle.terminate(pid: Int(getpid()), suspendAndDrain: { [weak self] in
+            self?.eventTapManager?.suspendAndDrainPendingInjection()
+        }, stop: { [weak self] in
+            self?.eventTapManager?.stop()
+        })
 
         // Remove read word hotkey monitors
         if let monitor = readWordHotKeyMonitor {
@@ -255,6 +313,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop focus observer + remove app switch observer
         // (TapEventSource.stop() now calls removeAXObserver() itself — Task 7)
         tapEventSource?.stop()
+
+        stopSecureInputPolling()
+        secureInputCancellable?.cancel()
+        secureInputCancellable = nil
+        if let observer = secureInputOwnershipObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+            secureInputOwnershipObserver = nil
+        }
+        secureInputMonitor.invalidate()
 
         // Stop permission check timer
         permissionCheckTimer?.invalidate()
@@ -349,8 +416,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create event tap manager
         eventTapManager = EventTapManager()
+        eventTapManager?.onEventTapPermissionLost = { [weak self] in
+            self?.debugWindowController?.updateStatus("Waiting for accessibility permission...")
+            self?.debugWindowController?.logEvent("Accessibility permission revoked; event tap stopped")
+            self?.startPermissionMonitoring()
+        }
+        eventTapManager?.onHostCommand = { [weak self] command, event, proxy in
+            guard let self else { return .unavailable }
+            return self.hostCommandRouter.route(
+                command,
+                context: AppHostCommandContext(event: event, proxy: proxy)
+            )
+        }
         eventTapManager?.delegate = keyboardHandler
         debugWindowController?.logEvent("Event tap manager created, delegate set")
+
+        // Connect host logging before the initial environment apply so dictionary
+        // availability/load failures are not lost on their first state transition.
+        updateHotPathLogWiring()
 
         // Wire host state into the tap layer through the one contract both hosts
         // share, before the tap can start and make its first AX call.
@@ -364,9 +447,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             axMessagingTimeout: 0.25
         )
         environment.apply(to: keyboardHandler!)
-
-        // Connect per-keystroke debug logging for handler + event tap
-        updateHotPathLogWiring()
         
         // Setup ForceAccessibilityManager log callback
         ForceAccessibilityManager.shared.logCallback = { [weak self] message in
@@ -384,29 +464,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check permission BEFORE trying to start event tap
         // This prevents macOS system dialog from appearing
-        guard let manager = eventTapManager else { return }
+        guard eventTapManager != nil else { return }
 
         // Check if current input source is XKeyIM
         // If so, don't start event tap yet (will be started when switching away)
-        if let currentSource = InputSourceManager.getCurrentInputSource(),
-           InputSourceManager.isXKeyInputSource(currentSource) {
-            debugWindowController?.logEvent("  Current input source is XKeyIM - event tap will NOT start")
-            debugWindowController?.logEvent("     Event tap will start automatically when switching away from XKeyIM")
-            return
-        }
-
-        if manager.checkAccessibilityPermission() {
-            // Permission already granted, start event tap
-            do {
-                try manager.start()
-                debugWindowController?.updateStatus("Event tap started - Ready to type!")
-            } catch {
-                debugWindowController?.updateStatus("ERROR: Failed to start event tap")
-            }
-        } else {
-            // No permission yet - don't call start() to avoid system dialog
-            debugWindowController?.updateStatus("Waiting for accessibility permission...")
-        }
+        mainInputOwnershipLifecycle.managerBecameReady(pid: Int(getpid()))
+        reconcileMainEventTapOwnership()
     }
     
     private func setupStatusBar() {
@@ -422,6 +485,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusBarManager?.viewModel.onOpenConvertTool = { [weak self] in
             self?.openConvertTool()
+        }
+        statusBarManager?.viewModel.onRemoteDesktopTargetChanged = { [weak self] enabled in
+            self?.applyRemoteDesktopTargetMode(enabled)
         }
         statusBarManager?.viewModel.onOpenDebugWindow = { [weak self] in
             self?.openDebugWindow()
@@ -526,29 +592,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func applyPreferences(_ preferences: Preferences) {
-        // Apply all engine settings at once (batch update - only 1 log message instead of 16+)
-        keyboardHandler?.applyAllSettings(
-            inputMethod: preferences.inputMethod,
-            codeTable: preferences.codeTable,
-            modernStyle: preferences.modernStyle,
-            spellCheckEnabled: preferences.spellCheckEnabled,
-            quickTelexEnabled: preferences.quickTelexEnabled,
-            quickStartConsonantEnabled: preferences.quickStartConsonantEnabled,
-            quickEndConsonantEnabled: preferences.quickEndConsonantEnabled,
-            upperCaseFirstChar: preferences.upperCaseFirstChar,
-            capitalizeOnlyAfterSpace: preferences.capitalizeOnlyAfterSpace,
-            restoreIfWrongSpelling: preferences.restoreIfWrongSpelling,
-            skipRestoreForUppercaseVietnameseAbbreviations: preferences.skipRestoreForUppercaseVietnameseAbbreviations,
-            customConsonants: preferences.customConsonantEnabled ? preferences.customConsonants : "",
-            macroEnabled: preferences.macroEnabled,
-            macroInEnglishMode: preferences.macroInEnglishMode,
-            autoCapsMacro: preferences.autoCapsMacro,
-            addSpaceAfterMacro: preferences.addSpaceAfterMacro,
-            yieldMacroToSystemReplacement: preferences.yieldMacroToSystemReplacement,
-            smartSwitchEnabled: preferences.smartSwitchEnabled,
-            excludedApps: preferences.excludedApps,
-            undoTypingEnabled: preferences.undoTypingEnabled
-        )
+        if let keyboardHandler {
+            let runtimePreferences = RuntimePreferences(
+                preferences: preferences,
+                vietnameseEnabled: statusBarManager?.viewModel.isVietnameseEnabled
+                    ?? SharedSettings.shared.vietnameseEnabled,
+                windowTitleRulesEnabled: preferences.windowTitleRulesEnabled,
+                remoteDesktopInjectMode: SharedSettings.shared.remoteDesktopInjectMode
+            )
+            keyboardHandler.apply(runtimePreferences)
+            tapEventSource?.handleFocusCheck()
+        }
         
         // Apply debug mode (toggle debug window)
         // Keep debug window open if either debugModeEnabled OR openDebugOnLaunch is true
@@ -601,16 +655,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update toggle window rules hotkey (pass hotkey directly to avoid re-loading preferences)
         updateToggleWindowRulesHotkey(hotkey: preferences.toggleWindowRulesHotkey)
 
-        // Restart event tap if remote target mode changed — session tap strategy differs
-        // (always-on tailAppend vs lazy frontmost-based).
-        let currentTargetMode = SharedSettings.shared.isRemoteDesktopTarget
-        if currentTargetMode != preferences.isRemoteDesktopTarget {
+        if SharedSettings.shared.isRemoteDesktopTarget != preferences.isRemoteDesktopTarget {
             SharedSettings.shared.isRemoteDesktopTarget = preferences.isRemoteDesktopTarget
-            if eventTapManager?.isRunning == true {
-                try? eventTapManager?.restart()
-                debugWindowController?.logEvent("Event tap restarted (isRemoteDesktopTarget → \(preferences.isRemoteDesktopTarget))")
-            }
         }
+        applyRemoteDesktopTargetMode(preferences.isRemoteDesktopTarget)
 
         debugWindowController?.logEvent("Preferences applied (including advanced features)")
     }
@@ -764,27 +812,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startPermissionMonitoring() {
+        guard permissionCheckTimer == nil else { return }
         // Check permission every 2 seconds
         permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             guard let self = self,
                   let manager = self.eventTapManager else { return }
             
             if manager.checkAccessibilityPermission() {
-                // Permission granted! Try to start event tap
                 self.debugWindowController?.logEvent("Accessibility permission granted!")
-                
-                do {
-                    try manager.start()
-                    self.debugWindowController?.updateStatus("Event tap started - Ready to type!")
-                    self.debugWindowController?.logEvent("Event tap started successfully after permission grant")
-                    
-                    // Stop monitoring
-                    self.permissionCheckTimer?.invalidate()
-                    self.permissionCheckTimer = nil
-                    
-                } catch {
-                    self.debugWindowController?.logEvent("Failed to start event tap: \(error)")
-                }
+                self.reconcileMainEventTapOwnership()
+                self.permissionCheckTimer?.invalidate()
+                self.permissionCheckTimer = nil
             }
         }
         
@@ -795,24 +833,63 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let preferences = SharedSettings.shared.loadPreferences()
         setupGlobalHotkey(with: preferences.toggleHotkey)
     }
+
+    private func handleHostCommand(_ command: HostCommand,
+                                   context: AppHostCommandContext) -> HostCommandResult {
+        if command == .undoTyping {
+            guard let keyboardHandler else { return .unavailable }
+            return keyboardHandler.performUndoTyping(event: context.event, proxy: context.proxy)
+                ? .handled
+                : .unavailable
+        }
+
+        let modifiers = ModifierFlags(from: context.event.flags)
+        let keyCode = context.event.keyCode
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let preferences = SharedSettings.shared.loadPreferences()
+            switch command {
+            case .toggleVietnamese:
+                if modifiers.contains(.function)
+                    || (modifiers == [.control] && keyCode == 49) {
+                    self.inputSourceManager?.temporarilyIgnoreInputSourceChanges(forSeconds: 0.5)
+                }
+                self.statusBarManager?.viewModel.toggleVietnamese()
+                self.debugWindowController?.logEvent("Toggled Vietnamese mode via host command")
+            case .toggleExclusionRules:
+                self.toggleExclusionRules()
+            case .toggleWindowTitleRules:
+                self.toggleWindowTitleRules()
+            case .showTranslation:
+                self.performTranslation()
+            case .translateToSource:
+                self.performTranslateToSource()
+            case .showConvertTool:
+                self.openConvertTool()
+            case .showSettings:
+                self.openPreferences()
+            case .showDebugWindow:
+                self.toggleDebugWindowFromMenu()
+                self.debugWindowController?.logEvent(
+                    "Debug mode toggled via hotkey (\(preferences.debugHotkey.displayString))"
+                )
+            case .showToolbar:
+                TempOffToolbarController.shared.toggle()
+                self.debugWindowController?.logEvent(
+                    "Temp off toolbar toggled via hotkey (\(preferences.tempOffToolbarHotkey.displayString))"
+                )
+            case .undoTyping:
+                break
+            }
+        }
+        return .handled
+    }
     
     private func setupGlobalHotkey(with hotkey: Hotkey) {
         // Configure EventTapManager to handle toggle hotkey
         // This ensures the hotkey is consumed at the lowest level
         // and doesn't reach other applications
         eventTapManager?.toggleHotkey = hotkey
-        eventTapManager?.onToggleHotkey = { [weak self] in
-            // If using Fn key or Ctrl+Space, temporarily ignore input source changes
-            // This prevents macOS's input source switching from interfering
-            if hotkey.modifiers.contains(.function) || 
-               (hotkey.modifiers == [.control] && hotkey.keyCode == 49) { // Space keyCode
-                self?.inputSourceManager?.temporarilyIgnoreInputSourceChanges(forSeconds: 0.5)
-            }
-            
-            self?.statusBarManager?.viewModel.toggleVietnamese()
-            
-            self?.debugWindowController?.logEvent("Toggled Vietnamese mode via hotkey (\(hotkey.displayString))")
-        }
 
         debugWindowController?.logEvent("Toggle hotkey configured: \(hotkey.displayString)")
     }
@@ -821,7 +898,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If undo typing is disabled, clear the hotkey
         guard enabled else {
             eventTapManager?.undoTypingHotkey = nil
-            eventTapManager?.onUndoTypingHotkey = nil
             return
         }
         
@@ -829,19 +905,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Otherwise, default Esc behavior is handled in KeyboardEventHandler
         if let hotkey = hotkey {
             eventTapManager?.undoTypingHotkey = hotkey
-            eventTapManager?.onUndoTypingHotkey = { [weak self] in
-                guard let handler = self?.keyboardHandler else { return false }
-                return handler.performUndoTyping()
-            }
             debugWindowController?.logEvent("Undo typing hotkey configured: \(hotkey.displayString)")
         } else {
             // Use default Esc key - set a default Esc hotkey
             let defaultEscHotkey = Hotkey(keyCode: VietnameseData.KEY_ESC, modifiers: [], isModifierOnly: false)
             eventTapManager?.undoTypingHotkey = defaultEscHotkey
-            eventTapManager?.onUndoTypingHotkey = { [weak self] in
-                guard let handler = self?.keyboardHandler else { return false }
-                return handler.performUndoTyping()
-            }
             debugWindowController?.logEvent("Undo typing hotkey configured: Esc (default)")
         }
     }
@@ -1086,6 +1154,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                message.contains("Text:") ||
                                message.contains("Word:") ||
                                message.contains("Valid:") ||
+                               message.contains("Dictionary unavailable:") ||
+                               message.contains("Dictionary load failed:") ||
                                message.contains("Chrome") ||  // Chrome fix logs
                                message.contains("[AX]")  // Accessibility logs
 
@@ -1122,22 +1192,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // target app. Read per event, not captured once: the flag flips while this
         // process keeps running.
         let source = TapEventSource(handler: keyboardHandler!,
-                                    isActiveHost: { !SharedSettings.shared.isXKeyIMTapOwningInput })
+                                    isActiveHost: { !SharedSettings.shared.isXKeyIMTapOwningInput },
+                                    secureInputMonitor: secureInputMonitor)
 
-        // Smart Switch stays in AppDelegate permanently — app/status-bar behaviour.
-        source.onSmartSwitch = { [weak self] notification in
-            self?.handleSmartSwitch(notification: notification)
+        source.onAppContext = { [weak self] context in
+            self?.applyAppPolicy(context)
         }
 
         // Debug window stays in AppDelegate permanently — it's XKey.app UI.
         source.onLogEvent = { [weak self] message in
             self?.debugWindowController?.logEvent(message)
-        }
-
-        // Secure Input overlay/status bar stay in AppDelegate permanently —
-        // they're XKey.app UI.
-        source.onEvaluateSecureInput = { [weak self] in
-            self?.evaluateSecureInput()
         }
 
         // Temp-off/translation toolbars stay in AppDelegate permanently —
@@ -1165,22 +1229,98 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.logFinalMouseClickDetection(attempt: attempt, wasRetried: wasRetried, injectionInfo: injectionInfo, focusedInfo: focusedInfo)
         }
 
-        // Smart Switch/per-app language for the overlay app stays in AppDelegate
-        // permanently — app/status-bar behaviour.
-        source.onEnableVietnameseForOverlay = { [weak self] in
-            self?.enableVietnameseForOverlay()
-        }
-        source.onSaveLanguageForOverlay = { [weak self] overlayName in
-            self?.saveLanguageForOverlay(overlayName: overlayName)
-        }
-        source.onRestoreLanguageForCurrentApp = { [weak self] in
-            self?.restoreLanguageForCurrentApp()
-        }
-
         source.start()
         tapEventSource = source
+        source.handleFocusCheck()
 
         debugWindowController?.logEvent("App switch observer registered")
+    }
+
+    private func applyAppPolicy(_ context: AppContext) {
+        guard let handler = keyboardHandler else { return }
+        handler.engine.smartSwitchManager.loadFromPlist()
+        let preferences = SharedSettings.shared.loadPreferences()
+        if context.overlayName == nil {
+            applyWindowTitleInputSourcePolicy(context, preferences: preferences)
+            if let currentSource = InputSourceManager.getCurrentInputSource(),
+               !InputSourceManager.shared.isEnabled(for: currentSource.id) {
+                handler.applyAppPolicyDecision(
+                    .disableTransformation,
+                    currentVietnameseEnabled: SharedSettings.shared.vietnameseEnabled
+                )
+                return
+            }
+        }
+        let runtimePreferences = RuntimePreferences(
+            preferences: preferences,
+            vietnameseEnabled: SharedSettings.shared.vietnameseEnabled,
+            windowTitleRulesEnabled: preferences.windowTitleRulesEnabled,
+            remoteDesktopInjectMode: SharedSettings.shared.remoteDesktopInjectMode
+        )
+        let current = statusBarManager?.viewModel.isVietnameseEnabled
+            ?? SharedSettings.shared.vietnameseEnabled
+        let runtime = AppPolicyRuntime(
+            smartSwitchStore: handler.engine.smartSwitchManager,
+            windowTitleRules: { AppBehaviorDetector.shared.getCustomRules() }
+        )
+        let decision = runtime.evaluate(
+            context: context,
+            currentVietnameseEnabled: current,
+            preferences: runtimePreferences
+        )
+        handler.applyAppPolicyDecision(decision, currentVietnameseEnabled: current)
+
+        if context.overlayName == nil,
+           preferences.smartSwitchEnabled,
+           decision != .disableTransformation {
+            smartSwitchHandledBundleId = context.bundleIdentifier
+        }
+        if case .restoreVietnamese(let enabled) = decision {
+            statusBarManager?.viewModel.isVietnameseEnabled = enabled
+            SharedSettings.shared.vietnameseEnabled = enabled
+        }
+    }
+
+    /// Input-source switching is a host side effect, so it stays outside the shared
+    /// language decision while using the same AX-free context captured by TapEventSource.
+    private func applyWindowTitleInputSourcePolicy(
+        _ context: AppContext,
+        preferences: Preferences
+    ) {
+        let matchingTarget: String?
+        if preferences.windowTitleRulesEnabled, context.hasResolvedWindowTitleRules {
+            matchingTarget = context.resolvedTargetInputSourceId
+        } else {
+            matchingTarget = preferences.windowTitleRulesEnabled
+                ? AppBehaviorDetector.shared.getCustomRules()
+                .filter { $0.isEnabled && !$0.hasAXPatterns }
+                .filter {
+                    $0.matches(
+                        bundleId: context.bundleIdentifier ?? "",
+                        windowTitle: context.windowTitle ?? "",
+                        axInfo: nil
+                    )
+                }
+                .compactMap(\.targetInputSourceId)
+                .last
+                : nil
+        }
+
+        if let target = matchingTarget {
+            if preRuleInputSourceId == nil {
+                preRuleInputSourceId = InputSourceSwitcher.shared.getCurrentInputSourceId()
+            }
+            if InputSourceSwitcher.shared.getCurrentInputSourceId() != target {
+                _ = InputSourceSwitcher.shared.selectInputSource(bundleId: target)
+            }
+            return
+        }
+
+        if let previous = preRuleInputSourceId,
+           InputSourceSwitcher.shared.getCurrentInputSourceId() != previous {
+            _ = InputSourceSwitcher.shared.selectInputSource(bundleId: previous)
+        }
+        preRuleInputSourceId = nil
     }
 
     /// Enable Vietnamese when overlay opens (Spotlight/Raycast/Alfred)
@@ -1568,7 +1708,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if isXKeyIM {
             // Switched TO XKeyIM - suspend CGEvent tap to let IMKit handle events
             debugWindowController?.logEvent("🔑 Switched to XKeyIM - suspending CGEvent tap")
-            eventTapManager?.suspend()
+            // This input-source notification consumes any coordination left by an app
+            // switch. Keeping it until the next source change can skip the restore when
+            // the user returns to a regular keyboard layout.
+            smartSwitchHandledBundleId = nil
+            reconcileMainEventTapOwnership(knownSource: source)
 
             // Force DISABLE XKey main app's Vietnamese engine
             // XKeyIM handles Vietnamese typing itself, so XKey main app shows "E" (engine off)
@@ -1577,17 +1721,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             // Check if event tap is already running
             // If not (e.g., started with XKeyIM active), start it now
-            guard let manager = eventTapManager else { return }
-
-            // Try to start event tap if it's not running
-            do {
-                try manager.start()
-            } catch EventTapManager.EventTapError.alreadyRunning {
-                // Already running - just resume it
-                manager.resume()
-            } catch {
-                debugWindowController?.logEvent("Failed to start event tap: \(error)")
-            }
+            reconcileMainEventTapOwnership(knownSource: source)
 
             // An excluded app is frontmost: XKey does not manage its E/V state, so this
             // notification must neither read the app's Smart Switch entry nor turn
@@ -1660,6 +1794,89 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.debugWindowController?.logEvent("'\(source.displayName)' → Vietnamese OFF")
                 }
             }
+        }
+    }
+
+    private func reconcileMainEventTapOwnership(knownSource: InputSourceInfo? = nil) {
+        mainTapOwnershipRecheckGeneration &+= 1
+        performMainEventTapOwnershipRecheck(
+            knownSource: knownSource,
+            attempt: 0,
+            generation: mainTapOwnershipRecheckGeneration
+        )
+    }
+
+    private func performMainEventTapOwnershipRecheck(knownSource: InputSourceInfo?,
+                                                      attempt: Int,
+                                                      generation: UInt64) {
+        guard generation == mainTapOwnershipRecheckGeneration,
+              let manager = eventTapManager else { return }
+        let sourceState: MainInputSourceState
+        if let source = knownSource ?? InputSourceManager.getCurrentInputSource() {
+            sourceState = InputSourceManager.isXKeyInputSource(source) ? .xkeyIM : .other
+        } else {
+            sourceState = .unknown
+        }
+
+        switch inputOwnershipHandoffCoordinator.mainHostDecision(source: sourceState) {
+        case .acknowledge:
+            if !inputOwnershipHandoffCoordinator.acknowledgePendingRequest(releaseAndDrain: {
+                manager.suspendAndDrainPendingInjection()
+            }) {
+                scheduleMainEventTapOwnershipRecheck(attempt: attempt, generation: generation)
+            }
+        case .deferMain:
+            manager.suspendAndDrainPendingInjection()
+        case .startMain:
+            guard manager.checkAccessibilityPermission() else {
+                debugWindowController?.updateStatus("Waiting for accessibility permission...")
+                return
+            }
+            do {
+                try manager.start()
+                manager.resume()
+                debugWindowController?.updateStatus("Event tap started - Ready to type!")
+            } catch EventTapManager.EventTapError.alreadyRunning {
+                manager.resume()
+            } catch {
+                debugWindowController?.logEvent("Failed to start event tap: \(error)")
+            }
+        case .retry:
+            manager.suspendAndDrainPendingInjection()
+            scheduleMainEventTapOwnershipRecheck(attempt: attempt, generation: generation)
+        }
+    }
+
+    private func scheduleMainEventTapOwnershipRecheck(attempt: Int, generation: UInt64) {
+        let exhaustedFastRetries = attempt >= Self.mainTapOwnershipMaxRechecks
+        let delay = exhaustedFastRetries
+            ? Self.mainTapOwnershipSlowRecheckDelay
+            : Self.mainTapOwnershipRecheckDelay
+        if exhaustedFastRetries {
+            debugWindowController?.logEvent("Input ownership unresolved; continuing safe low-rate checks")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.performMainEventTapOwnershipRecheck(
+                knownSource: nil,
+                attempt: exhaustedFastRetries ? Self.mainTapOwnershipMaxRechecks : attempt + 1,
+                generation: generation
+            )
+        }
+    }
+
+    private func restartMainEventTapThroughOwnershipGate() {
+        guard eventTapManager?.isRunning == true else { return }
+        eventTapManager?.suspendAndDrainPendingInjection()
+        eventTapManager?.stop()
+        reconcileMainEventTapOwnership()
+    }
+
+    private func applyRemoteDesktopTargetMode(_ enabled: Bool) {
+        remoteDesktopTargetLifecycle.apply(enabled) { [weak self] appliedMode in
+            self?.restartMainEventTapThroughOwnershipGate()
+            self?.debugWindowController?.logEvent(
+                "Event tap topology updated (isRemoteDesktopTarget → \(appliedMode))"
+            )
         }
     }
 
@@ -1761,10 +1978,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Secure Input Detection
 
-    /// Last observed Secure Input state. Drives edge-triggered evaluation: side effects
-    /// fire only when this changes, which is what makes evaluateSecureInput() safe to
-    /// call from the poll timer and every event hook.
-    private var lastSecureInputState = SecureInputState()
     private var secureInputTimer: Timer?
     private var secureInputCancellable: AnyCancellable?
 
@@ -1788,6 +2001,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
     }
 
+    private func setupSharedSettingsObserver() {
+        mainSettingsChangeTracker = MainSettingsChangeTracker(
+            vietnameseEnabled: SharedSettings.shared.vietnameseEnabled,
+            xkeyIMOwnsInput: SharedSettings.shared.isXKeyIMTapOwningInput
+        )
+        secureInputOwnershipObserver = DistributedNotificationCenter.default().addObserver(
+            forName: .xkeySettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            SharedSettings.shared.invalidateCache()
+            let enabled = SharedSettings.shared.vietnameseEnabled
+            let xkeyIMOwnsInput = SharedSettings.shared.isXKeyIMTapOwningInput
+            let action = self.mainSettingsChangeTracker?.update(
+                vietnameseEnabled: enabled,
+                xkeyIMOwnsInput: xkeyIMOwnsInput
+            ) ?? .none
+
+            self.applyRemoteDesktopTargetMode(SharedSettings.shared.isRemoteDesktopTarget)
+            self.applyMainSettingsChange(action, vietnameseEnabled: enabled)
+            self.evaluateSecureInput()
+            self.tapEventSource?.handleFocusCheck()
+        }
+    }
+
+    private func applyInitialMainSettingsState() {
+        guard let action = mainSettingsChangeTracker?.currentAction else { return }
+        applyMainSettingsChange(
+            action,
+            vietnameseEnabled: SharedSettings.shared.vietnameseEnabled
+        )
+    }
+
+    private func applyMainSettingsChange(_ action: MainSettingsChangeAction,
+                                         vietnameseEnabled: Bool) {
+        switch action {
+        case .none:
+            reconcileMainEventTapOwnership()
+        case .applyVietnamese(let enabled):
+            reconcileMainEventTapOwnership()
+            statusBarManager?.viewModel.isVietnameseEnabled = enabled
+            keyboardHandler?.setVietnamese(enabled)
+        case .deferToXKeyIM:
+            reconcileMainEventTapOwnership()
+            statusBarManager?.viewModel.isVietnameseEnabled = false
+            keyboardHandler?.setVietnamese(false)
+        case .restoreAfterXKeyIM:
+            if let currentSource = InputSourceManager.getCurrentInputSource() {
+                let shouldEnable = inputSourceManager?.isEnabled(for: currentSource.id) ?? true
+                handleInputSourceChange(source: currentSource, shouldEnable: shouldEnable)
+            } else {
+                reconcileMainEventTapOwnership()
+                statusBarManager?.viewModel.isVietnameseEnabled = vietnameseEnabled
+                keyboardHandler?.setVietnamese(vietnameseEnabled)
+            }
+        }
+    }
+
     /// Poll only while the XKey engine is on. Catches transitions that emit no event at all,
     /// such as Terminal's "Secure Keyboard Entry" menu item or a holder quitting in
     /// the background. Costs ~0.011ms per tick; tolerance lets macOS coalesce wakeups.
@@ -1808,58 +2080,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Read the current Secure Input state and apply whatever the transition warrants.
     /// Idempotent — repeated calls with no state change do nothing.
     private func evaluateSecureInput() {
-        guard let manager = eventTapManager else { return }
-
-        let (isSecure, pid, appName) = manager.checkSecureInput()
-        let name = appName ?? "Unknown"
-        let new = SecureInputState(
-            pid: isSecure ? (pid ?? 0) : 0,
-            vietnamese: statusBarManager?.viewModel.isVietnameseEnabled ?? false
-        )
-        let old = lastSecureInputState
-        lastSecureInputState = new
-
-        for action in secureInputActions(from: old, to: new, appName: name) {
-            switch action {
-            case .showOverlay(let appName):
-                SecureInputOverlay.shared.show(appName: appName)
-            case .hideOverlay:
-                SecureInputOverlay.shared.hide()
-            case .logHeld(let appName):
-                debugWindowController?.logEvent("⚠️ Secure Input đang BẬT bởi '\(appName)' — XKey không thể nhận phím!")
-                debugWindowController?.updateStatus("⚠️ Secure Input: \(appName)")
-            case .logReleased:
-                debugWindowController?.logEvent("✅ Secure Input đã TẮT — XKey hoạt động bình thường")
-                debugWindowController?.updateStatus("Ready")
-            }
-        }
+        secureInputMonitor.evaluate()
     }
 
     // MARK: - Spell Check Dictionary Setup
 
     private func setupSpellCheckDictionary() {
         let preferences = SharedSettings.shared.loadPreferences()
-
-        guard preferences.spellCheckEnabled else {
-            debugWindowController?.logEvent("  Spell checking disabled, skipping dictionary load")
-            return
-        }
-
         let style: VNDictionaryManager.DictionaryStyle = preferences.modernStyle ? .dauMoi : .dauCu
+        let result = DictionaryRuntime.shared.refresh(enabled: preferences.spellCheckEnabled, style: style)
+        guard result.didChange else { return }
 
-        // Check if dictionary is already available locally
-        if VNDictionaryManager.shared.isDictionaryAvailable(style: style) {
-            // Load from local storage
-            do {
-                try VNDictionaryManager.shared.loadDictionary(style: style)
-                let stats = VNDictionaryManager.shared.getDictionaryStats()
-                let count = stats[style.rawValue] ?? 0
-                debugWindowController?.logEvent("Loaded \(style.rawValue) dictionary (\(count) words)")
-            } catch {
-                debugWindowController?.logEvent("Failed to load dictionary: \(error.localizedDescription)")
-            }
-        } else {
+        switch result.newState {
+        case .disabled:
+            debugWindowController?.logEvent("  Spell checking disabled, skipping dictionary load")
+        case .unavailable:
             debugWindowController?.logEvent("Dictionary not found. User can download from Settings > Spell Checking")
+        case .loaded(let style):
+            let count = VNDictionaryManager.shared.getDictionaryStats()[style.rawValue] ?? 0
+            debugWindowController?.logEvent("Loaded \(style.rawValue) dictionary (\(count) words)")
+        case .failed:
+            let diagnostic = result.diagnostic.map { ": \($0)" } ?? ""
+            debugWindowController?.logEvent("Failed to load dictionary\(diagnostic)")
         }
     }
 
@@ -1939,7 +2181,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func disableTempOffToolbar() {
         // Clear hotkey from EventTapManager
         eventTapManager?.toolbarHotkey = nil
-        eventTapManager?.onToolbarHotkey = nil
 
         // Hide toolbar if visible
         TempOffToolbarController.shared.hide()
@@ -2041,7 +2282,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard hotkey.keyCode != 0 else {
             eventTapManager?.toolbarHotkey = nil
-            eventTapManager?.onToolbarHotkey = nil
             debugWindowController?.logEvent("  Temp off toolbar hotkey disabled (no key set)")
             return
         }
@@ -2049,10 +2289,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Configure EventTapManager to handle toolbar hotkey
         // This ensures the hotkey is consumed at the lowest level
         eventTapManager?.toolbarHotkey = hotkey
-        eventTapManager?.onToolbarHotkey = { [weak self] in
-            TempOffToolbarController.shared.toggle()
-            self?.debugWindowController?.logEvent("Temp off toolbar toggled via hotkey (\(hotkey.displayString))")
-        }
 
         debugWindowController?.logEvent("Temp off toolbar hotkey: \(hotkey.displayString) (via EventTap)")
     }
@@ -2095,17 +2331,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard hotkey.keyCode != 0 else {
             eventTapManager?.convertToolHotkey = nil
-            eventTapManager?.onConvertToolHotkey = nil
             debugWindowController?.logEvent("Convert tool hotkey disabled (no key set)")
             return
         }
 
         // Configure EventTapManager to handle convert tool hotkey
         eventTapManager?.convertToolHotkey = hotkey
-        eventTapManager?.onConvertToolHotkey = { [weak self] in
-            self?.openConvertTool()
-            self?.debugWindowController?.logEvent("Convert tool opened via hotkey (\(hotkey.displayString))")
-        }
 
         debugWindowController?.logEvent("Convert tool hotkey set: \(hotkey.displayString)")
     }
@@ -2166,7 +2397,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if translation is enabled
         guard preferences.translationEnabled else {
             eventTapManager?.translationHotkey = nil
-            eventTapManager?.onTranslationHotkey = nil
             debugWindowController?.logEvent("Translation hotkey disabled (feature off)")
             return
         }
@@ -2176,16 +2406,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard hotkey.keyCode != 0 else {
             eventTapManager?.translationHotkey = nil
-            eventTapManager?.onTranslationHotkey = nil
             debugWindowController?.logEvent("Translation hotkey disabled (no key set)")
             return
         }
 
         // Configure EventTapManager to handle translation hotkey
         eventTapManager?.translationHotkey = hotkey
-        eventTapManager?.onTranslationHotkey = { [weak self] in
-            self?.performTranslation()
-        }
 
         debugWindowController?.logEvent("Translation hotkey set: \(hotkey.displayString)")
     }
@@ -2343,7 +2569,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if translation is enabled
         guard preferences.translationEnabled else {
             eventTapManager?.translateToSourceHotkey = nil
-            eventTapManager?.onTranslateToSourceHotkey = nil
             debugWindowController?.logEvent("Translate-to-source hotkey disabled (feature off)")
             return
         }
@@ -2353,16 +2578,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard hotkey.keyCode != 0 else {
             eventTapManager?.translateToSourceHotkey = nil
-            eventTapManager?.onTranslateToSourceHotkey = nil
             debugWindowController?.logEvent("Translate-to-source hotkey disabled (no key set)")
             return
         }
 
         // Configure EventTapManager to handle translate-to-source hotkey
         eventTapManager?.translateToSourceHotkey = hotkey
-        eventTapManager?.onTranslateToSourceHotkey = { [weak self] in
-            self?.performTranslateToSource()
-        }
 
         debugWindowController?.logEvent("Translate-to-source hotkey set: \(hotkey.displayString)")
     }
@@ -2462,17 +2683,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard hotkey.keyCode != 0 else {
             eventTapManager?.debugHotkey = nil
-            eventTapManager?.onDebugHotkey = nil
             debugWindowController?.logEvent("Debug hotkey disabled (no key set)")
             return
         }
 
         // Configure EventTapManager to handle debug hotkey
         eventTapManager?.debugHotkey = hotkey
-        eventTapManager?.onDebugHotkey = { [weak self] in
-            self?.toggleDebugWindowFromMenu()
-            self?.debugWindowController?.logEvent("Debug mode toggled via hotkey (\(hotkey.displayString))")
-        }
 
         debugWindowController?.logEvent("Debug hotkey set: \(hotkey.displayString)")
     }
@@ -2491,15 +2707,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard resolvedHotkey.keyCode != 0 else {
             eventTapManager?.toggleExclusionHotkey = nil
-            eventTapManager?.onToggleExclusionHotkey = nil
             return
         }
 
         // Configure EventTapManager to handle toggle exclusion hotkey
         eventTapManager?.toggleExclusionHotkey = resolvedHotkey
-        eventTapManager?.onToggleExclusionHotkey = { [weak self] in
-            self?.toggleExclusionRules()
-        }
 
         debugWindowController?.logEvent("Toggle exclusion hotkey set: \(resolvedHotkey.displayString)")
     }
@@ -2545,15 +2757,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If no keycode, disable hotkey
         guard resolvedHotkey.keyCode != 0 else {
             eventTapManager?.toggleWindowRulesHotkey = nil
-            eventTapManager?.onToggleWindowRulesHotkey = nil
             return
         }
 
         // Configure EventTapManager to handle toggle window rules hotkey
         eventTapManager?.toggleWindowRulesHotkey = resolvedHotkey
-        eventTapManager?.onToggleWindowRulesHotkey = { [weak self] in
-            self?.toggleWindowTitleRules()
-        }
 
         debugWindowController?.logEvent("Toggle window rules hotkey set: \(resolvedHotkey.displayString)")
     }
@@ -2584,4 +2792,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ToggleHUDWindow.shared.show(title: String(localized: "Hiệu chỉnh Engine"), isEnabled: newValue)
     }
 }
-

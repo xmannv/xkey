@@ -151,14 +151,34 @@ final class TapEventSourceActiveHostGateTests: XCTestCase {
         XCTAssertFalse(focusCheckReachedAXPass(isActiveHost: { false }),
                        "a non-owning host must not spend AX round-trips on a tap that transforms nothing")
     }
+
+}
+
+final class TapEventSourceInactiveMutationTests: XCTestCase {
+    func testAppSwitchDoesNotMutateInactiveHandlerTypingState() {
+        let handler = KeyboardEventHandler()
+        _ = handler.engine.processKey(
+            character: "a",
+            keyCode: VietnameseData.KEY_A,
+            isUppercase: false
+        )
+        let source = TapEventSource(handler: handler, isActiveHost: { false })
+        source.start()
+        defer { source.stop() }
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: NSWorkspace.shared,
+            userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current]
+        )
+
+        XCTAssertEqual(handler.engine.getCurrentWord(), "a")
+    }
 }
 
 /// The overlay open/close callback takes a full AX snapshot (detectInjectionMethod).
-/// That snapshot only feeds THIS process's tap, and the overlay path
-/// (Spotlight/Raycast/Alfred) is where AX pressure has already cost this project a
-/// freeze once — so it is gated on ownership. What the callback does BESIDES the
-/// snapshot is not gated: overlay Smart Switch writes the shared language state the
-/// owning process reads back, exactly like onSmartSwitch in the app-switch block.
+/// Snapshot and app-policy mutation both feed THIS process's active session, so both
+/// are gated on ownership.
 final class TapEventSourceOverlayGateTests: XCTestCase {
 
     override func tearDown() {
@@ -177,7 +197,7 @@ final class TapEventSourceOverlayGateTests: XCTestCase {
     ) -> (didSnapshotAX: Bool, didRunSmartSwitch: Bool) {
         let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: isActiveHost)
         var didRunSmartSwitch = false
-        source.onEnableVietnameseForOverlay = { didRunSmartSwitch = true }
+        source.onAppContext = { _ in didRunSmartSwitch = true }
         source.start()
         defer { source.stop() }
 
@@ -205,8 +225,26 @@ final class TapEventSourceOverlayGateTests: XCTestCase {
         let result = runOverlayOpened(isActiveHost: { false })
         XCTAssertFalse(result.didSnapshotAX,
                        "a non-owning host must not duplicate an AX snapshot into the overlay")
-        XCTAssertTrue(result.didRunSmartSwitch,
-                      "overlay Smart Switch is not AX work and must keep running for the owning process")
+        XCTAssertFalse(result.didRunSmartSwitch,
+                       "a non-owning host must never mutate app policy or typing state")
+    }
+
+    func testOverlayClosePublishesUnderlyingAppPolicyFromResolvedSnapshot() {
+        let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: { true })
+        var contexts: [AppContext] = []
+        source.onAppContext = { contexts.append($0) }
+        let snapshotApplied = expectation(description: "overlay-close AX snapshot applied")
+        source.onLogEvent = { message in
+            if message.contains("Overlay closed — Injection:") { snapshotApplied.fulfill() }
+        }
+        source.start()
+        defer { source.stop() }
+
+        OverlayAppDetector.shared.onOverlayVisibilityChanged?(false, "Raycast")
+        wait(for: [snapshotApplied], timeout: 2)
+
+        XCTAssertTrue(contexts.last?.hasResolvedWindowTitleRules == true,
+                      "overlay close must restore policy from the same resolved AX snapshot")
     }
 }
 

@@ -2,23 +2,20 @@
 //  SecureInputOverlay.swift
 //  XKey
 //
-//  Thin wrapper around FloatingOverlay for Secure Input warnings.
-//  Uses its own FloatingOverlay instance to avoid conflicts with other overlays.
+//  Shared Secure Input warning presenter for XKey.app and standalone XKeyIM.
 //
 
 import Foundation
 import SwiftUI
 
-class SecureInputOverlay {
-    
+final class SecureInputOverlay: SecureInputPresenting {
     static let shared = SecureInputOverlay()
-    
-    /// Own overlay instance — independent from TranslationLoadingOverlay etc.
+
+    /// Independent from translation and other overlays.
     private let overlay = FloatingOverlay()
-    
+
     private init() {}
-    
-    /// Show warning overlay with the name of the app holding Secure Input
+
     func show(appName: String) {
         overlay.show(
             content: AnyView(OverlayWarningView(
@@ -26,11 +23,10 @@ class SecureInputOverlay {
                 subtitle: String(localized: "\(appName) đang chặn XKey xử lý Tiếng Việt")
             )),
             position: .bottomCenter,
-            autoHideAfter: 5.0
+            autoHideAfter: 5
         )
     }
-    
-    /// Hide the overlay
+
     func hide() {
         overlay.hide()
     }

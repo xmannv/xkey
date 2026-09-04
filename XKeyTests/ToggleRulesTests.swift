@@ -658,16 +658,10 @@ class ToggleHotkeySlotTests: XCTestCase {
             "toggleWindowRulesHotkey should start as nil")
     }
     
-    /// Verify toggle exclusion callback starts nil
-    func testInitialState_OnToggleExclusionHotkey_IsNil() {
-        XCTAssertNil(eventTapManager.onToggleExclusionHotkey,
-            "onToggleExclusionHotkey callback should start as nil")
-    }
-    
-    /// Verify toggle window rules callback starts nil
-    func testInitialState_OnToggleWindowRulesHotkey_IsNil() {
-        XCTAssertNil(eventTapManager.onToggleWindowRulesHotkey,
-            "onToggleWindowRulesHotkey callback should start as nil")
+    /// Verify unified command callback starts nil
+    func testInitialState_OnHostCommand_IsNil() {
+        XCTAssertNil(eventTapManager.onHostCommand,
+            "onHostCommand callback should start as nil")
     }
     
     // MARK: - Hotkey Configuration
@@ -704,34 +698,13 @@ class ToggleHotkeySlotTests: XCTestCase {
     
     // MARK: - Callback Registration
     
-    /// Verify callback can be set and cleared
-    func testSetAndClearExclusionCallback() {
-        var called = false
-        eventTapManager.onToggleExclusionHotkey = { called = true }
-        
-        // Verify callback was set
-        XCTAssertNotNil(eventTapManager.onToggleExclusionHotkey)
-        
-        // Invoke directly to verify it's callable
-        eventTapManager.onToggleExclusionHotkey?()
-        XCTAssertTrue(called, "Callback should have been invoked")
-        
-        // Clear callback
-        eventTapManager.onToggleExclusionHotkey = nil
-        XCTAssertNil(eventTapManager.onToggleExclusionHotkey)
-    }
-    
-    /// Verify callback can be set and cleared for window rules
-    func testSetAndClearWindowRulesCallback() {
-        var called = false
-        eventTapManager.onToggleWindowRulesHotkey = { called = true }
-        
-        XCTAssertNotNil(eventTapManager.onToggleWindowRulesHotkey)
-        eventTapManager.onToggleWindowRulesHotkey?()
-        XCTAssertTrue(called, "Callback should have been invoked")
-        
-        eventTapManager.onToggleWindowRulesHotkey = nil
-        XCTAssertNil(eventTapManager.onToggleWindowRulesHotkey)
+    /// Verify the single command boundary can be set and cleared.
+    func testSetAndClearHostCommandCallback() {
+        eventTapManager.onHostCommand = { _, _, _ in .handled }
+        XCTAssertNotNil(eventTapManager.onHostCommand)
+
+        eventTapManager.onHostCommand = nil
+        XCTAssertNil(eventTapManager.onHostCommand)
     }
 }
 

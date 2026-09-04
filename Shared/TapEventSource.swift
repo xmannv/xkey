@@ -10,14 +10,8 @@
 //  and the mouse-click monitor + overlay callback (this file, Task 8) have
 //  moved. TapController (Task 9) constructs this class.
 //
-//  Some calls the moved code makes reach into state that still lives on the
-//  host (AppDelegate) — Smart Switch, the debug window, the temp-off/
-//  translation toolbars, Secure Input. Those are routed through the callback
-//  properties below instead of being dragged along. Force Accessibility used
-//  to be one of them (Task 8) until ForceAccessibilityManager joined the
-//  XKeyIM target and the call became direct. Each remaining callback's doc
-//  comment says whether it stays on the host forever, or is temporary until
-//  a later task inlines it.
+//  Shared app policy and Secure Input use explicit runtime services. Remaining
+//  optional callbacks present main-app-only debug and toolbar UI.
 //
 
 import Cocoa
@@ -60,19 +54,14 @@ final class TapEventSource {
 
     // MARK: - Host callbacks
 
-    /// Smart Switch: auto-switches input language per app / window-title rule.
-    /// Stays on the host forever — Smart Switch is app/status-bar behaviour.
-    var onSmartSwitch: ((Notification) -> Void)?
+    /// Shared app policy context. Only the active input owner receives it; observers in
+    /// the inactive process may keep their lifecycle subscriptions but cannot mutate a
+    /// typing session or shared language state.
+    var onAppContext: ((AppContext) -> Void)?
 
     /// Debug window event log.
     /// Stays on the host forever — the debug window is XKey.app UI.
     var onLogEvent: ((String) -> Void)?
-
-    /// Re-evaluates Secure Input state (overlay warning + status bar) after
-    /// an app switch.
-    /// Stays on the host forever — the Secure Input overlay/status bar are
-    /// XKey.app UI.
-    var onEvaluateSecureInput: (() -> Void)?
 
     /// Hides the temp-off toolbar when there is no AX-focused element at all.
     /// Stays on the host forever — the temp-off toolbar is XKey.app UI.
@@ -95,19 +84,6 @@ final class TapEventSource {
     /// Stays on the host forever — toolbar tracking is XKey.app UI.
     var onUpdateLastFocusedElement: ((AXUIElement) -> Void)?
 
-    /// Restores the overlay app's (Spotlight/Raycast/Alfred) saved Smart Switch
-    /// language when the overlay opens.
-    /// Stays on the host forever — Smart Switch/per-app language is XKey.app behaviour.
-    var onEnableVietnameseForOverlay: (() -> Void)?
-
-    /// Saves the current language for the given overlay app name (for Smart Switch).
-    /// Stays on the host forever — Smart Switch/per-app language is XKey.app behaviour.
-    var onSaveLanguageForOverlay: ((String?) -> Void)?
-
-    /// Restores the current frontmost app's Smart Switch language.
-    /// Stays on the host forever — Smart Switch/per-app language is XKey.app behaviour.
-    var onRestoreLanguageForCurrentApp: (() -> Void)?
-
     /// Whether the debug window is currently open. Gates the extra AX
     /// retry-detection queries after a mouse click (perf: avoids the extra
     /// work during normal use, see setupMouseClickMonitor).
@@ -127,6 +103,7 @@ final class TapEventSource {
     /// Required, not optional: a host that forgets it would silently duplicate every AX query in
     /// this file against the target app. See Task 9b.
     private let isActiveHost: () -> Bool
+    private let secureInputMonitor: SecureInputMonitor
 
     /// Guards start()/stop() so a host that arms and disarms repeatedly (XKeyIM,
     /// once per IME activation) never double-registers the observers below.
@@ -337,9 +314,12 @@ final class TapEventSource {
         let overlayName: String?
     }
 
-    init(handler: KeyboardEventHandler, isActiveHost: @escaping () -> Bool) {
+    init(handler: KeyboardEventHandler,
+         isActiveHost: @escaping () -> Bool,
+         secureInputMonitor: SecureInputMonitor = .disabled) {
         self.handler = handler
         self.isActiveHost = isActiveHost
+        self.secureInputMonitor = secureInputMonitor
     }
 
     deinit {
@@ -373,6 +353,18 @@ final class TapEventSource {
             // extra IPC. nil falls back to a live NSWorkspace query per keystroke.
             let activatedApp = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             self.handler.noteFrontmostApp(bundleId: activatedApp?.bundleIdentifier)
+
+            // Inactive host still observes activation to keep its cheap bundle cache fresh,
+            // but owns no typing state and must not reset or apply policy.
+            guard self.isActiveHost() else { return }
+
+            // Retire the previous app's policy at the ownership boundary. The full
+            // title/AX policy arrives with the off-main snapshot below; until then the
+            // global language is the only valid provisional state for the new app.
+            self.handler.applyAppPolicyDecision(
+                .keepCurrentLanguage,
+                currentVietnameseEnabled: SharedSettings.shared.vietnameseEnabled
+            )
 
             // Reset keyboard handler engine when switching apps
             // Use resetForAppSwitch() which assumes typing mid-sentence to prevent
@@ -411,26 +403,6 @@ final class TapEventSource {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                 guard let self = self else { return }
 
-                // Handle Smart Switch - auto switch language per app
-                // Moved INSIDE delay to ensure window title is available for rule-based
-                // input source switching (targetInputSourceId in rules)
-                self.onSmartSwitch?(notification)
-
-                // Everything below is AX work that only feeds THIS process's tap, so it
-                // is gated on ownership (Task 9b). Smart Switch above stays ungated
-                // deliberately, and it is NOT free: handleSmartSwitch →
-                // getTargetInputSourceOverride → getMergedRuleResult →
-                // findAllMatchingRules → getCurrentWindowTitle costs roughly one
-                // window-title AX query per app switch, plus one focused-element
-                // snapshot as soon as a rule carrying AX patterns is EVALUATED —
-                // matchRules loads it before it knows whether that rule matches. The
-                // whole residual is zero while Window Title Rules is off:
-                // findAllMatchingRules returns on that master switch before it asks for
-                // the window title. That residual cost is accepted because gating it
-                // would silence per-app language switching entirely — XKeyIM has no
-                // Smart Switch of its own — and because it writes the shared language
-                // state the owning process reads back. It can only be removed once
-                // XKeyIM owns Smart Switch itself.
                 guard self.isActiveHost() else { return }
 
                 // Setup AXObserver for the new app to monitor focus changes (CMD+T, etc.)
@@ -448,7 +420,7 @@ final class TapEventSource {
                 //
                 // Safe ahead of the detection below: neither call reads the snapshot or
                 // anything the detection writes — setupAXObserverForApp takes the app out
-                // of the notification and only installs callbacks, and onEvaluateSecureInput
+                // of the notification and only installs callbacks, and SecureInputMonitor
                 // reads IsSecureEventInputEnabled, not AppBehaviorDetector. The one thing
                 // the earlier install changes is that the observer's first notification can
                 // now supersede the pass below, and that direction is harmless: a
@@ -458,8 +430,8 @@ final class TapEventSource {
                     self.setupAXObserverForApp(app)
                 }
 
-                // Check Secure Input on app switch — password managers often enable it when focused
-                self.onEvaluateSecureInput?()
+                // Check Secure Input on app switch — password managers often enable it when focused.
+                self.secureInputMonitor.evaluate()
 
                 // Detect and set confirmed injection method for the new app
                 // This ensures keystrokes use correct method immediately after app switch.
@@ -467,6 +439,10 @@ final class TapEventSource {
                 // must not take with it is above.
                 self.scheduleAXPass(element: nil) { source, snapshot in
                     let injectionInfo = source.confirmInjectionMethod(from: snapshot)
+                    source.publishAppContext(
+                        bundleIdentifier: activatedApp?.bundleIdentifier,
+                        snapshot: snapshot
+                    )
 
                     // DEBUG: Log window title available at app switch time
                     let switchWindowTitle = snapshot.focusedInfo.windowTitle ?? "(nil)"
@@ -650,7 +626,7 @@ final class TapEventSource {
                 // and schedules a new pass, bumping the generation — so checking after it
                 // would make an overlay transition drop this pass's own apply, losing the
                 // focus-change bookkeeping (signature, notifyFocusChanged, title
-                // verification, toolbar) and onEvaluateSecureInput. The replacement pass
+                // verification, toolbar) and Secure Input evaluation. The replacement pass
                 // only redoes the injection-method detection, not the rest.
                 let isCurrent = self?.axPassGeneration == pass.generation
 
@@ -763,6 +739,7 @@ final class TapEventSource {
 
         // 1. ALWAYS check for injection method changes (CMD+T, Tab, etc.)
         checkIntraAppFocusChange(with: elementInfo, overlayName: snapshot.overlayName)
+        publishAppContext(snapshot: snapshot)
 
         // 2. Check toolbar display (only if enabled)
         if SharedSettings.shared.tempOffToolbarEnabled {
@@ -997,6 +974,7 @@ final class TapEventSource {
         let previousMethod = detector.confirmedInjectionMethod
         let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo,
                                                           resolvedOverlayName: .some(snapshot.overlayName))
+        publishAppContext(snapshot: snapshot)
 
         // Log focus change (only when signature actually changed)
         if signatureChanged {
@@ -1043,7 +1021,7 @@ final class TapEventSource {
 
         // Focusing a password field enables Secure Input with no app switch — WebKit does
         // this in Safari and Chrome. This is the only trigger that catches it promptly.
-        onEvaluateSecureInput?()
+        secureInputMonitor.evaluate()
 
         // Check toolbar display (only if enabled)
         // This ensures toolbar shows/hides when focus changes via keyboard (CMD+T, Tab, etc.)
@@ -1118,6 +1096,7 @@ final class TapEventSource {
         let previousMethod = detector.confirmedInjectionMethod
         let injectionInfo = detector.detectInjectionMethod(focusedInfo: snapshot.focusedInfo,
                                                           resolvedOverlayName: .some(snapshot.overlayName))
+        publishAppContext(snapshot: snapshot)
 
         // Only update and log if detection result actually changed
         if previousMethod == nil ||
@@ -1238,9 +1217,11 @@ final class TapEventSource {
     /// re-entrancy this path had: the overlay visibility callback fires from
     /// OverlayAppDetector's probe on the main thread, and what it reaches here no longer
     /// takes a nested AX snapshot on that thread.
-    private func refreshInjectionMethodForOverlay(completion: @escaping (InjectionMethodInfo) -> Void) {
+    private func refreshInjectionMethodForOverlay(
+        completion: @escaping (InjectionMethodInfo, AXSnapshot) -> Void
+    ) {
         scheduleAXPass(element: nil) { source, snapshot in
-            completion(source.confirmInjectionMethod(from: snapshot))
+            completion(source.confirmInjectionMethod(from: snapshot), snapshot)
         }
     }
 
@@ -1432,17 +1413,16 @@ final class TapEventSource {
 
         OverlayAppDetector.shared.onOverlayVisibilityChanged = { [weak self] isVisible, overlayName in
             guard let self = self else { return }
+            guard self.isActiveHost() else { return }
 
-            // Only the AX snapshot is gated. Everything below stays ungated for the same
-            // reason onSmartSwitch does in the app-switch block: the overlay Smart Switch
-            // callbacks write the shared language state the owning process reads back,
-            // and the engine bookkeeping is this process's own state, not an AX query.
-            // The snapshot now completes after them rather than before, so its injection
-            // line lands after the transition's other log lines instead of between them.
+            // Both the AX snapshot and policy mutation belong only to the active owner.
             let transition = isVisible ? "opened" : "closed"
-            self.refreshInjectionMethodForOverlay { [weak self] injectionInfo in
+            self.refreshInjectionMethodForOverlay { [weak self] injectionInfo, snapshot in
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 self?.onLogEvent?("Overlay \(transition) — Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
+                if !isVisible {
+                    self?.publishAppContext(snapshot: snapshot)
+                }
             }
 
             if isVisible {
@@ -1451,7 +1431,7 @@ final class TapEventSource {
                 // 2. Apply Smart Switch for overlay (restore saved language)
                 // 3. Reset mid-sentence flag (overlay apps start with empty/fresh input)
                 self.onLogEvent?("Overlay opened - checking overlay rules")
-                self.onEnableVietnameseForOverlay?()
+                self.publishAppContext(overlayName: overlayName)
 
                 // CRITICAL FIX: When overlay opens (e.g., CMD+Space for Spotlight),
                 // reset mid-sentence flag. The resetForAppSwitch() called earlier sets isTypingMidSentence=true
@@ -1467,11 +1447,6 @@ final class TapEventSource {
                 // 3. Restore language for current app
                 // 4. Set mid-sentence flag (protect text in underlying app)
                 self.onLogEvent?("Overlay closed - saving overlay state, restoring underlying app language")
-                // Save overlay's language BEFORE restoring underlying app
-                // Use overlayName from callback parameter (cache is already cleared at this point)
-                self.onSaveLanguageForOverlay?(overlayName)
-                self.onRestoreLanguageForCurrentApp?()
-
                 // When overlay closes, user returns to previous app where cursor position is unknown.
                 // Set mid-sentence flag to protect text on the right of cursor.
                 // Note: Overlay close doesn't trigger didActivateApplicationNotification since
@@ -1480,5 +1455,25 @@ final class TapEventSource {
                 self.onLogEvent?("Overlay closed → set mid-sentence flag (protect underlying app)")
             }
         }
+    }
+
+    private func publishAppContext(
+        bundleIdentifier: String? = nil,
+        snapshot: AXSnapshot? = nil,
+        overlayName: String? = nil
+    ) {
+        guard isActiveHost() else { return }
+        let resolvedRules = snapshot.map {
+            AppBehaviorDetector.shared.getMergedRuleResult(focusedInfo: $0.focusedInfo)
+        }
+        onAppContext?(AppContext(
+            bundleIdentifier: bundleIdentifier
+                ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            windowTitle: snapshot?.focusedInfo.windowTitle,
+            overlayName: overlayName,
+            resolvedInputMethodPolicy: overlayName == nil ? resolvedRules?.inputMethodPolicy : nil,
+            resolvedTargetInputSourceId: overlayName == nil ? resolvedRules?.targetInputSourceId : nil,
+            hasResolvedWindowTitleRules: overlayName == nil && snapshot != nil
+        ))
     }
 }
