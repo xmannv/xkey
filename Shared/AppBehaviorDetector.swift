@@ -1940,10 +1940,12 @@ class AppBehaviorDetector {
         return info
     }
     
-    /// Check if focused element is Dia Browser's address bar (Command Bar)
+    /// Check if focused element is Arc or Dia Browser's address bar (Command Bar)
     /// Detection via AX Identifier: "commandBarTextField"
-    /// - Returns: true if focused element is Dia's address bar
-    func isDiaAddressBar(info: FocusedElementInfo) -> Bool {
+    /// - Returns: true if focused element is Arc or Dia's address bar
+    func isArcOrDiaAddressBar(info: FocusedElementInfo, bundleId: String) -> Bool {
+        guard bundleId == "company.thebrowser.Browser" || bundleId == "company.thebrowser.Arc"
+            || bundleId == "company.thebrowser.dia" else { return false }
         guard let identifier = info.identifier else { return false }
         return identifier == "commandBarTextField"
     }
@@ -1995,7 +1997,7 @@ class AppBehaviorDetector {
         // Chromium-based (Chrome, Edge, Brave, Opera, Vivaldi, Arc, ...)
         if isChromiumAddressBar(info: info) { return true }
         if isOperaSpeedDialAddressBar(bundleId: bundleId, role: info.role, focusedInfo: info) { return true }
-        if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: info) { return true }
+        if isArcOrDiaAddressBar(info: info, bundleId: bundleId) { return true }
         return false
     }
 
@@ -2863,8 +2865,11 @@ class AppBehaviorDetector {
                 return makeAddressBarInjection(browserType: "Opera Speed Dial", bundleId: bundleId)
             }
             
-            // Dia Browser address bar (AX Identifier: commandBarTextField)
-            if bundleId == "company.thebrowser.dia" && isDiaAddressBar(info: focusedInfo) {
+            // Arc and Dia Browser address bar (AX Identifier: commandBarTextField)
+            if isArcOrDiaAddressBar(info: focusedInfo, bundleId: bundleId) {
+                if bundleId != "company.thebrowser.dia" {
+                    return makeAddressBarInjection(browserType: "Arc", bundleId: bundleId)
+                }
                 return InjectionMethodInfo(
                     method: .axDirect,
                     delays: InjectionMethod.axDirect.defaultDelays,

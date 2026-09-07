@@ -148,6 +148,29 @@ class FocusedElementInfoLazyTests: XCTestCase {
         XCTAssertEqual(classCounter.count, 1)
     }
 
+    // MARK: - Arc and Dia command bars
+
+    func testArcAndDiaCommandBarsAreAddressBars() {
+        let info = makeInfo(role: "AXTextField", identifier: "commandBarTextField")
+        for bundleId in ["company.thebrowser.Browser", "company.thebrowser.Arc", "company.thebrowser.dia"] {
+            XCTAssertTrue(AppBehaviorDetector.shared.isAddressBar(info: info, bundleId: bundleId), bundleId)
+        }
+    }
+
+    func testCommandBarIdentifierDoesNotMatchOtherBrowsers() {
+        let info = makeInfo(role: "AXTextField", identifier: "commandBarTextField")
+        XCTAssertFalse(AppBehaviorDetector.shared.isAddressBar(info: info, bundleId: "com.google.Chrome"))
+    }
+
+    func testArcAndDiaOrdinaryTextFieldsAreNotAddressBars() {
+        for identifier in [nil, "otherTextField"] as [String?] {
+            let info = makeInfo(role: "AXTextField", identifier: identifier)
+            for bundleId in ["company.thebrowser.Browser", "company.thebrowser.Arc", "company.thebrowser.dia"] {
+                XCTAssertFalse(AppBehaviorDetector.shared.isAddressBar(info: info, bundleId: bundleId), bundleId)
+            }
+        }
+    }
+
     // MARK: - Firefox-style address bar gate
 
     func testFirefoxAddressBarByIdentifierDoesNotFireDOMQuery() {
