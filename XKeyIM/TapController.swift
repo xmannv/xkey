@@ -359,7 +359,8 @@ final class TapController {
 
     private func configureHotkeys(_ preferences: Preferences) {
         guard let manager else { return }
-        manager.toggleHotkey = preferences.toggleHotkey
+        manager.toggleHotkey = preferences.toggleHotkey.isUnset
+            ? nil : preferences.toggleHotkey
         manager.undoTypingHotkey = preferences.undoTypingEnabled
             ? (preferences.undoTypingHotkey
                 ?? Hotkey(keyCode: VietnameseData.KEY_ESC, modifiers: []))

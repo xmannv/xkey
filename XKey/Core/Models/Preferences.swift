@@ -215,7 +215,14 @@ struct Hotkey: Codable, Equatable {
         self.modifiers = modifiers
         self.isModifierOnly = isModifierOnly
     }
-    
+
+    /// True when the user cleared the hotkey: no key and no modifiers, so nothing
+    /// can ever match it. Distinct from `keyCode == 0`, which a modifier-only
+    /// hotkey also has.
+    var isUnset: Bool {
+        keyCode == 0 && modifiers.isEmpty
+    }
+
     var displayString: String {
         var parts: [String] = []
         

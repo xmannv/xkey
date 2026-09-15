@@ -575,6 +575,13 @@ class SharedSettings {
     private func writeInt(_ value: Int, forKey key: String) {
         mutatePlist { $0[key] = value }
     }
+
+    /// True when the key was written at least once. A cleared hotkey is stored as
+    /// 0/0, which reads back the same as a missing key, so only key presence can
+    /// tell "user cleared it" from "never configured".
+    private func hasStoredValue(forKey key: String) -> Bool {
+        readPlistDict()[key] != nil
+    }
     
     /// Read a String value from plist
     private func readString(forKey key: String) -> String? {
@@ -1972,7 +1979,7 @@ class SharedSettings {
         // Hotkey settings
         let hotkeyCode = toggleHotkeyCode
         let hotkeyModifiers = toggleHotkeyModifiers
-        if hotkeyCode != 0 || hotkeyModifiers != 0 {
+        if hasStoredValue(forKey: SharedSettingsKey.toggleHotkeyCode.rawValue) {
             prefs.toggleHotkey = Hotkey(
                 keyCode: hotkeyCode,
                 modifiers: ModifierFlags(rawValue: hotkeyModifiers),
@@ -2021,7 +2028,7 @@ class SharedSettings {
         // Temp off toolbar hotkey
         let toolbarHotkeyCode = tempOffToolbarHotkeyCode
         let toolbarHotkeyModifiers = tempOffToolbarHotkeyModifiers
-        if toolbarHotkeyCode != 0 || toolbarHotkeyModifiers != 0 {
+        if hasStoredValue(forKey: SharedSettingsKey.tempOffToolbarHotkeyCode.rawValue) {
             prefs.tempOffToolbarHotkey = Hotkey(
                 keyCode: toolbarHotkeyCode,
                 modifiers: ModifierFlags(rawValue: toolbarHotkeyModifiers)
@@ -2108,7 +2115,7 @@ class SharedSettings {
         prefs.translationEnabled = translationEnabled
         let transHotkeyCode = translationHotkeyCode
         let transHotkeyModifiers = translationHotkeyModifiers
-        if transHotkeyCode != 0 || transHotkeyModifiers != 0 {
+        if hasStoredValue(forKey: SharedSettingsKey.translationHotkeyCode.rawValue) {
             prefs.translationHotkey = Hotkey(
                 keyCode: transHotkeyCode,
                 modifiers: ModifierFlags(rawValue: transHotkeyModifiers)
@@ -2140,7 +2147,7 @@ class SharedSettings {
         prefs.openDebugOnLaunch = openDebugOnLaunch
         let dbgHotkeyCode = debugHotkeyCode
         let dbgHotkeyModifiers = debugHotkeyModifiers
-        if dbgHotkeyCode != 0 || dbgHotkeyModifiers != 0 {
+        if hasStoredValue(forKey: SharedSettingsKey.debugHotkeyCode.rawValue) {
             prefs.debugHotkey = Hotkey(
                 keyCode: dbgHotkeyCode,
                 modifiers: ModifierFlags(rawValue: dbgHotkeyModifiers)

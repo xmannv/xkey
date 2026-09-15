@@ -889,9 +889,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Configure EventTapManager to handle toggle hotkey
         // This ensures the hotkey is consumed at the lowest level
         // and doesn't reach other applications
-        eventTapManager?.toggleHotkey = hotkey
+        // A cleared hotkey is keyCode 0 with no modifiers, which would match a plain
+        // "A" keystroke. Unregister it instead.
+        eventTapManager?.toggleHotkey = hotkey.isUnset ? nil : hotkey
 
-        debugWindowController?.logEvent("Toggle hotkey configured: \(hotkey.displayString)")
+        debugWindowController?.logEvent(hotkey.isUnset
+            ? "Toggle hotkey disabled (no key set)"
+            : "Toggle hotkey configured: \(hotkey.displayString)")
     }
     
     private func setupUndoTypingHotkey(with hotkey: Hotkey?, enabled: Bool) {
