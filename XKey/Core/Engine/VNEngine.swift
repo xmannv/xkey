@@ -631,6 +631,7 @@ class VNEngine {
             // what user actually typed. E.g., "ass" should have raw keystrokes ["a", "s", "s"]
             // The modifier "s" on entry "á" represents the first "s", and the new entry "s"
             // from insertKey represents the second "s" that triggered restore.
+            // The dd undo in insertD is the exception: see the comment there.
         }
         
         // Insert or replace key for macro
@@ -1425,6 +1426,11 @@ class VNEngine {
                     typingWord[i] &= ~VNEngine.TONE_MASK
                     // Use getCharacterCode to convert to proper character (not raw key code)
                     hookState.charData[Int(index) - 1 - i] = getCharacterCode(typingWord[i])
+                    // Drop the 'd' that made 'đ': the screen is back to "dd" and the key
+                    // that undid it is recorded as its own entry by the vRestore branch of
+                    // processKey. Keeping the modifier too would make restore-on-wrong-spelling
+                    // replay "dddos" for "ddó" instead of "ddos".
+                    buffer.removeModifier(at: i, keyCode: keyCode)
                     tempDisableKey = true
                     break
                 } else {

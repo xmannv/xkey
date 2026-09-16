@@ -164,3 +164,47 @@ final class ScreenSimulationTests: XCTestCase {
         }
     }
 }
+
+/// Undo of a double-letter transform (the third "d" in "ddd", which turns "đ" back
+/// into "dd") must not leave the consumed modifier keystroke in the restore record.
+/// Otherwise restore-on-wrong-spelling replays one key too many: typing "d d d o s"
+/// shows "ddó" on screen but restores to "dddos" instead of "ddos".
+final class DoubleLetterUndoRestoreTests: XCTestCase {
+    private func rawKeystrokes(after typing: String) -> String {
+        let engine = VNEngine()
+        for ch in typing {
+            _ = engine.processKey(character: ch,
+                                  keyCode: CGKeyCode(VietnameseData.keyCode(for: ch) ?? 0),
+                                  isUppercase: ch.isUppercase)
+        }
+        return engine.buffer.getKeystrokeSequence().reduce(into: "") { result, keystroke in
+            if let char = VNEngine.keyCodeToChar(keystroke.keyCode) {
+                result.append(keystroke.isCaps ? Character(String(char).uppercased()) : char)
+            }
+        }
+    }
+
+    func testDdUndoDropsConsumedModifierFromRestoreRecord() {
+        XCTAssertEqual(rawKeystrokes(after: "ddd"), "dd",
+                       "third 'd' undoes 'đ'; screen shows \"dd\" so restore must replay \"dd\"")
+        XCTAssertEqual(rawKeystrokes(after: "dddos"), "ddos",
+                       "screen shows \"ddó\"; restoring wrong spelling must give back \"ddos\"")
+    }
+
+    /// The other undo gestures deliberately KEEP the cancelled modifier, so this is not
+    /// generalised to them. A tone key never reaches the screen, so its record is what
+    /// heals the swallowed keystroke: "address" (a,d,d,r,e,s,s) shows "ađres" and must
+    /// restore with both "s". Repeated vowels feed the same record to the
+    /// three-identical-keystrokes English heuristic ("baaas" → "baas").
+    func testToneUndoKeepsBothKeystrokes() {
+        XCTAssertEqual(rawKeystrokes(after: "ass"), "ass",
+                       "a tone key is swallowed by the screen — restore replays both 's'")
+    }
+
+    func testTransformsWithoutUndoStillRestoreEveryKeystroke() {
+        for (typed, expected) in [("ddos", "ddos"), ("aas", "aas"), ("uw", "uw"), ("oow", "oow")] {
+            XCTAssertEqual(rawKeystrokes(after: typed), expected,
+                           "'\(typed)' has no undo — restore must replay all of its keys")
+        }
+    }
+}

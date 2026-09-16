@@ -495,6 +495,22 @@ final class TypingBuffer {
         return removed
     }
 
+    /// Remove the most recent modifier with `keyCode` from entry at `index`, pulling the
+    /// matching keystroke out of the sequence too. An entry can carry several modifiers
+    /// (a horn and a tone, say), so an undo must drop the key it actually cancelled rather
+    /// than whichever modifier happens to be newest — `removeLastModifier(at:)` would take
+    /// the wrong one.
+    @discardableResult
+    func removeModifier(at index: Int, keyCode: UInt16) -> RawKeystroke? {
+        guard index >= 0 && index < entries.count else { return nil }
+        guard let modifierIndex = entries[index].modifierKeystrokes.lastIndex(where: { $0.keyCode == keyCode }) else {
+            return nil
+        }
+        let removed = entries[index].modifierKeystrokes.remove(at: modifierIndex)
+        removeKeystrokeFromSequence(matching: removed)
+        return removed
+    }
+
     /// Remove one keystroke from `keystrokeSequence` whose `entryId`, keyCode and caps
     /// flag all match. Walks from the tail so the most-recent occurrence wins when an
     /// entry has multiple identical modifiers.
