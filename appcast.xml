@@ -6,30 +6,33 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20260915)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260915</link>
-      <sparkle:version>20260915</sparkle:version>
+      <title>Version 1.2.25 (Build 20260916)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260916</link>
+      <sparkle:version>20260916</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(hotkey): keep a cleared hotkey cleared across settings reloads</p>
-<p>Clearing a hotkey stores keyCode 0 with no modifiers, which loadPreferences</p>
-<p>read back the same as a key that was never written, so the built-in default</p>
-<p>came back the next time the settings window opened (#324).</p>
-<p>Check for the presence of the stored key instead of its value, for the four</p>
-<p>hotkeys whose default is non-empty: toggleHotkey, tempOffToolbarHotkey,</p>
-<p>translationHotkey and debugHotkey.</p>
-<p>A cleared toggle hotkey also matched a plain "A" keystroke, because keyCode 0</p>
-<p>with no modifiers is what an unmodified "A" key down carries. Add Hotkey.isUnset</p>
-<p>and unregister the hotkey instead of arming it; the other hotkeys already guard</p>
-<p>on keyCode, which the toggle hotkey cannot use because it supports</p>
-<p>modifier-only combinations.</p>
-<p>Bump the build number to 20260915.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260915">Xem chi tiết trên GitHub</a></p>
+<p>fix(engine): drop the cancelled 'd' modifier when "ddd" undoes "đ"</p>
+<p>Typing d-d-d-o-s shows "ddó" on screen, but restore-on-wrong-spelling replayed</p>
+<p>"dddos" instead of "ddos". The third 'd' was counted twice in the restore record:</p>
+<p>insertD's undo branch stripped TONE_MASK without removing the modifier keystroke</p>
+<p>that dd→đ had recorded, while the vRestore branch of processKey re-inserts that</p>
+<p>same key as its own entry.</p>
+<p>The undo branch now drops it through a new TypingBuffer.removeModifier(at:keyCode:),</p>
+<p>which targets the key the undo actually cancelled rather than the newest modifier —</p>
+<p>an entry can carry both a horn and a tone.</p>
+<p>This stays scoped to 'd'. The other undo gestures must keep the cancelled modifier:</p>
+<p>a tone key never reaches the screen, so the record is what heals the swallowed</p>
+<p>keystroke ("address" restores both 's'), and a vowel undo leaves Vietnamese off for</p>
+<p>the rest of the word, so no restore ever runs. Only the 'd' path re-enables</p>
+<p>processing (the "Allow d after consonant" rule in insertKey), which is what exposed</p>
+<p>the double count.</p>
+<p>Also bump CURRENT<em>PROJECT</em>VERSION to 20260916.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260916">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 15 Sep 2026 09:23:55 +0000</pubDate>
+      <pubDate>Wed, 16 Sep 2026 07:13:42 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260915/XKey.dmg" sparkle:version="20260915" sparkle:shortVersionString="1.2.25" length="12675267" type="application/octet-stream" sparkle:edSignature="QBC8pINEPCFGQcLLElKmcIgtCpaw2tjvtOm1yU5VoKVR3bheVa15qJTW/a7dls9ZjnjfP9X+YvJ0m8+IU8owBg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260916/XKey.dmg" sparkle:version="20260916" sparkle:shortVersionString="1.2.25" length="12604482" type="application/octet-stream" sparkle:edSignature="jcXYvdx/VH45K9qxNblyuzWTknmymbVJ07jWU/m5f1gkSmOLbl7vEZaphI60+vVa6WEFjPVhptpLANhEAob9Cw==" />
     </item>
   </channel>
 </rss>
