@@ -84,9 +84,36 @@ struct InputSourcesSection: View {
                         .padding(8)
                         .background(Color.blue.opacity(0.05))
                         .cornerRadius(6)
-                        
+
                         Divider()
-                        
+
+                        // Note about Accessibility permission requirement
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.shield")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Cần quyền Accessibility")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Text("XKeyIM cần quyền Accessibility để xử lý phím tắt (Ctrl+C) khi đang có marked text, và để nhận diện address bar trình duyệt (Chrome, Safari, Firefox...).")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Button("Mở System Settings → Accessibility") {
+                                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                                .buttonStyle(.link)
+                                .font(.caption2)
+                            }
+                        }
+                        .padding(8)
+                        .background(Color.orange.opacity(0.08))
+                        .cornerRadius(6)
+
+                        Divider()
+
                         // Install XKeyIM button
                         HStack {
                             Text("XKeyIM Input Method:")

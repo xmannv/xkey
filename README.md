@@ -339,13 +339,15 @@ XKeyIM là input method dùng IMKit của Apple, cung cấp trải nghiệm gõ 
 
 ### Quyền truy cập cho XKeyIM
 
-XKeyIM cần quyền **Accessibility** để xử lý một số tổ hợp phím đặc biệt (như Ctrl+C trong Terminal):
+XKeyIM cần quyền **Accessibility** để:
+- Xử lý một số tổ hợp phím đặc biệt (như Ctrl+C trong Terminal) khi đang có marked text
+- Nhận diện address bar / ô tìm kiếm của trình duyệt (Chrome, Safari, Firefox...) để gõ tiếng Việt mượt trong autocomplete
 
 1. Mở **System Settings → Privacy & Security → Accessibility**
 2. Nhấn **"+"** và thêm `XKeyIM.app` từ `~/Library/Input Methods/`
 3. Bật quyền cho XKeyIM
 
-Nếu không cấp quyền Accessibility, XKeyIM vẫn gõ tiếng Việt bình thường. Quyền này chỉ cần để đảm bảo các phím tắt như Ctrl+C hoạt động đúng khi đang có marked text.
+Nếu không cấp quyền Accessibility, XKeyIM tự chuyển về chế độ gạch chân (marked text, giống cơ chế trước khi unify) và vẫn gõ tiếng Việt bình thường ở mọi ứng dụng kể cả trình duyệt. Quyền này chỉ cần để mở chế độ gõ phím thật (mượt hơn, tự xử lý autocomplete của address bar) và để các phím tắt như Ctrl+C hoạt động đúng khi đang có marked text.
 
 Phím hoàn tác: XKeyIM dùng ESC làm phím hoàn tác mặc định (không thể tùy chỉnh do hạn chế của Input Method Kit). Bấm ESC khi đang gõ từ có dấu sẽ hoàn tác về dạng không dấu.
 

@@ -339,13 +339,15 @@ XKeyIM is an input method built on Apple's IMKit, offering a smoother typing exp
 
 ### Permissions for XKeyIM
 
-XKeyIM needs **Accessibility** permission to handle certain special key combinations (such as Ctrl+C in Terminal):
+XKeyIM needs **Accessibility** permission to:
+- Handle certain special key combinations (such as Ctrl+C in Terminal) while marked text is present
+- Detect browser address bars / search fields (Chrome, Safari, Firefox...) for smooth typing in autocomplete fields
 
 1. Open **System Settings → Privacy & Security → Accessibility**
 2. Click **"+"** and add `XKeyIM.app` from `~/Library/Input Methods/`
 3. Enable XKeyIM
 
-Without Accessibility permission, XKeyIM still types Vietnamese normally. The permission is only needed so shortcuts like Ctrl+C behave correctly while marked text is present.
+Without Accessibility permission, XKeyIM falls back to marked-text mode (the same mechanism used before the unification) and still types Vietnamese normally in every app, including browsers. The permission is only needed to unlock real-key typing mode (smoother, handles browser address-bar autocomplete itself) and so shortcuts like Ctrl+C behave correctly while marked text is present.
 
 Undo key: XKeyIM uses ESC as the default undo key (not customizable due to Input Method Kit limitations). Pressing ESC while typing an accented word reverts it to its plain form.
 
