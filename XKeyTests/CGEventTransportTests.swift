@@ -183,6 +183,7 @@ private enum SinkCall: Equatable {
 }
 
 private final class RecordingSink: CGEventInjectionSink {
+    var prefersAsyncDirectInjection = false
     var debugCallback: ((String) -> Void)?
     var injections: [Injection] = []
     var sessions: [(cursorMoved: Bool, preserveMidSentence: Bool)] = []
@@ -211,6 +212,7 @@ private final class RecordingSink: CGEventInjectionSink {
 }
 
 private final class BlockingInjectionSink: CGEventInjectionSink {
+    var prefersAsyncDirectInjection = false
     var debugCallback: ((String) -> Void)?
     let injectionStarted = DispatchSemaphore(value: 0)
     let allowInjectionToFinish = DispatchSemaphore(value: 0)

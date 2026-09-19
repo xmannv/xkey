@@ -2,7 +2,7 @@
 //  InjectionRoutingTests.swift
 //  XKeyTests
 //
-//  Guards CharacterInjector.canRunSlowDirectAsync, the gate that decides whether an
+//  Guards CharacterInjector.canRunDirectAsync, the gate that decides whether an
 //  injection may leave the event-tap callback. performSlowDirectInjection reproduces
 //  only the plain `.slow` direct-post sequence, so any combination it cannot express
 //  (proxy-bound methods, empty-char prefix, paste, Forward Delete) MUST stay on
@@ -22,14 +22,16 @@ final class InjectionRoutingTests: XCTestCase {
         needsEmptyCharPrefix: Bool = false,
         textSendingMethod: TextSendingMethod = .oneByOne,
         backspaceCount: Int = 1,
+        prefersAsyncDirectInjection: Bool = false,
         needsForwardDelete: Bool = false,
         probe: Probe? = nil
     ) -> Bool {
-        CharacterInjector.canRunSlowDirectAsync(
+        CharacterInjector.canRunDirectAsync(
             method: method,
             needsEmptyCharPrefix: needsEmptyCharPrefix,
             textSendingMethod: textSendingMethod,
             backspaceCount: backspaceCount,
+            prefersAsyncDirectInjection: prefersAsyncDirectInjection,
             needsForwardDelete: {
                 probe?.evaluated = true
                 return needsForwardDelete
@@ -48,6 +50,28 @@ final class InjectionRoutingTests: XCTestCase {
     }
 
     // MARK: - Rejected: everything the async path cannot express
+
+    /// The XKeyIM host cannot block its tap thread, so `.fast` joins the async path there.
+    func testAllowsFastForAsyncDirectHost() {
+        XCTAssertTrue(canRunAsync(method: .fast, prefersAsyncDirectInjection: true))
+    }
+
+    func testStillRejectsProxyBoundMethodsForAsyncDirectHost() {
+        for method in InjectionMethod.allCases where method != .slow && method != .fast {
+            XCTAssertFalse(
+                canRunAsync(method: method, prefersAsyncDirectInjection: true),
+                "\(method) needs a CGEventTapProxy and must stay synchronous even for XKeyIM"
+            )
+        }
+    }
+
+    func testRejectsEmptyCharPrefixForAsyncDirectHost() {
+        XCTAssertFalse(
+            canRunAsync(method: .fast,
+                        needsEmptyCharPrefix: true,
+                        prefersAsyncDirectInjection: true)
+        )
+    }
 
     func testRejectsNonSlowMethods() {
         for method in InjectionMethod.allCases where method != .slow {

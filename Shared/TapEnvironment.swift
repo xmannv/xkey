@@ -41,18 +41,26 @@ struct TapEnvironment {
     /// the tap — the primitive behind every freeze we have chased.
     let axMessagingTimeout: Double
 
+    /// Whether the host runs its tap inside the process that is also the active input
+    /// method. XKeyIM does, so a synchronous injection blocks the thread the focused app
+    /// waits on for every injected event, and WebKit drops what it cannot get an answer
+    /// for. Such a host injects asynchronously with direct posting instead.
+    let prefersAsyncDirectInjection: Bool
+
     init(preferences: Preferences,
          overlayAppName: @escaping () -> String?,
          remoteDesktopInjectMode: @escaping () -> Bool,
          windowTitleRulesEnabled: Bool,
          vietnameseEnabled: Bool,
-         axMessagingTimeout: Double) {
+         axMessagingTimeout: Double,
+         prefersAsyncDirectInjection: Bool = false) {
         self.preferences = preferences
         self.overlayAppName = overlayAppName
         self.remoteDesktopInjectMode = remoteDesktopInjectMode
         self.windowTitleRulesEnabled = windowTitleRulesEnabled
         self.vietnameseEnabled = vietnameseEnabled
         self.axMessagingTimeout = axMessagingTimeout
+        self.prefersAsyncDirectInjection = prefersAsyncDirectInjection
     }
 }
 
@@ -77,6 +85,7 @@ extension TapEnvironment {
         detector.windowTitleRulesEnabled = runtimePreferences.windowTitleRulesEnabled
         detector.loadCustomRules()
 
+        handler.prefersAsyncDirectInjection = prefersAsyncDirectInjection
         handler.apply(runtimePreferences)
     }
 }

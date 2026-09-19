@@ -21,6 +21,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
     // Debug logging callback
     var debugLogCallback: ((String) -> Void)?
+
+    /// Inject asynchronously, off the event-tap callback, with direct posting. Set by
+    /// TapEnvironment: true for the XKeyIM host, whose tap runs on the main thread of the
+    /// active input method — the thread the focused app waits on for every injected event.
+    var prefersAsyncDirectInjection: Bool {
+        get { transport.prefersAsyncDirectInjection }
+        set { transport.prefersAsyncDirectInjection = newValue }
+    }
     
     /// Enable verbose engine logging (causes lag when enabled!)
     /// Only turn on for debugging specific issues
