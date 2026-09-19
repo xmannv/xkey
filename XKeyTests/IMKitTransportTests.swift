@@ -776,6 +776,7 @@ private final class RecordingTextClient: IMKitTextClient {
 }
 
 private final class ParityInjectionSink: CGEventInjectionSink {
+    var prefersAsyncDirectInjection = false
     var debugCallback: ((String) -> Void)?
     var text = ""
 

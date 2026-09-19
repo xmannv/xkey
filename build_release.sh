@@ -518,12 +518,23 @@ if [ "$ENABLE_DMG" = true ]; then
     
     # Create DMG
     echo "📀 Creating DMG file..."
-    hdiutil create \
-        -volname "$DMG_VOLUME_NAME" \
-        -srcfolder "$DMG_SOURCE_DIR" \
-        -ov \
-        -format UDZO \
-        "Release/$DMG_NAME"
+    # macOS 27 deprecates `hdiutil create`. Prefer the diskutil subcommand where it
+    # exists and keep hdiutil for older systems, which do not have it. `-ov` has no
+    # diskutil equivalent; the old DMG is already removed above.
+    if diskutil image create from --help >/dev/null 2>&1; then
+        diskutil image create from \
+            --format UDZO \
+            --volumeName "$DMG_VOLUME_NAME" \
+            "$DMG_SOURCE_DIR" \
+            "Release/$DMG_NAME"
+    else
+        hdiutil create \
+            -volname "$DMG_VOLUME_NAME" \
+            -srcfolder "$DMG_SOURCE_DIR" \
+            -ov \
+            -format UDZO \
+            "Release/$DMG_NAME"
+    fi
     
     # Sign DMG if code signing is enabled
     if [ "$ENABLE_CODESIGN" = true ]; then

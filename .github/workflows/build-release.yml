@@ -277,12 +277,23 @@ jobs:
           rm -f "Release/$DMG_NAME"
           
           # Create DMG
-          hdiutil create \
-            -volname "$DMG_VOLUME_NAME" \
-            -srcfolder "$DMG_SOURCE_DIR" \
-            -ov \
-            -format UDZO \
-            "Release/$DMG_NAME"
+          # macOS 27 deprecates `hdiutil create`. Prefer the diskutil subcommand where
+          # it exists and keep hdiutil for runners that predate it. `-ov` has no
+          # diskutil equivalent; the old DMG is already removed above.
+          if diskutil image create from --help >/dev/null 2>&1; then
+            diskutil image create from \
+              --format UDZO \
+              --volumeName "$DMG_VOLUME_NAME" \
+              "$DMG_SOURCE_DIR" \
+              "Release/$DMG_NAME"
+          else
+            hdiutil create \
+              -volname "$DMG_VOLUME_NAME" \
+              -srcfolder "$DMG_SOURCE_DIR" \
+              -ov \
+              -format UDZO \
+              "Release/$DMG_NAME"
+          fi
           
           # Sign DMG
           echo "🔐 Signing DMG..."

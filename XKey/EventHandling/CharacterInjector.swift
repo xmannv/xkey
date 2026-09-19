@@ -37,7 +37,45 @@ class CharacterInjector {
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
-    
+
+    /// Whether this host must keep the event-tap callback free while it injects.
+    ///
+    /// XKeyIM runs its tap on the main run loop of the process that is also the active
+    /// input method. A synchronous injection blocks that thread for the whole backspace →
+    /// text sequence, and the focused app asks this very process about each injected event
+    /// through IMKit before delivering it. WebKit gives up on the unanswered reply and
+    /// drops the event, so Vietnamese loses its diacritics in every Safari web field while
+    /// physical keys still land. TextEdit, which does not wait on the input method the same
+    /// way, is unaffected — and `.slow` always worked here precisely because it already
+    /// runs asynchronously.
+    ///
+    /// Set for XKeyIM only. XKey.app is not an input method, so nothing waits on its main
+    /// thread and it keeps the proxy path unchanged.
+    var prefersAsyncDirectInjection = false
+
+    /// Name of the route `postInjected` will take, for the debug log.
+    private func routeName(useDirectPost: Bool) -> String {
+        useDirectPost ? "session" : "proxy"
+    }
+
+    /// Where one injected event goes: directly to the session tap, or back into the tap
+    /// stream through the proxy. Returns false when neither is available, so callers can
+    /// abandon the rest of the sequence instead of posting half of it.
+    @discardableResult
+    private func postInjected(_ event: CGEvent,
+                              proxy: CGEventTapProxy?,
+                              useDirectPost: Bool) -> Bool {
+        if useDirectPost {
+            event.post(tap: .cgSessionEventTap)
+        } else if let proxy {
+            event.tapPostEvent(proxy)
+        } else {
+            assertionFailure("A tap proxy is required when direct posting is disabled")
+            return false
+        }
+        return true
+    }
+
     // MARK: - Initialization
     
     init() {
@@ -97,31 +135,37 @@ class CharacterInjector {
     
     // MARK: - Synchronized Injection
 
-    /// Route injection through the smallest safe non-blocking path.
-    ///
-    /// Only plain `.slow` one-by-one/chunked injections run on the serial queue. Those
-    /// paths already post every event directly to `.cgSessionEventTap`, so moving them
-    /// off the event-tap callback does not change their posting behavior. Any path that
-    /// may use `CGEventTapProxy` remains synchronous and unchanged.
     /// Decides whether an injection may leave the event-tap callback.
     ///
-    /// Async is only safe for the `.slow` paths that post every event directly to
-    /// `.cgSessionEventTap`, because `performSlowDirectInjection` reproduces exactly that
-    /// subset: it has no `CGEventTapProxy`, no empty-char prefix, no paste, and no Forward
-    /// Delete step. Every other combination must stay on `injectSync`.
+    /// Async is safe only for the plain backspace → text sequence `performSlowDirectInjection`
+    /// reproduces: no `CGEventTapProxy`, no empty-char prefix, no paste, no Forward Delete
+    /// step. Every other combination must stay on `injectSync`.
+    ///
+    /// `.slow` always qualifies. `.fast` qualifies for a host that passes
+    /// `prefersAsyncDirectInjection` — XKeyIM, which must not block its tap thread because
+    /// the focused app waits on that same thread for every injected event.
     ///
     /// `needsForwardDelete` is an autoclosure and a parameter rather than a direct
     /// `AppBehaviorDetector` call: resolving it hits the frontmost app and scans the
     /// confirmed method description, and `injectSync` only consults it when
     /// `backspaceCount > 0`, so a plain insert must not pay for it.
-    static func canRunSlowDirectAsync(
+    static func canRunDirectAsync(
         method: InjectionMethod,
         needsEmptyCharPrefix: Bool,
         textSendingMethod: TextSendingMethod,
         backspaceCount: Int,
+        prefersAsyncDirectInjection: Bool = false,
         needsForwardDelete: @autoclosure () -> Bool
     ) -> Bool {
-        guard method == .slow, !needsEmptyCharPrefix, textSendingMethod != .paste else {
+        // `.fast` joins `.slow` only for a host that must not block its tap thread, and
+        // only because performSlowDirectInjection reproduces the plain backspace → text
+        // sequence for any delays. The other guards below still exclude everything that
+        // sequence cannot express.
+        let methodAllowed = method == .slow || (prefersAsyncDirectInjection && method == .fast)
+        // The empty-char prefix posts every event directly too, so an async-direct host can
+        // run it off the callback as well; `.slow` keeps its original, narrower contract.
+        let prefixAllowed = !needsEmptyCharPrefix || prefersAsyncDirectInjection
+        guard methodAllowed, prefixAllowed, textSendingMethod != .paste else {
             return false
         }
         return backspaceCount == 0 || !needsForwardDelete()
@@ -129,15 +173,16 @@ class CharacterInjector {
 
     func inject(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
         let methodInfo = AppBehaviorDetector.shared.getConfirmedInjectionMethod()
-        let canRunSlowDirectAsync = Self.canRunSlowDirectAsync(
+        let canRunDirectAsync = Self.canRunDirectAsync(
             method: methodInfo.method,
             needsEmptyCharPrefix: methodInfo.needsEmptyCharPrefix,
             textSendingMethod: methodInfo.textSendingMethod,
             backspaceCount: backspaceCount,
+            prefersAsyncDirectInjection: prefersAsyncDirectInjection,
             needsForwardDelete: AppBehaviorDetector.shared.needsForwardDeleteWithAXCheck
         )
 
-        guard canRunSlowDirectAsync else {
+        guard canRunDirectAsync else {
             injectSync(
                 backspaceCount: backspaceCount,
                 characters: characters,
@@ -152,8 +197,17 @@ class CharacterInjector {
         // enqueue→execute gap and let the next physical key overtake this injection.
         injectionSemaphore.wait()
         let semaphore = injectionSemaphore
-        let delays = methodInfo.delays
+        // `.fast` spacing is too tight for this route. Posted to the session tap about a
+        // millisecond apart, WebKit applies the second backspace AFTER the text that was
+        // posted behind it — traced in a Safari textarea, where `cos` produced
+        // insert U+202F, delete, insert "ó", delete, leaving the diacritic deleted by the
+        // backspace meant for the character before it. `.slow` spacing is what held in the
+        // same field, and it costs nothing here: these sleeps run off the tap callback.
+        let delays = (prefersAsyncDirectInjection && methodInfo.method == .fast)
+            ? InjectionMethod.slow.defaultDelays
+            : methodInfo.delays
         let textSendingMethod = methodInfo.textSendingMethod
+        let needsEmptyCharPrefix = methodInfo.needsEmptyCharPrefix
         slowInjectionQueue.async { [weak self] in
             defer { semaphore.signal() }
             self?.performSlowDirectInjection(
@@ -161,7 +215,8 @@ class CharacterInjector {
                 characters: characters,
                 codeTable: codeTable,
                 delays: delays,
-                textSendingMethod: textSendingMethod
+                textSendingMethod: textSendingMethod,
+                needsEmptyCharPrefix: needsEmptyCharPrefix
             )
         }
     }
@@ -267,7 +322,7 @@ class CharacterInjector {
                     return
                 }
                 
-                debugCallback?("    → Backspace method: delays=\(delays), directPost=\(useDirectPost)")
+                debugCallback?("    → Backspace method: delays=\(delays), route=\(routeName(useDirectPost: useDirectPost))")
                 // Forward Delete is only used for .autocomplete method
                 // For slow/fast methods, just send backspaces
                 
@@ -332,10 +387,10 @@ class CharacterInjector {
             // Use text sending method from rule/detection
             switch textSendingMethod {
             case .oneByOne:
-                debugCallback?("    → Text mode: one-by-one, directPost=\(useDirectPost)")
+                debugCallback?("    → Text mode: one-by-one, route=\(routeName(useDirectPost: useDirectPost))")
                 sendTextOneByOneInternal(charPreview, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
             case .chunked:
-                debugCallback?("    → Text mode: chunked, directPost=\(useDirectPost)")
+                debugCallback?("    → Text mode: chunked, route=\(routeName(useDirectPost: useDirectPost))")
                 sendTextChunkedInternal(charPreview, delay: delays.text, proxy: proxy, useDirectPost: useDirectPost)
             case .paste:
                 debugCallback?("    → Text mode: paste (clipboard + Cmd+V)")
@@ -353,19 +408,33 @@ class CharacterInjector {
         debugCallback?("injectSync: complete")
     }
 
-    /// Performs the subset of `.slow` injection that is guaranteed to use direct session
-    /// posting. The caller owns `injectionSemaphore`; this method must not wait or signal it.
+    /// Performs the plain backspace → text sequence with direct session posting, off the
+    /// event-tap callback. Used by `.slow` on every host, and by `.fast` on a host that
+    /// must not block its tap thread. The caller owns `injectionSemaphore`; this method must not wait or signal it.
     private func performSlowDirectInjection(
         backspaceCount: Int,
         characters: [VNCharacter],
         codeTable: CodeTable,
         delays: InjectionDelays,
-        textSendingMethod: TextSendingMethod
+        textSendingMethod: TextSendingMethod,
+        needsEmptyCharPrefix: Bool = false
     ) {
         eventSource = CGEventSource(stateID: .privateState)
 
         let text = characters.map { $0.unicode(codeTable: codeTable) }.joined()
-        debugCallback?("Inject async slow-direct: bs=\(backspaceCount), chars=\(characters.count), text=\"\(text)\", textMode=\(textSendingMethod)")
+        debugCallback?("Inject async direct: bs=\(backspaceCount), chars=\(characters.count), text=\"\(text)\", textMode=\(textSendingMethod), emptyCharPrefix=\(needsEmptyCharPrefix)")
+
+        // Same gate injectSync uses: with nothing to delete there is no highlighted
+        // suggestion for the prefix to break.
+        if needsEmptyCharPrefix && backspaceCount > 0 {
+            injectViaEmptyCharPrefixInternal(backspaceCount: backspaceCount,
+                                             text: text,
+                                             delays: delays,
+                                             proxy: nil,
+                                             textSendingMethod: textSendingMethod)
+            debugCallback?("Inject async direct: complete (emptyCharPrefix)")
+            return
+        }
 
         for index in 0..<backspaceCount {
             sendBackspaceKey(codeTable: codeTable, proxy: nil, useDirectPost: true)
@@ -390,7 +459,7 @@ class CharacterInjector {
         }
 
         usleep(Self.slowSettleTime)
-        debugCallback?("Inject async slow-direct: complete")
+        debugCallback?("Inject async direct: complete")
     }
     
     /// Internal: Send backspace key (no semaphore)
@@ -438,7 +507,7 @@ class CharacterInjector {
     /// Sends U+202F to break autocomplete, then (backspaceCount+1) backspaces, then text.
     /// The +1 backspace removes the U+202F character itself.
     /// Uses post(tap: .cgSessionEventTap) for reliable delivery in Firefox.
-    private func injectViaEmptyCharPrefixInternal(backspaceCount: Int, text: String, delays: InjectionDelays, proxy: CGEventTapProxy, textSendingMethod: TextSendingMethod) {
+    private func injectViaEmptyCharPrefixInternal(backspaceCount: Int, text: String, delays: InjectionDelays, proxy: CGEventTapProxy?, textSendingMethod: TextSendingMethod) {
         // Step 1: Send U+202F to break autocomplete suggestions
         sendEmptyCharacter(proxy: proxy, useDirectPost: true)
         usleep(1000)  // 1ms for empty char to be registered
@@ -545,14 +614,8 @@ class CharacterInjector {
                     keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
                     
                     // For slow method (terminals), post directly to session event tap
-                    if useDirectPost {
-                        keyDown.post(tap: .cgSessionEventTap)
-                        keyUp.post(tap: .cgSessionEventTap)
-                    } else if let proxy {
-                        keyDown.tapPostEvent(proxy)
-                        keyUp.tapPostEvent(proxy)
-                    } else {
-                        assertionFailure("A tap proxy is required when direct posting is disabled")
+                    guard postInjected(keyDown, proxy: proxy, useDirectPost: useDirectPost),
+                          postInjected(keyUp, proxy: proxy, useDirectPost: useDirectPost) else {
                         return
                     }
                     
@@ -624,14 +687,8 @@ class CharacterInjector {
             keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
             
             // For slow method (terminals), post directly to session event tap
-            if useDirectPost {
-                keyDown.post(tap: .cgSessionEventTap)
-                keyUp.post(tap: .cgSessionEventTap)
-            } else if let proxy {
-                keyDown.tapPostEvent(proxy)
-                keyUp.tapPostEvent(proxy)
-            } else {
-                assertionFailure("A tap proxy is required when direct posting is disabled")
+            guard postInjected(keyDown, proxy: proxy, useDirectPost: useDirectPost),
+                  postInjected(keyUp, proxy: proxy, useDirectPost: useDirectPost) else {
                 return
             }
             
@@ -847,7 +904,7 @@ class CharacterInjector {
     /// keep .privateState (avoids cross-app side effects).
     ///
     /// NOTE: Clipboard is NOT restored after paste to avoid race conditions when typing fast.
-    private func sendTextViaPaste(_ text: String, proxy: CGEventTapProxy, config: PasteConfig = PasteConfig()) {
+    private func sendTextViaPaste(_ text: String, proxy: CGEventTapProxy?, config: PasteConfig = PasteConfig()) {
         let pasteboard = NSPasteboard.general
 
         // Set clipboard to replacement text
@@ -871,12 +928,17 @@ class CharacterInjector {
             return
         }
 
+        // Read once here rather than inside the closure: the closure would have to capture
+        // self to reach anything on the instance, and this route cannot change mid-paste.
+        let pastesDirectly = config.useDirectPost
         let postPaste: (CGEvent) -> Void = { event in
             event.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-            if config.useDirectPost {
+            if pastesDirectly {
                 event.post(tap: .cgSessionEventTap)
-            } else {
+            } else if let proxy {
                 event.tapPostEvent(proxy)
+            } else {
+                assertionFailure("A tap proxy is required when direct posting is disabled")
             }
         }
 
@@ -949,45 +1011,10 @@ class CharacterInjector {
 
         // For slow method (terminals), post directly to session event tap
         // This avoids race conditions where tapPostEvent can cause timing issues
-        if useDirectPost {
-            keyDown.post(tap: .cgSessionEventTap)
-            keyUp.post(tap: .cgSessionEventTap)
-        } else if let proxy {
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-        } else {
-            assertionFailure("A tap proxy is required when direct posting is disabled")
-        }
+        postInjected(keyDown, proxy: proxy, useDirectPost: useDirectPost)
+        postInjected(keyUp, proxy: proxy, useDirectPost: useDirectPost)
     }
     
-    private func sendUnicodeCharacter(_ char: UnicodeScalar, proxy: CGEventTapProxy) {
-        guard let source = eventSource else { return }
-
-        // Create keyboard events with Unicode character
-        // Use CGEventCreateKeyboardEvent with virtualKey 0 for Unicode input
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
-            return
-        }
-
-        // Convert UnicodeScalar to UTF-16 (UniChar array)
-        let unicodeString = String(char)
-        var utf16Chars = Array(unicodeString.utf16)
-
-        // Use the official keyboardSetUnicodeString instance method (Swift 3+ API)
-        // This is the same method used by OpenKey
-        keyDown.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: &utf16Chars)
-        keyUp.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: &utf16Chars)
-
-        // Mark as XKey-injected event to prevent re-processing by event tap
-        keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
-
-        // Post events using tapPostEvent
-        keyDown.tapPostEvent(proxy)
-        keyUp.tapPostEvent(proxy)
-    }
-
     // MARK: - Autocomplete Fix Methods
     
     /// Send Right Arrow key to move cursor to end (deselect autocomplete in Spotlight)
@@ -1011,7 +1038,7 @@ class CharacterInjector {
     /// Send empty character to fix autocomplete (U+202F - Narrow No-Break Space)
     /// - Parameter useDirectPost: If true, posts via cgSessionEventTap (for emptyCharPrefix method).
     ///   If false, uses tapPostEvent(proxy) (for other methods).
-    private func sendEmptyCharacter(proxy: CGEventTapProxy, useDirectPost: Bool = false) {
+    private func sendEmptyCharacter(proxy: CGEventTapProxy?, useDirectPost: Bool = false) {
         guard let source = eventSource else { return }
 
         let emptyChar: UInt16 = 0x202F  // Narrow No-Break Space
@@ -1029,13 +1056,8 @@ class CharacterInjector {
         keyDown.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
         keyUp.setIntegerValueField(.eventSourceUserData, value: kXKeyEventMarker)
 
-        if useDirectPost {
-            keyDown.post(tap: .cgSessionEventTap)
-            keyUp.post(tap: .cgSessionEventTap)
-        } else {
-            keyDown.tapPostEvent(proxy)
-            keyUp.tapPostEvent(proxy)
-        }
+        postInjected(keyDown, proxy: proxy, useDirectPost: useDirectPost)
+        postInjected(keyUp, proxy: proxy, useDirectPost: useDirectPost)
     }
 
     /// Send Shift+Left Arrow to select text (for Chromium browsers)

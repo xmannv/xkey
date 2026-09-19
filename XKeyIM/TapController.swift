@@ -351,9 +351,19 @@ final class TapController {
             remoteDesktopInjectMode: { SharedSettings.shared.remoteDesktopInjectMode },
             windowTitleRulesEnabled: tapPreferences.windowTitleRulesEnabled,
             vietnameseEnabled: SharedSettings.shared.vietnameseEnabled,
-            axMessagingTimeout: 0.25
+            axMessagingTimeout: 0.25,
+            prefersAsyncDirectInjection: true
         )
         environment.apply(to: handler)
+        // The armed tap runs the same keystroke path XKey.app runs, so it must log it the
+        // same way. Without this a debug log captured from an XKeyIM session shows focus
+        // and injection-method lines only — no CONSUME/Engine/Injector lines — and a typing
+        // bug reported against XKeyIM cannot be diagnosed from it.
+        let loggingEnabled = tapPreferences.debugModeEnabled
+        handler.debugLogCallback = loggingEnabled
+            ? { message in IMKitDebugger.shared.log(message, category: "TAP") }
+            : nil
+        handler.verboseEngineLogging = loggingEnabled
         configureHotkeys(tapPreferences)
     }
 

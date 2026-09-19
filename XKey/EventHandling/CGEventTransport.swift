@@ -2,6 +2,7 @@ import CoreGraphics
 
 protocol CGEventInjectionSink: AnyObject {
     var debugCallback: ((String) -> Void)? { get set }
+    var prefersAsyncDirectInjection: Bool { get set }
     func inject(backspaceCount: Int,
                 characters: [VNCharacter],
                 codeTable: CodeTable,
@@ -38,6 +39,14 @@ final class CGEventTransport {
     var debugCallback: ((String) -> Void)? {
         get { sink.debugCallback }
         set { sink.debugCallback = newValue }
+    }
+
+    /// Forwarded to the injector: keep the event-tap callback free by injecting
+    /// asynchronously with direct posting. Set by the host whose tap thread something else
+    /// waits on — XKeyIM, where the focused app queries this same process through IMKit.
+    var prefersAsyncDirectInjection: Bool {
+        get { sink.prefersAsyncDirectInjection }
+        set { sink.prefersAsyncDirectInjection = newValue }
     }
 
     func normalize(_ event: CGEvent, type: CGEventType) -> InputEvent? {

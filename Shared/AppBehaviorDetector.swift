@@ -955,6 +955,43 @@ class AppBehaviorDetector {
         cachedAddressBarInjection = nil
         cachedAddressBarBundleId = nil
     }
+
+    /// Roles a focused editable field inside a page reports.
+    private static let webTextInputRoles: Set<String> = [
+        "AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"
+    ]
+
+    /// When a real, non-address-bar text field was last the confirmed focus in a browser,
+    /// and which browser that was.
+    ///
+    /// Safari re-reports the focused element of a page as AXWindow or AXGroup for a moment
+    /// at a time — observed repeatedly while typing in a GitHub comment box, where focus
+    /// flapped AXTextArea → AXGroup → AXWindow without the caret ever leaving the field.
+    /// Both the type-ahead inference and the address-bar cache below read such a blink as
+    /// "no editable field has focus, so the address bar does", and answer with .fast +
+    /// needsEmptyCharPrefix — a U+202F and one backspace too many, injected into the page.
+    private var lastWebTextInputAt: TimeInterval = 0
+    private var lastWebTextInputBundleId: String?
+
+    /// How long a web text field keeps the benefit of the doubt over a degraded role.
+    /// ponytail: a fixed window, because AX gives no event for "that last reading was
+    /// wrong"; key it on a focus signal instead once one proves reliable enough.
+    private static let webTextInputGrace: TimeInterval = 2.0
+
+    /// Record that a browser is editing page content, not its address bar.
+    private func noteWebTextInputFocus(bundleId: String) {
+        lastWebTextInputAt = CFAbsoluteTimeGetCurrent()
+        lastWebTextInputBundleId = bundleId
+    }
+
+    /// Whether this browser had an editable page field focused a moment ago. Cmd+T or
+    /// Cmd+L right after typing in such a field therefore stays on the page's method for
+    /// up to `webTextInputGrace` — except when the address bar identifies itself, which
+    /// the explicit checks catch before anything here is consulted.
+    private func hasRecentWebTextInput(bundleId: String) -> Bool {
+        guard lastWebTextInputBundleId == bundleId else { return false }
+        return CFAbsoluteTimeGetCurrent() - lastWebTextInputAt < Self.webTextInputGrace
+    }
     
     /// Set confirmed injection method (call from mouse click handler, app switch, or focus change)
     /// - Parameter methodInfo: The injection method to use for subsequent keystrokes
@@ -2838,10 +2875,12 @@ class AppBehaviorDetector {
                 // (.selection) race conditions that browser autocomplete is prone to.
                 let isExplicitAddressBar = isSafariAddressBar(info: focusedInfo)
                 let role = focusedInfo.role
-                let isTypeAheadContext = role == nil
+                let isDegradedOrStartPageRole = role == nil
                     || role == "AXWindow"
                     || role == "AXList"
                     || role == "AXCollectionList"
+                let isTypeAheadContext = isDegradedOrStartPageRole
+                    && !hasRecentWebTextInput(bundleId: bundleId)
                 if isExplicitAddressBar || isTypeAheadContext {
                     let browserType = isExplicitAddressBar ? "Safari" : "Safari (type-ahead)"
                     // makeAddressBarInjection sets .fast + needsEmptyCharPrefix and caches
@@ -2884,6 +2923,15 @@ class AppBehaviorDetector {
                 return makeAddressBarInjection(browserType: "Firefox", bundleId: bundleId)
             }
             
+            // Every address-bar check above has already declined, so an editable role
+            // here belongs to the page. Remember it: the two answers below both treat a
+            // degraded role as the address bar, and this is what tells them apart from a
+            // page field whose role AX misreported for a moment.
+            let isTextInput = currentRole.map(Self.webTextInputRoles.contains) ?? false
+            if isTextInput {
+                noteWebTextInputFocus(bundleId: bundleId)
+            }
+
             // Check address bar cache: If user was in a browser address bar and
             // focus shifted to a non-text-input element (autocomplete popup etc.),
             // keep using the cached address bar injection method.
@@ -2891,9 +2939,11 @@ class AppBehaviorDetector {
             if let cached = cachedAddressBarInjection,
                cachedAddressBarBundleId == bundleId {
                 // Focus shifted but still in same browser - check if it's an autocomplete artifact
-                let isTextInput = currentRole == "AXTextField" || currentRole == "AXTextArea"
-                    || currentRole == "AXComboBox" || currentRole == "AXSearchField"
-                if !isTextInput {
+                if !isTextInput && hasRecentWebTextInput(bundleId: bundleId) {
+                    // A page field had focus a moment ago, so this is that AX blink, not an
+                    // autocomplete popup. Drop the cache rather than prefix the page's text.
+                    clearAddressBarCache()
+                } else if !isTextInput {
                     // Non-text-input focus (AXWindow, AXStaticText, AXGroup, AXList etc.)
                     // This is likely an autocomplete popup - keep cached address bar method
                     return cached
