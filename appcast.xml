@@ -6,9 +6,9 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20260919)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919</link>
-      <sparkle:version>20260919</sparkle:version>
+      <title>Version 1.2.25 (Build 20260919.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919.1</link>
+      <sparkle:version>20260919.1</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
@@ -42,11 +42,20 @@
 <p>debug log captured while XKeyIM owned the keyboard held focus and</p>
 <p>injection-method lines and nothing else, which is why this bug could not be</p>
 <p>diagnosed from the log at all.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919">Xem chi tiết trên GitHub</a></p>
+<p>Build scripts create the DMG with <code>diskutil image create from</code> where that</p>
+<p>subcommand exists, since macOS 27 deprecates <code>hdiutil create</code>, and fall back to</p>
+<p>hdiutil on systems without it.</p>
+<p>Injected events also need <code>.slow</code> spacing on that async route. Posted to the</p>
+<p>session tap about a millisecond apart, WebKit applies the second backspace after</p>
+<p>the text posted behind it — traced in a Safari textarea, where <code>cos</code> produced</p>
+<p>insert U+202F, delete, insert "ó", delete, so the diacritic was removed by the</p>
+<p>backspace meant for the character before it. The sleeps cost nothing here</p>
+<p>because they run off the tap callback.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 19 Sep 2026 06:46:54 +0000</pubDate>
+      <pubDate>Sat, 19 Sep 2026 07:12:28 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260919/XKey.dmg" sparkle:version="20260919" sparkle:shortVersionString="1.2.25" length="12593941" type="application/octet-stream" sparkle:edSignature="HRomNeI3C0XYutcJxXiHWCCqYbKamBCv9M6aqisWuyukLiKrseUnTHvbShBzxP5uVLdc48NIw1HA3PWAV5BOAA==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260919.1/XKey.dmg" sparkle:version="20260919.1" sparkle:shortVersionString="1.2.25" length="11446006" type="application/octet-stream" sparkle:edSignature="RAqphsAvsHs6pjpQDXgknGfUCq4TSpua5iBbX5j5A9Pe5NoymbU5RGW8ZDSohEKZjdOVnl9K/b6Gfge6i8CvAg==" />
     </item>
   </channel>
 </rss>
