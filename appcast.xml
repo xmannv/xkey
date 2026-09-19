@@ -6,33 +6,47 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20260916)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260916</link>
-      <sparkle:version>20260916</sparkle:version>
+      <title>Version 1.2.25 (Build 20260919)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919</link>
+      <sparkle:version>20260919</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(engine): drop the cancelled 'd' modifier when "ddd" undoes "đ"</p>
-<p>Typing d-d-d-o-s shows "ddó" on screen, but restore-on-wrong-spelling replayed</p>
-<p>"dddos" instead of "ddos". The third 'd' was counted twice in the restore record:</p>
-<p>insertD's undo branch stripped TONE_MASK without removing the modifier keystroke</p>
-<p>that dd→đ had recorded, while the vRestore branch of processKey re-inserts that</p>
-<p>same key as its own entry.</p>
-<p>The undo branch now drops it through a new TypingBuffer.removeModifier(at:keyCode:),</p>
-<p>which targets the key the undo actually cancelled rather than the newest modifier —</p>
-<p>an entry can carry both a horn and a tone.</p>
-<p>This stays scoped to 'd'. The other undo gestures must keep the cancelled modifier:</p>
-<p>a tone key never reaches the screen, so the record is what heals the swallowed</p>
-<p>keystroke ("address" restores both 's'), and a vowel undo leaves Vietnamese off for</p>
-<p>the rest of the word, so no restore ever runs. Only the 'd' path re-enables</p>
-<p>processing (the "Allow d after consonant" rule in insertKey), which is what exposed</p>
-<p>the double count.</p>
-<p>Also bump CURRENT<em>PROJECT</em>VERSION to 20260916.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260916">Xem chi tiết trên GitHub</a></p>
+<p>fix(xkeyim): inject asynchronously so the IMKit thread stays free</p>
+<p>XKeyIM runs its event tap on the main run loop of the process that is also the</p>
+<p>active input method, and injectSync blocks that thread for the whole</p>
+<p>backspace -> text sequence. The focused app queries this same process through</p>
+<p>IMKit for every injected event before delivering it, so WebKit gave up on the</p>
+<p>unanswered reply and dropped the event: Vietnamese lost every diacritic in</p>
+<p>Safari web fields while physical keys still landed. TextEdit, which does not</p>
+<p>wait on the input method that way, was unaffected, and <code>.slow</code> always worked</p>
+<p>here only because it was the one method allowed to leave the tap callback.</p>
+<p>Give the injector a <code>prefersAsyncDirectInjection</code> flag, wired through</p>
+<p>TapEnvironment and set for XKeyIM alone, and let <code>.fast</code> and the empty-char</p>
+<p>prefix take the async direct-post path when it is set. XKey.app is not an input</p>
+<p>method, so nothing waits on its main thread and it keeps the proxy path</p>
+<p>unchanged. The post branches duplicated across four senders move into one</p>
+<p><code>postInjected</code> helper, the injection debug lines name the route they took, and</p>
+<p>the unused sendUnicodeCharacter goes.</p>
+<p>Safari also reports the focused element of a page as AXWindow or AXGroup for a</p>
+<p>moment at a time — observed while typing in a GitHub comment box, where focus</p>
+<p>flapped AXTextArea -> AXGroup -> AXWindow without the caret leaving the field.</p>
+<p>Both the type-ahead inference and the address-bar cache read such a blink as</p>
+<p>"no editable field has focus, so the address bar does" and answered .fast +</p>
+<p>needsEmptyCharPrefix, sending a U+202F and one backspace too many into the</p>
+<p>page, overriding the user's Window Title Rules along the way. Record when a</p>
+<p>real page text field was the confirmed focus and give it a short grace window:</p>
+<p>while it holds, the type-ahead inference stays quiet and the cache is dropped</p>
+<p>rather than applied. An address bar that identifies itself still wins.</p>
+<p>Finally, wire debugLogCallback and verboseEngineLogging in TapController. A</p>
+<p>debug log captured while XKeyIM owned the keyboard held focus and</p>
+<p>injection-method lines and nothing else, which is why this bug could not be</p>
+<p>diagnosed from the log at all.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 16 Sep 2026 07:13:42 +0000</pubDate>
+      <pubDate>Sat, 19 Sep 2026 06:46:54 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260916/XKey.dmg" sparkle:version="20260916" sparkle:shortVersionString="1.2.25" length="12604482" type="application/octet-stream" sparkle:edSignature="jcXYvdx/VH45K9qxNblyuzWTknmymbVJ07jWU/m5f1gkSmOLbl7vEZaphI60+vVa6WEFjPVhptpLANhEAob9Cw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260919/XKey.dmg" sparkle:version="20260919" sparkle:shortVersionString="1.2.25" length="12593941" type="application/octet-stream" sparkle:edSignature="HRomNeI3C0XYutcJxXiHWCCqYbKamBCv9M6aqisWuyukLiKrseUnTHvbShBzxP5uVLdc48NIw1HA3PWAV5BOAA==" />
     </item>
   </channel>
 </rss>
