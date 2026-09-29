@@ -6,56 +6,83 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20260919.1)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919.1</link>
-      <sparkle:version>20260919.1</sparkle:version>
+      <title>Version 1.2.25 (Build 20260929)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260929</link>
+      <sparkle:version>20260929</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(xkeyim): inject asynchronously so the IMKit thread stays free</p>
-<p>XKeyIM runs its event tap on the main run loop of the process that is also the</p>
-<p>active input method, and injectSync blocks that thread for the whole</p>
-<p>backspace -> text sequence. The focused app queries this same process through</p>
-<p>IMKit for every injected event before delivering it, so WebKit gave up on the</p>
-<p>unanswered reply and dropped the event: Vietnamese lost every diacritic in</p>
-<p>Safari web fields while physical keys still landed. TextEdit, which does not</p>
-<p>wait on the input method that way, was unaffected, and <code>.slow</code> always worked</p>
-<p>here only because it was the one method allowed to leave the tap callback.</p>
-<p>Give the injector a <code>prefersAsyncDirectInjection</code> flag, wired through</p>
-<p>TapEnvironment and set for XKeyIM alone, and let <code>.fast</code> and the empty-char</p>
-<p>prefix take the async direct-post path when it is set. XKey.app is not an input</p>
-<p>method, so nothing waits on its main thread and it keeps the proxy path</p>
-<p>unchanged. The post branches duplicated across four senders move into one</p>
-<p><code>postInjected</code> helper, the injection debug lines name the route they took, and</p>
-<p>the unused sendUnicodeCharacter goes.</p>
-<p>Safari also reports the focused element of a page as AXWindow or AXGroup for a</p>
-<p>moment at a time — observed while typing in a GitHub comment box, where focus</p>
-<p>flapped AXTextArea -> AXGroup -> AXWindow without the caret leaving the field.</p>
-<p>Both the type-ahead inference and the address-bar cache read such a blink as</p>
-<p>"no editable field has focus, so the address bar does" and answered .fast +</p>
-<p>needsEmptyCharPrefix, sending a U+202F and one backspace too many into the</p>
-<p>page, overriding the user's Window Title Rules along the way. Record when a</p>
-<p>real page text field was the confirmed focus and give it a short grace window:</p>
-<p>while it holds, the type-ahead inference stays quiet and the cache is dropped</p>
-<p>rather than applied. An address bar that identifies itself still wins.</p>
-<p>Finally, wire debugLogCallback and verboseEngineLogging in TapController. A</p>
-<p>debug log captured while XKeyIM owned the keyboard held focus and</p>
-<p>injection-method lines and nothing else, which is why this bug could not be</p>
-<p>diagnosed from the log at all.</p>
-<p>Build scripts create the DMG with <code>diskutil image create from</code> where that</p>
-<p>subcommand exists, since macOS 27 deprecates <code>hdiutil create</code>, and fall back to</p>
-<p>hdiutil on systems without it.</p>
-<p>Injected events also need <code>.slow</code> spacing on that async route. Posted to the</p>
-<p>session tap about a millisecond apart, WebKit applies the second backspace after</p>
-<p>the text posted behind it — traced in a Safari textarea, where <code>cos</code> produced</p>
-<p>insert U+202F, delete, insert "ó", delete, so the diacritic was removed by the</p>
-<p>backspace meant for the character before it. The sleeps cost nothing here</p>
-<p>because they run off the tap callback.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260919.1">Xem chi tiết trên GitHub</a></p>
+<p>fix(smart-switch): restore per-app language on app entry, not from an AX pass</p>
+<p>Since 95af7cd, Smart Switch ran only inside the AX pass the app-switch block</p>
+<p>schedules. AX passes are last-writer-wins: any newer one drops the pass in</p>
+<p>flight. The switch clears the confirmed injection method, so the first keystroke</p>
+<p>in the new app asks the tap for a detection pass, and that pass superseded the</p>
+<p>app-switch one without publishing any app context. A click's focus check, or a</p>
+<p>title-change pass with an unchanged title, did the same. In Electron apps (Slack,</p>
+<p>Claude Desktop), whose AX round-trips run up to the 0.25s messaging timeout, the</p>
+<p>user nearly always types or clicks before the pass lands, so the saved language</p>
+<p>was never restored for that activation. Native apps finish the pass first, which</p>
+<p>is why the feature looked intermittent.</p>
+<p>Split AppContext into entries and refinements with <code>appliesSmartSwitch</code>:</p>
+<ul>
+<li>Entries (TapEventSource.start, app activation, overlay open and close) are</li>
+</ul>
+<p>  published synchronously from the bundle ID alone. Only an entry restores or</p>
+<p>  records an app's language, reloads the per-app map, and sets</p>
+<p>  smartSwitchHandledBundleId.</p>
+<ul>
+<li>Every AX pass publishes a refinement that re-applies the exclusion and</li>
+</ul>
+<p>  window-title rules. That includes the detection pass, a focus check with no</p>
+<p>  focused element, and a title pass whose title did not change, so a superseded</p>
+<p>  pass no longer loses the rules either. A pass that lands while a launcher is</p>
+<p>  open describes the launcher, not the app beneath it. Re-evaluating after the</p>
+<p>  Window Title Rules hotkey is a refinement too.</p>
+<ul>
+<li>An entry has no window title, so it cannot tell that no rule covers the window.</li>
+</ul>
+<p>  AppPolicyRuntime.inputSourceRuleAction now decides the target-input-source rule</p>
+<p>  and only restores the pre-rule source from a context that has the title.</p>
+<p>  Restoring from the entry flipped the source out and back on every Spotlight</p>
+<p>  close in a rule-switched window. App-wide rules still switch at entry.</p>
+<p>Two sticky decisions also left typing broken:</p>
+<ul>
+<li><code>.restoreVietnamese</code> stayed the handler's decision, so the user's next toggle</li>
+</ul>
+<p>  changed the menu bar but not the typing. It is now applied once.</p>
+<ul>
+<li>A disabled input source stored <code>.disableTransformation</code>, and switching back to</li>
+</ul>
+<p>  ABC never cleared it. It is now a separate <code>inputSourceEnabled</code> gate. The gate</p>
+<p>  is read for overlays too, since the source is global, and</p>
+<p>  handleInputSourceChange updates it. Under such a source the rules still apply,</p>
+<p>  but no app's language is restored or recorded. handleInputSourceChange then</p>
+<p>  restores the language from a freshly loaded map, because returning from</p>
+<p>  XKeyIM there was no entry to reload it.</p>
+<p>Remove what this left dead, and what was already dead:</p>
+<ul>
+<li>AppDelegate's handleSmartSwitch, restoreLanguageForCurrentApp,</li>
+</ul>
+<p>  enableVietnameseForOverlay, saveLanguageForOverlay and overlayNameToBundleId.</p>
+<ul>
+<li>VNEngine's checkSmartSwitchForApp, checkSmartSwitch, handleAppSwitch and</li>
+</ul>
+<p>  getCurrentAppBundleId.</p>
+<ul>
+<li>SmartSwitchManager's saveToPlist (a whole-map write that dropped the other</li>
+</ul>
+<p>  process's entries), removeApp, clearAll and getAllApps, plus</p>
+<p>  SharedSettings.setSmartSwitchData.</p>
+<ul>
+<li>TapEventSource's focusCheckObserver, which observed an NSWorkspace</li>
+</ul>
+<p>  notification on NotificationCenter.default and so never fired.</p>
+<p>Bump the build number to 20260929.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20260929">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 19 Sep 2026 07:12:28 +0000</pubDate>
+      <pubDate>Tue, 29 Sep 2026 08:33:32 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260919.1/XKey.dmg" sparkle:version="20260919.1" sparkle:shortVersionString="1.2.25" length="11446006" type="application/octet-stream" sparkle:edSignature="RAqphsAvsHs6pjpQDXgknGfUCq4TSpua5iBbX5j5A9Pe5NoymbU5RGW8ZDSohEKZjdOVnl9K/b6Gfge6i8CvAg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20260929/XKey.dmg" sparkle:version="20260929" sparkle:shortVersionString="1.2.25" length="11442934" type="application/octet-stream" sparkle:edSignature="F5aa5BMjZ96Pqe+WkBu9OVbWr7vxlP3pIwh+l8zoxy9mVHr/mNrAT0o3e1ugZBsAzQype+9kpVW7NYBMwzWACg==" />
     </item>
   </channel>
 </rss>
