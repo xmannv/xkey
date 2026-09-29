@@ -112,11 +112,6 @@ final class TapEventSource {
     private var appSwitchObserver: NSObjectProtocol?
     private var appDeactivateObserver: NSObjectProtocol?
 
-    /// The NSWorkspace.didActivateApplicationNotification observer registered by
-    /// setupFocusChangeMonitoring(). Kept distinct from appSwitchObserver (same
-    /// notification name, different observer/purpose) so stop() can remove both.
-    private var focusCheckObserver: NSObjectProtocol?
-
     /// Global monitor for mouse-up events, used to detect focus changes from clicks.
     private var mouseClickMonitor: Any?
 
@@ -358,9 +353,8 @@ final class TapEventSource {
             // but owns no typing state and must not reset or apply policy.
             guard self.isActiveHost() else { return }
 
-            // Retire the previous app's policy at the ownership boundary. The full
-            // title/AX policy arrives with the off-main snapshot below; until then the
-            // global language is the only valid provisional state for the new app.
+            // Retire the previous app's policy at the ownership boundary, before the
+            // entry below decides the new one.
             self.handler.applyAppPolicyDecision(
                 .keepCurrentLanguage,
                 currentVietnameseEnabled: SharedSettings.shared.vietnameseEnabled
@@ -376,6 +370,15 @@ final class TapEventSource {
             // is the one transition after which those describe the wrong app, so they go
             // too — the pass scheduled below refills them.
             AppBehaviorDetector.shared.clearInjectionMethodFallback()
+
+            // Smart Switch keys on the bundle ID alone, so the app is entered here rather
+            // than from the AX pass below. Any newer pass supersedes that one — the tap's
+            // detection request on the first keystroke, a click's focus check — and in
+            // Electron apps, whose AX round-trips run up to the messaging timeout, the
+            // user nearly always types or clicks before it lands. The pass still refines
+            // Window Title Rules once it has the title.
+            self.publishAppContext(bundleIdentifier: activatedApp?.bundleIdentifier,
+                                   appliesSmartSwitch: true)
 
             // Cancel pending title verifications from previous app
             self.titleVerificationWorkItem?.cancel()
@@ -397,9 +400,8 @@ final class TapEventSource {
 
             // Small delay to allow AX tree to update after setting AXManualAccessibility
             // Electron/Chromium apps need a moment to refresh their accessibility tree
-            // NOTE: handleSmartSwitch is also inside this delay because it evaluates window
-            // title rules via getTargetInputSourceOverride() → getMergedRuleResult().
-            // Without the delay, window title may not be available yet (AX timing issue).
+            // Window Title Rules are refined from inside this delay for the same reason:
+            // without it, the window title may not be available yet (AX timing issue).
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                 guard let self = self else { return }
 
@@ -441,7 +443,8 @@ final class TapEventSource {
                     let injectionInfo = source.confirmInjectionMethod(from: snapshot)
                     source.publishAppContext(
                         bundleIdentifier: activatedApp?.bundleIdentifier,
-                        snapshot: snapshot
+                        snapshot: snapshot,
+                        appliesSmartSwitch: false
                     )
 
                     // DEBUG: Log window title available at app switch time
@@ -480,6 +483,9 @@ final class TapEventSource {
         AppBehaviorDetector.shared.scheduleInjectionMethodDetection = { [weak self] delay in
             self?.scheduleInjectionMethodDetection(after: delay)
         }
+
+        // The host starts inside some app with no activation to announce it.
+        publishAppContext(appliesSmartSwitch: true)
     }
 
     func stop() {
@@ -505,12 +511,6 @@ final class TapEventSource {
         if let observer = appDeactivateObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             appDeactivateObserver = nil
-        }
-
-        // Remove the focus-check observer registered by setupFocusChangeMonitoring().
-        if let observer = focusCheckObserver {
-            NotificationCenter.default.removeObserver(observer)
-            focusCheckObserver = nil
         }
 
         removeAXObserver()
@@ -671,16 +671,7 @@ final class TapEventSource {
 
     /// Setup monitoring for focus changes to auto-show toolbar when focusing text fields
     private func setupFocusChangeMonitoring() {
-        // Use NSWorkspace notification to detect app activation
-        // Then check if focused element is a text field
-        focusCheckObserver = NotificationCenter.default.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleFocusCheck()
-        }
-
+        // App activation is handled by the app-switch block in start()
         // Mouse clicks are already handled by mouseClickMonitor
         // Focus changes within apps are handled by AXObserver (event-driven, no polling)
 
@@ -689,7 +680,7 @@ final class TapEventSource {
             setupAXObserverForApp(frontApp)
         }
 
-        onLogEvent?("Focus change monitoring enabled (AXObserver + NSWorkspace notifications)")
+        onLogEvent?("Focus change monitoring enabled (AXObserver)")
     }
 
     /// Main focus check handler - schedules one AX pass and lets applyFocusCheck feed
@@ -697,8 +688,8 @@ final class TapEventSource {
     /// off the main thread.
     func handleFocusCheck() {
         // Skip the whole AX pass while another process owns the keystroke path
-        // (Task 9b). Gating the function covers all of its callers — the NSWorkspace
-        // observer, the mouse-click monitor, and AppDelegate's forwarder.
+        // (Task 9b). Gating the function covers all of its callers — the mouse-click
+        // monitor and AppDelegate's forwarder.
         guard isActiveHost() else { return }
 
         // Ownership can come back WITHOUT an app switch — the user selects a different
@@ -711,7 +702,7 @@ final class TapEventSource {
         // setupAXObserverForApp is already a no-op when an observer for that PID is
         // installed, and it never calls back into this function.
         // Skipped for an app whose install already failed: this path runs on every
-        // mouse-up and every activation, and re-attempting against an AX server that is
+        // mouse-up and every settings change, and re-attempting against an AX server that is
         // slow or refusing costs up to the AX messaging timeout every time. The
         // app-switch block still retries that app — the cadence a failed install had
         // before this re-arm existed.
@@ -729,6 +720,10 @@ final class TapEventSource {
 
     /// Main-thread stage of the focus check.
     private func applyFocusCheck(_ snapshot: AXSnapshot) {
+        // Ahead of the guard: this pass may have superseded the app-switch pass, and an
+        // Electron window often reports no focused element at all.
+        publishAppContext(snapshot: snapshot, appliesSmartSwitch: false)
+
         guard snapshot.hasFocusedElement else {
             // No focused element - hide toolbar if visible
             onNoFocusedElement?()
@@ -739,7 +734,6 @@ final class TapEventSource {
 
         // 1. ALWAYS check for injection method changes (CMD+T, Tab, etc.)
         checkIntraAppFocusChange(with: elementInfo, overlayName: snapshot.overlayName)
-        publishAppContext(snapshot: snapshot)
 
         // 2. Check toolbar display (only if enabled)
         if SharedSettings.shared.tempOffToolbarEnabled {
@@ -787,7 +781,7 @@ final class TapEventSource {
             // - Mouse click (setupMouseClickMonitor)
             // - Tab key (KeyboardEventHandler.processKeyEvent)
             // - Arrow keys / Home / End / PageUp / PageDown (KeyboardEventHandler.processKeyEvent)
-            // - App switch (handleAppSwitch)
+            // - App switch (the app-switch block in start())
             //
             // Focus change detection is ONLY for re-detecting injection method.
             // This avoids issues where apps "refine" focus after user starts typing
@@ -974,7 +968,7 @@ final class TapEventSource {
         let previousMethod = detector.confirmedInjectionMethod
         let injectionInfo = detector.detectInjectionMethod(focusedInfo: elementInfo,
                                                           resolvedOverlayName: .some(snapshot.overlayName))
-        publishAppContext(snapshot: snapshot)
+        publishAppContext(snapshot: snapshot, appliesSmartSwitch: false)
 
         // Log focus change (only when signature actually changed)
         if signatureChanged {
@@ -1087,6 +1081,9 @@ final class TapEventSource {
         // here before, already paid for off this thread.
         let freshTitle = snapshot.focusedInfo.windowTitle ?? ""
 
+        // Ahead of the guard, for the reason applyFocusCheck publishes ahead of its own.
+        publishAppContext(snapshot: snapshot, appliesSmartSwitch: false)
+
         // Skip if title hasn't actually changed from last detection
         guard freshTitle != (lastDetectedTitle ?? "") else { return }
 
@@ -1096,7 +1093,6 @@ final class TapEventSource {
         let previousMethod = detector.confirmedInjectionMethod
         let injectionInfo = detector.detectInjectionMethod(focusedInfo: snapshot.focusedInfo,
                                                           resolvedOverlayName: .some(snapshot.overlayName))
-        publishAppContext(snapshot: snapshot)
 
         // Only update and log if detection result actually changed
         if previousMethod == nil ||
@@ -1262,6 +1258,9 @@ final class TapEventSource {
     private func runInjectionMethodDetection() {
         scheduleAXPass(element: nil) { source, snapshot in
             source.confirmInjectionMethod(from: snapshot)
+            // This is the pass most likely to supersede the app-switch pass: the first
+            // keystroke after a switch asks for it.
+            source.publishAppContext(snapshot: snapshot, appliesSmartSwitch: false)
         }
     }
 
@@ -1421,7 +1420,7 @@ final class TapEventSource {
                 let textMethodName = injectionInfo.textSendingMethod == .chunked ? "Chunked" : "OneByOne"
                 self?.onLogEvent?("Overlay \(transition) — Injection: \(injectionInfo.method) (\(injectionInfo.description)) [\(textMethodName)] ✓ confirmed")
                 if !isVisible {
-                    self?.publishAppContext(snapshot: snapshot)
+                    self?.publishAppContext(snapshot: snapshot, appliesSmartSwitch: false)
                 }
             }
 
@@ -1431,7 +1430,7 @@ final class TapEventSource {
                 // 2. Apply Smart Switch for overlay (restore saved language)
                 // 3. Reset mid-sentence flag (overlay apps start with empty/fresh input)
                 self.onLogEvent?("Overlay opened - checking overlay rules")
-                self.publishAppContext(overlayName: overlayName)
+                self.publishAppContext(overlayName: overlayName, appliesSmartSwitch: true)
 
                 // CRITICAL FIX: When overlay opens (e.g., CMD+Space for Spotlight),
                 // reset mid-sentence flag. The resetForAppSwitch() called earlier sets isTypingMidSentence=true
@@ -1447,6 +1446,8 @@ final class TapEventSource {
                 // 3. Restore language for current app
                 // 4. Set mid-sentence flag (protect text in underlying app)
                 self.onLogEvent?("Overlay closed - saving overlay state, restoring underlying app language")
+                // Re-entered here, not from the pass above, which a newer pass can drop.
+                self.publishAppContext(appliesSmartSwitch: true)
                 // When overlay closes, user returns to previous app where cursor position is unknown.
                 // Set mid-sentence flag to protect text on the right of cursor.
                 // Note: Overlay close doesn't trigger didActivateApplicationNotification since
@@ -1457,23 +1458,32 @@ final class TapEventSource {
         }
     }
 
+    /// - Parameter appliesSmartSwitch: true only where the user enters an app (start, an
+    ///   activation, an overlay opening or closing); false for a pass that refines the app
+    ///   they are already in. See AppContext.appliesSmartSwitch.
     private func publishAppContext(
         bundleIdentifier: String? = nil,
         snapshot: AXSnapshot? = nil,
-        overlayName: String? = nil
+        overlayName: String? = nil,
+        appliesSmartSwitch: Bool
     ) {
         guard isActiveHost() else { return }
+        // A pass that lands while a launcher is open describes the launcher. Published as
+        // the app underneath, that app's exclusion or window rule would apply to what the
+        // user types into the launcher.
+        let overlayName = overlayName ?? snapshot?.overlayName
         let resolvedRules = snapshot.map {
             AppBehaviorDetector.shared.getMergedRuleResult(focusedInfo: $0.focusedInfo)
         }
         onAppContext?(AppContext(
             bundleIdentifier: bundleIdentifier
                 ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-            windowTitle: snapshot?.focusedInfo.windowTitle,
+            windowTitle: overlayName == nil ? snapshot?.focusedInfo.windowTitle : nil,
             overlayName: overlayName,
             resolvedInputMethodPolicy: overlayName == nil ? resolvedRules?.inputMethodPolicy : nil,
             resolvedTargetInputSourceId: overlayName == nil ? resolvedRules?.targetInputSourceId : nil,
-            hasResolvedWindowTitleRules: overlayName == nil && snapshot != nil
+            hasResolvedWindowTitleRules: overlayName == nil && snapshot != nil,
+            appliesSmartSwitch: appliesSmartSwitch
         ))
     }
 }

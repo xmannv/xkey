@@ -7,15 +7,14 @@
 //
 
 import Foundation
-import Cocoa
 
 extension VNEngine {
-    
+
     // MARK: - Smart Switch Manager
-    
+
     /// Shared smart switch manager instance
     private static var _smartSwitchManager: SmartSwitchManager?
-    
+
     var smartSwitchManager: SmartSwitchManager {
         if VNEngine._smartSwitchManager == nil {
             VNEngine._smartSwitchManager = SmartSwitchManager()
@@ -23,102 +22,25 @@ extension VNEngine {
         }
         return VNEngine._smartSwitchManager!
     }
-    
+
     /// Set shared smart switch manager (for integration with KeyboardEventHandler)
     static func setSharedSmartSwitchManager(_ manager: SmartSwitchManager) {
         _smartSwitchManager = manager
     }
-    
+
     // MARK: - Smart Switch Processing
-    
-    /// Handle app switch - get/set language for the new app
-    /// - Parameters:
-    ///   - bundleId: Bundle identifier of the new active app
-    ///   - currentLanguage: Current language setting (0: English, 1: Vietnamese)
-    /// - Returns: Language to use for this app, or -1 if no change needed
-    func handleAppSwitch(bundleId: String, currentLanguage: Int) -> Int {
-        guard vUseSmartSwitchKey == 1 else { return -1 }
-        
-        let savedLanguage = smartSwitchManager.getAppLanguage(bundleId: bundleId, currentLanguage: currentLanguage)
-        
-        if savedLanguage >= 0 && savedLanguage != currentLanguage {
-            logCallback?("Smart Switch: App '\(bundleId)' → Language \(savedLanguage == 1 ? "Vietnamese" : "English")")
-            return savedLanguage
-        }
-        
-        return -1
-    }
-    
+    //
+    // Restoring an app's language is decided by AppPolicyRuntime, which both hosts share.
+
     /// Save current language for the active app
     /// - Parameters:
     ///   - bundleId: Bundle identifier of the active app
     ///   - language: Language to save (0: English, 1: Vietnamese)
     func saveAppLanguage(bundleId: String, language: Int) {
         guard vUseSmartSwitchKey == 1 else { return }
-        
+
         smartSwitchManager.setAndSaveAppLanguage(bundleId: bundleId, language: language)
-        
+
         logCallback?("Smart Switch: Saved '\(bundleId)' → Language \(language == 1 ? "Vietnamese" : "English")")
-    }
-    
-    /// Get current active app bundle ID
-    static func getCurrentAppBundleId() -> String? {
-        return NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-    }
-}
-
-// MARK: - Smart Switch Result
-
-extension VNEngine {
-    
-    /// Result of smart switch check
-    struct SmartSwitchResult {
-        let shouldSwitch: Bool
-        let newLanguage: Int  // 0: English, 1: Vietnamese
-        let bundleId: String
-    }
-    
-    /// Check if should switch language for current app
-    /// - Note: This method uses vLanguage which may not be in sync with UI. 
-    ///         Prefer checkSmartSwitchForApp(bundleId:currentLanguage:) instead.
-    func checkSmartSwitch() -> SmartSwitchResult {
-        guard vUseSmartSwitchKey == 1 else {
-            return SmartSwitchResult(shouldSwitch: false, newLanguage: vLanguage, bundleId: "")
-        }
-        
-        guard let bundleId = VNEngine.getCurrentAppBundleId() else {
-            return SmartSwitchResult(shouldSwitch: false, newLanguage: vLanguage, bundleId: "")
-        }
-        
-        let newLanguage = handleAppSwitch(bundleId: bundleId, currentLanguage: vLanguage)
-        
-        if newLanguage >= 0 {
-            return SmartSwitchResult(shouldSwitch: true, newLanguage: newLanguage, bundleId: bundleId)
-        }
-        
-        return SmartSwitchResult(shouldSwitch: false, newLanguage: vLanguage, bundleId: bundleId)
-    }
-    
-    /// Check if should switch language for a specific app with explicit current language
-    /// - Parameters:
-    ///   - bundleId: Bundle identifier of the app
-    ///   - currentLanguage: Current language from UI (0: English, 1: Vietnamese)
-    /// - Returns: SmartSwitchResult indicating if switch is needed
-    func checkSmartSwitchForApp(bundleId: String, currentLanguage: Int) -> SmartSwitchResult {
-        guard vUseSmartSwitchKey == 1 else {
-            return SmartSwitchResult(shouldSwitch: false, newLanguage: currentLanguage, bundleId: bundleId)
-        }
-        
-        // Get saved language for this app
-        let savedLanguage = smartSwitchManager.getAppLanguage(bundleId: bundleId, currentLanguage: currentLanguage)
-        
-        // If app is new (savedLanguage == -1), don't switch - just use current language
-        // If app has saved language and it's different from current, switch
-        if savedLanguage >= 0 && savedLanguage != currentLanguage {
-            logCallback?("Smart Switch: App '\(bundleId)' has saved language \(savedLanguage == 1 ? "Vietnamese" : "English"), current is \(currentLanguage == 1 ? "Vietnamese" : "English")")
-            return SmartSwitchResult(shouldSwitch: true, newLanguage: savedLanguage, bundleId: bundleId)
-        }
-        
-        return SmartSwitchResult(shouldSwitch: false, newLanguage: currentLanguage, bundleId: bundleId)
     }
 }

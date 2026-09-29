@@ -54,29 +54,8 @@ class SmartSwitchManager {
         appLanguageMap = map
     }
     
-    /// Remove app from map
-    func removeApp(bundleId: String) {
-        appLanguageMap.removeValue(forKey: bundleId)
-    }
-    
-    /// Clear all app settings
-    func clearAll() {
-        appLanguageMap.removeAll()
-    }
-    
-    /// Get all app settings
-    func getAllApps() -> [(bundleId: String, language: Int)] {
-        return appLanguageMap.map { (bundleId: $0.key, language: $0.value) }
-    }
-    
     // MARK: - Persistence
-    
-    /// Save to plist via SharedSettings
-    func saveToPlist() {
-        guard let data = try? JSONEncoder().encode(appLanguageMap) else { return }
-        SharedSettings.shared.setSmartSwitchData(data)
-    }
-    
+
     /// Load from plist via SharedSettings
     func loadFromPlist() {
         guard let data = SharedSettings.shared.getSmartSwitchData(),

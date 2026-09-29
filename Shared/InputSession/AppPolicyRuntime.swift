@@ -7,19 +7,25 @@ struct AppContext: Equatable {
     let resolvedInputMethodPolicy: InputMethodPolicy?
     let resolvedTargetInputSourceId: String?
     let hasResolvedWindowTitleRules: Bool
+    /// False for a context that only refines the app the user is already in (a focus,
+    /// title, click or detection pass). Smart Switch restores an app's language when the
+    /// user enters it; re-running it on every refinement would undo a change made in place.
+    let appliesSmartSwitch: Bool
 
     init(bundleIdentifier: String?,
          windowTitle: String?,
          overlayName: String?,
          resolvedInputMethodPolicy: InputMethodPolicy? = nil,
          resolvedTargetInputSourceId: String? = nil,
-         hasResolvedWindowTitleRules: Bool = false) {
+         hasResolvedWindowTitleRules: Bool = false,
+         appliesSmartSwitch: Bool = true) {
         self.bundleIdentifier = bundleIdentifier
         self.windowTitle = windowTitle
         self.overlayName = overlayName
         self.resolvedInputMethodPolicy = resolvedInputMethodPolicy
         self.resolvedTargetInputSourceId = resolvedTargetInputSourceId
         self.hasResolvedWindowTitleRules = hasResolvedWindowTitleRules
+        self.appliesSmartSwitch = appliesSmartSwitch
     }
 }
 
@@ -28,6 +34,13 @@ enum AppPolicyDecision: Equatable {
     case overrideVietnamese(Bool)
     case restoreVietnamese(Bool)
     case disableTransformation
+}
+
+/// What a Window Title Rule's target input source asks the host to do.
+enum InputSourceRuleAction: Equatable {
+    case select(String)
+    case restorePreRuleSource
+    case none
 }
 
 struct AppContextCacheDecision: Equatable {
@@ -64,10 +77,12 @@ final class AppPolicyRuntime {
         refresh: () -> Void
     ) {
         if let context {
+            // A refinement: the user toggled rules in the window they are already in.
             let provisionalContext = AppContext(
                 bundleIdentifier: context.bundleIdentifier,
                 windowTitle: context.windowTitle,
-                overlayName: context.overlayName
+                overlayName: context.overlayName,
+                appliesSmartSwitch: false
             )
             apply(evaluate(context: provisionalContext,
                            currentVietnameseEnabled: currentVietnameseEnabled,
@@ -123,6 +138,7 @@ final class AppPolicyRuntime {
         }
 
         guard preferences.engineSettings.smartSwitchEnabled,
+              context.appliesSmartSwitch,
               let bundleIdentifier else {
             return .keepCurrentLanguage
         }
@@ -148,6 +164,32 @@ final class AppPolicyRuntime {
         guard preferences.engineSettings.smartSwitchEnabled,
               let bundleIdentifier = effectiveBundleIdentifier(for: context) else { return }
         smartSwitchStore.saveVietnameseEnabled(enabled, for: bundleIdentifier)
+    }
+
+    func inputSourceRuleAction(context: AppContext,
+                               windowTitleRulesEnabled: Bool) -> InputSourceRuleAction {
+        guard context.overlayName == nil else { return .none }
+        let target: String?
+        if windowTitleRulesEnabled, context.hasResolvedWindowTitleRules {
+            target = context.resolvedTargetInputSourceId
+        } else if windowTitleRulesEnabled {
+            target = windowTitleRules()
+                .filter { $0.isEnabled && !$0.hasAXPatterns }
+                .filter {
+                    $0.matches(bundleId: context.bundleIdentifier ?? "",
+                               windowTitle: context.windowTitle ?? "",
+                               axInfo: nil)
+                }
+                .compactMap(\.targetInputSourceId)
+                .last
+        } else {
+            target = nil
+        }
+        if let target { return .select(target) }
+        // Only a context that knows the window title can tell that no rule covers the
+        // window. An entry has none yet: restoring there flips the source out and back
+        // once the refinement matches the title.
+        return context.hasResolvedWindowTitleRules ? .restorePreRuleSource : .none
     }
 
     private func effectiveBundleIdentifier(for context: AppContext) -> String? {

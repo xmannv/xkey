@@ -275,8 +275,9 @@ final class AXPassOffMainThreadTests: XCTestCase {
     ///
     /// What this pins is the property that makes them undroppable: they complete before
     /// the app-switch block returns, i.e. before the pass can even reach its main-thread
-    /// stage. App policy now needs the title from that pass, while Secure Input evaluation
-    /// still happens before policy publication.
+    /// stage. The pass then refines the policy with the window title, and Secure Input
+    /// evaluation still happens before that refinement. Smart Switch's entry is published
+    /// by the block itself, ahead of both — see SmartSwitchEntryTests.
     func testAppSwitchChecksSecureInputAndPublishesContextFromTheAXPass() {
         let detector = AXPassSecureInputDetector()
         let secureInputMonitor = SecureInputMonitor(
@@ -294,6 +295,8 @@ final class AXPassOffMainThreadTests: XCTestCase {
         var publishedBundleIdentifier: String?
         let blockReturned = expectation(description: "the app-switch block returned")
         source.onAppContext = { context in
+            // start() and the activation publish entries; this test is about the pass.
+            guard !context.appliesSmartSwitch else { return }
             DispatchQueue.main.async {
                 checksWhenBlockReturned = detector.readCount
                 publishedBundleIdentifier = context.bundleIdentifier
@@ -642,8 +645,9 @@ final class AXPassOffMainThreadTests: XCTestCase {
     /// clearInjectionMethodFallback() itself and so says nothing about whether anything in
     /// production does.
     ///
-    /// Read from onAppContext after the app-switch pass. The result may already be the new
-    /// app's detected method, but it must never be the old fallback marker.
+    /// Read from onAppContext at the activation's entry and at the pass after it. The
+    /// result may already be the new app's detected method, but it must never be the old
+    /// fallback marker.
     func testTheAppSwitchBlockDropsTheInjectionMethodFallback() {
         let detector = AppBehaviorDetector.shared
         let source = TapEventSource(handler: KeyboardEventHandler(), isActiveHost: { true })
@@ -653,15 +657,17 @@ final class AXPassOffMainThreadTests: XCTestCase {
                                          textSendingMethod: .oneByOne,
                                          description: "unit-test marker")
 
+        source.start()
+        defer { source.stop() }
+
+        // Installed after start(), which publishes its own entry for the frontmost app.
         var answerAtSwitch: String?
         let switched = expectation(description: "the app-switch block reached Smart Switch")
+        switched.assertForOverFulfill = false
         source.onAppContext = { _ in
             answerAtSwitch = detector.getConfirmedInjectionMethod().description
             switched.fulfill()
         }
-
-        source.start()
-        defer { source.stop() }
 
         detector.setConfirmedInjectionMethod(marker)
         NSWorkspace.shared.notificationCenter.post(

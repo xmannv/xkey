@@ -18,6 +18,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     private var isVietnameseEnabled = true
     var durableVietnameseEnabled: Bool { isVietnameseEnabled }
     private var appPolicyDecision: AppPolicyDecision = .keepCurrentLanguage
+    /// False while the current input source is one XKey is configured off for. Kept apart
+    /// from appPolicyDecision so leaving that source brings back the app's own policy,
+    /// a window-title override included, instead of leaving typing blocked.
+    var inputSourceEnabled = true
 
     // Debug logging callback
     var debugLogCallback: ((String) -> Void)?
@@ -262,6 +266,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             if !enabled { session.reset() }
         case .restoreVietnamese(let enabled):
             setVietnamese(enabled)
+            // A restore sets the language once. Kept as the decision it would outrank the
+            // user's next toggle, which then changes the menu bar but not the typing.
+            appPolicyDecision = .keepCurrentLanguage
         case .disableTransformation:
             session.setEffectiveVietnameseEnabled(false)
             session.reset()
@@ -336,7 +343,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return nil
         }
 
-        if appPolicyDecision == .disableTransformation || isCurrentAppExcluded() {
+        if !inputSourceEnabled || appPolicyDecision == .disableTransformation || isCurrentAppExcluded() {
             return nil
         }
 

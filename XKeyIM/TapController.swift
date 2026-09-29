@@ -636,7 +636,10 @@ final class TapController {
     }
 
     private func applyAppPolicy(_ context: AppContext, to handler: KeyboardEventHandler) {
-        handler.engine.smartSwitchManager.loadFromPlist()
+        // Only an entry reads the per-app map, and XKey.app may have written it since.
+        if context.appliesSmartSwitch {
+            handler.engine.smartSwitchManager.loadFromPlist()
+        }
         let preferences = SharedSettings.shared.loadPreferences()
         let runtimePreferences = RuntimePreferences(
             preferences: preferences,

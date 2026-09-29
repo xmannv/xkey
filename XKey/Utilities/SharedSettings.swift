@@ -868,10 +868,6 @@ class SharedSettings {
         return readData(forKey: SharedSettingsKey.smartSwitchData.rawValue)
     }
     
-    func setSmartSwitchData(_ data: Data) {
-        writeData(data, forKey: SharedSettingsKey.smartSwitchData.rawValue)
-    }
-
     /// Merge one app into the latest on-disk Smart Switch map. Both processes write
     /// this value, so replacing it from either process's cached manager loses entries.
     func updateSmartSwitchLanguage(bundleIdentifier: String, language: Int) -> Data? {

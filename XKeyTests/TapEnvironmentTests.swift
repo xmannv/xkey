@@ -312,7 +312,7 @@ final class TapEventSourceObserverSelfHealTests: XCTestCase {
     }
 
     /// A refused install leaves `focusObserver` nil, so the re-arm's "no observer" condition
-    /// stays true forever. handleFocusCheck runs on every mouse-up and every app activation,
+    /// stays true forever. handleFocusCheck runs on every mouse-up and every settings change,
     /// and re-attempting against an AX server that is slow or refusing costs up to the AX
     /// messaging timeout each time — a per-click stall for as long as that app stays
     /// frontmost. The next app switch is what retries it.

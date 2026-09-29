@@ -721,7 +721,7 @@ final class TapOwnershipTests: XCTestCase {
 
     /// A setting the other process wrote must survive this process's next write, even
     /// though this process never saw the notification that would have invalidated its
-    /// cache (`setSmartSwitchData` and friends write without notifying at all).
+    /// cache (`setInputSourceConfig` and friends write without notifying at all).
     func testWriteMergesOntoCurrentDiskStateNotAStaleCache() {
         // Warm this process's cache.
         _ = SharedSettings.shared.xkeyIMTapArmed
