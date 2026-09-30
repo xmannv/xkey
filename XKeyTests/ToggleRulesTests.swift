@@ -577,6 +577,23 @@ class ToggleWindowTitleRulesTests: XCTestCase {
         ))
     }
 
+    func testBuiltInTelegramWebRule_ExcludesNativeTelegramButMatchesBrowser() throws {
+        let rule = try XCTUnwrap(AppBehaviorDetector.builtInWindowTitleRules.first {
+            $0.name == "Telegram Web"
+        })
+
+        XCTAssertFalse(rule.matches(
+            bundleId: "ru.keepcoder.Telegram",
+            windowTitle: "Telegram @ Example",
+            axInfo: nil
+        ))
+        XCTAssertTrue(rule.matches(
+            bundleId: "com.google.Chrome",
+            windowTitle: "Telegram Web",
+            axInfo: nil
+        ))
+    }
+
     func testWindowTitleRule_ExcludedBundleIdsRoundTripInStableOrder() throws {
         let rule = WindowTitleRule(
             name: "Excluded apps",

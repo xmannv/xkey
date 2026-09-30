@@ -1232,11 +1232,16 @@ class AppBehaviorDetector {
         // Telegram Web's emoji suggestion popup intercepts keydown events,
         // causing Vietnamese text loss when XKey sends replacement text via CGEvent.
         // Slow + oneByOne bypasses this by giving popup time to process each character.
+        //
+        // The native macOS client's window title ("Telegram @ <name>") also contains
+        // "Telegram"; Shift+Left selection races its text view and leaves the original
+        // character behind ("ee" → "eê"), so it is excluded and keeps the default method.
         WindowTitleRule(
             name: "Telegram Web",
-            bundleIdPattern: "",  // Match all browsers
+            bundleIdPattern: "",  // Match all apps — rely on the window title
             titlePattern: "Telegram",
             matchMode: .contains,
+            excludedBundleIds: ["ru.keepcoder.Telegram"],
             injectionMethod: .selection,
             injectionDelays: [3000, 8000, 3000],
             textSendingMethod: .oneByOne,
