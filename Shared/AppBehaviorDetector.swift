@@ -434,7 +434,10 @@ struct WindowTitleRule: Codable, Identifiable {
 
     /// Exact bundle IDs that must not match this rule; array order keeps exported JSON stable
     let excludedBundleIds: [String]
-    
+
+    /// Match only browsers, regardless of bundleIdPattern
+    let browsersOnly: Bool
+
     /// Window title pattern to match
     let titlePattern: String
     
@@ -517,6 +520,10 @@ struct WindowTitleRule: Codable, Identifiable {
     /// - Returns: true if all specified patterns match
     func matches(bundleId: String, windowTitle: String, axInfo: AppBehaviorDetector.FocusedElementInfo?) -> Bool {
         guard !excludedBundleIds.contains(bundleId) else {
+            return false
+        }
+
+        if browsersOnly && !AppBehaviorDetector.isReprobeBrowser(bundleId) {
             return false
         }
 
@@ -613,7 +620,7 @@ struct WindowTitleRule: Codable, Identifiable {
     // MARK: - Codable
     
     enum CodingKeys: String, CodingKey {
-        case id, name, bundleIdPattern, excludedBundleIds, titlePattern, matchMode, isEnabled, sortIndex
+        case id, name, bundleIdPattern, excludedBundleIds, browsersOnly, titlePattern, matchMode, isEnabled, sortIndex
         // AX matching patterns
         case axRolePattern, axDescriptionPattern, axIdentifierPattern, axDOMClassList
         // Behavior overrides
@@ -628,6 +635,7 @@ struct WindowTitleRule: Codable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         bundleIdPattern = try container.decode(String.self, forKey: .bundleIdPattern)
         excludedBundleIds = try container.decodeIfPresent([String].self, forKey: .excludedBundleIds) ?? []
+        browsersOnly = try container.decodeIfPresent(Bool.self, forKey: .browsersOnly) ?? false
         titlePattern = try container.decode(String.self, forKey: .titlePattern)
         matchMode = try container.decode(WindowTitleMatchMode.self, forKey: .matchMode)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
@@ -676,6 +684,9 @@ struct WindowTitleRule: Codable, Identifiable {
         if !excludedBundleIds.isEmpty {
             try container.encode(excludedBundleIds, forKey: .excludedBundleIds)
         }
+        if browsersOnly {
+            try container.encode(browsersOnly, forKey: .browsersOnly)
+        }
         try container.encode(titlePattern, forKey: .titlePattern)
         try container.encode(matchMode, forKey: .matchMode)
         try container.encode(isEnabled, forKey: .isEnabled)
@@ -723,6 +734,7 @@ struct WindowTitleRule: Codable, Identifiable {
         titlePattern: String,
         matchMode: WindowTitleMatchMode,
         excludedBundleIds: [String] = [],
+        browsersOnly: Bool = false,
         isEnabled: Bool = true,
         sortIndex: Int = WindowTitleRule.unassignedSortIndex,
         // AX matching patterns
@@ -748,6 +760,7 @@ struct WindowTitleRule: Codable, Identifiable {
         self.name = name
         self.bundleIdPattern = bundleIdPattern
         self.excludedBundleIds = excludedBundleIds
+        self.browsersOnly = browsersOnly
         self.titlePattern = titlePattern
         self.matchMode = matchMode
         self.isEnabled = isEnabled
@@ -1234,9 +1247,10 @@ class AppBehaviorDetector {
         // Slow + oneByOne bypasses this by giving popup time to process each character.
         WindowTitleRule(
             name: "Telegram Web",
-            bundleIdPattern: "",  // Match all browsers
+            bundleIdPattern: "",
             titlePattern: "Telegram",
             matchMode: .contains,
+            browsersOnly: true,  // native apps with "Telegram" in the title are not affected
             injectionMethod: .selection,
             injectionDelays: [3000, 8000, 3000],
             textSendingMethod: .oneByOne,

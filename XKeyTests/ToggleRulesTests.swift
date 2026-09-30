@@ -577,6 +577,34 @@ class ToggleWindowTitleRulesTests: XCTestCase {
         ))
     }
 
+    func testBuiltInTelegramWebRule_MatchesBrowsersOnly() throws {
+        let rule = try XCTUnwrap(AppBehaviorDetector.builtInWindowTitleRules.first {
+            $0.name == "Telegram Web"
+        })
+
+        XCTAssertTrue(rule.matches(bundleId: "com.google.Chrome", windowTitle: "Telegram Web", axInfo: nil))
+        XCTAssertTrue(rule.matches(bundleId: "org.mozilla.firefox", windowTitle: "Telegram Web", axInfo: nil))
+        XCTAssertFalse(rule.matches(bundleId: "org.telegram.desktop", windowTitle: "Telegram", axInfo: nil))
+        XCTAssertFalse(rule.matches(bundleId: "com.google.Chrome", windowTitle: "GitHub", axInfo: nil))
+    }
+
+    func testWindowTitleRule_BrowsersOnlyRoundTripsAndDefaultsToFalse() throws {
+        let rule = WindowTitleRule(
+            name: "Browser only",
+            bundleIdPattern: "",
+            titlePattern: "Telegram",
+            matchMode: .contains,
+            browsersOnly: true
+        )
+
+        let decoded = try JSONDecoder().decode(WindowTitleRule.self, from: JSONEncoder().encode(rule))
+        XCTAssertTrue(decoded.browsersOnly)
+        XCTAssertFalse(decoded.matches(bundleId: "org.telegram.desktop", windowTitle: "Telegram", axInfo: nil))
+
+        let legacy = Data(#"{"name":"Old","bundleIdPattern":"","titlePattern":"x","matchMode":"contains"}"#.utf8)
+        XCTAssertFalse(try JSONDecoder().decode(WindowTitleRule.self, from: legacy).browsersOnly)
+    }
+
     func testWindowTitleRule_ExcludedBundleIdsRoundTripInStableOrder() throws {
         let rule = WindowTitleRule(
             name: "Excluded apps",

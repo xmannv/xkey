@@ -284,6 +284,7 @@ struct WindowTitleRulesView: View {
                     titlePattern: rule.titlePattern,
                     matchMode: rule.matchMode,
                     excludedBundleIds: rule.excludedBundleIds,
+                    browsersOnly: rule.browsersOnly,
                     isEnabled: rule.isEnabled,
                     // AX matching patterns
                     axRolePattern: rule.axRolePattern,
@@ -788,6 +789,7 @@ struct AddRuleSheet: View {
     @State private var selectedTab: RuleSheetTab = .basic
     @State private var name: String = ""
     @State private var bundleIdPattern: String = "*"
+    @State private var browsersOnly: Bool = false
     @State private var titlePattern: String = ""
     @State private var matchMode: WindowTitleMatchMode = .contains
     @State private var useMarkedText: Bool = true
@@ -984,6 +986,8 @@ struct AddRuleSheet: View {
                         Text("Ví dụ: com.apple.Safari hoặc * để match tất cả")
                             .font(.caption2)
                             .foregroundColor(.secondary)
+
+                        Toggle("Chỉ áp dụng cho trình duyệt", isOn: $browsersOnly)
                     }
                     .padding(.vertical, 4)
                 }
@@ -1313,6 +1317,7 @@ struct AddRuleSheet: View {
     private func loadExistingRule(_ rule: WindowTitleRule) {
         name = rule.name
         bundleIdPattern = rule.bundleIdPattern
+        browsersOnly = rule.browsersOnly
         titlePattern = rule.titlePattern
         matchMode = rule.matchMode
         description = rule.description ?? ""
@@ -1401,6 +1406,7 @@ struct AddRuleSheet: View {
             titlePattern: titlePattern,
             matchMode: matchMode,
             excludedBundleIds: existingRule?.excludedBundleIds ?? [],
+            browsersOnly: browsersOnly,
             isEnabled: isEditing ? ruleIsEnabled : true,  // Preserve enabled state when editing
             // AX matching patterns
             axRolePattern: showAXPatterns && !axRolePattern.isEmpty ? axRolePattern : nil,
