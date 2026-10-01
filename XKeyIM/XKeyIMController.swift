@@ -226,6 +226,8 @@ class XKeyIMController: IMKInputController {
             session.reset()
             transport.resetComposition(in: nil)
         }
+        // Before the armed return: Secure Input blinds the tap but not IMKit, so this is
+        // the armed mode's only per-keystroke signal. Off, it costs the monitor's fast path.
         let secureInputEnabled = TapController.shared.evaluateSecureInput()
         if TapController.shared.isArmed { return false }
         if TapController.shared.blocksIMKitProcessingForHandoff { return false }
@@ -255,7 +257,9 @@ class XKeyIMController: IMKInputController {
                 guard let self else { return }
                 self.pendingContextEvents.drain(
                     process: { [weak self] event, client, command in
+                        // Drained later, so Secure Input may have changed since handle().
                         self?.processInputEvent(event,
+                                                secureInputEnabled: TapController.shared.evaluateSecureInput(),
                                                 client: client,
                                                 context: context,
                                                 matchedHostCommand: command) ?? false
@@ -271,17 +275,18 @@ class XKeyIMController: IMKInputController {
                                                command: matchedHostCommand)
         }
         return processInputEvent(inputEvent,
+                                 secureInputEnabled: false,
                                  client: textClient,
                                  context: context,
                                  matchedHostCommand: matchedHostCommand)
     }
 
     private func processInputEvent(_ inputEvent: InputEvent,
+                                   secureInputEnabled: Bool,
                                    client textClient: IMKitTextClient,
                                    context: AppContext,
                                    matchedHostCommand: HostCommand?) -> Bool {
         let appPolicyDecision = applyAppPolicy(context: context)
-        let secureInputEnabled = TapController.shared.evaluateSecureInput()
 
         if secureInputEnabled
             || appPolicyDecision == .disableTransformation

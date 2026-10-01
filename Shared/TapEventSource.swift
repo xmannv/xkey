@@ -433,7 +433,9 @@ final class TapEventSource {
                 }
 
                 // Check Secure Input on app switch — password managers often enable it when focused.
-                self.secureInputMonitor.evaluate()
+                // Remind: a holder that stays active in the background still blocks typing in
+                // the app the user just switched to.
+                self.secureInputMonitor.remindAfterSettle()
 
                 // Detect and set confirmed injection method for the new app
                 // This ensures keystrokes use correct method immediately after app switch.
@@ -1015,7 +1017,12 @@ final class TapEventSource {
 
         // Focusing a password field enables Secure Input with no app switch — WebKit does
         // this in Safari and Chrome. This is the only trigger that catches it promptly.
+        // A real focus move also re-shows the warning for a holder that is still active,
+        // sampled after settle: leaving a password field drops Secure Input slightly late.
         secureInputMonitor.evaluate()
+        if signatureChanged {
+            secureInputMonitor.remindAfterSettle()
+        }
 
         // Check toolbar display (only if enabled)
         // This ensures toolbar shows/hides when focus changes via keyboard (CMD+T, Tab, etc.)

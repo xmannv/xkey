@@ -45,6 +45,10 @@ final class SecureInputMonitor: @unchecked Sendable {
     private var presentationGeneration: UInt64 = 0
     private var validityGeneration: UInt64 = 0
     private var isValid = true
+    /// Sticky until a current delivery consumes it, so an evaluation without remind that
+    /// supersedes the reminding one cannot swallow the reminder.
+    private var pendingRemind = false
+    private var settleWorkItem: DispatchWorkItem?
 
     init(
         detector: SecureInputDetecting,
@@ -71,8 +75,11 @@ final class SecureInputMonitor: @unchecked Sendable {
 
     /// Samples and reduces one observation atomically. Presentation and callbacks are
     /// sequenced separately and never execute while the state executor is held.
+    /// - Parameter remind: re-show the warning even if it was already shown for this
+    ///   holder. The toast auto-hides, so without this a long-lived holder (1Password
+    ///   waiting for unlock) is announced once and then silently blocks typing.
     @discardableResult
-    func evaluate() -> SecureInputEvaluation {
+    func evaluate(remind: Bool = false) -> SecureInputEvaluation {
         withState {
             guard isValid else {
                 return SecureInputEvaluation(observation: currentObservation, transition: nil)
@@ -80,6 +87,15 @@ final class SecureInputMonitor: @unchecked Sendable {
 
             let observation = detector.observation
             let transition = stateMachine.evaluate(observation)
+            // Hot path (every IMKit keystroke, every poll tick): off, still off, nothing
+            // shown or pending to hide, so a delivery would only hop to main and do nothing.
+            // Generations stay untouched so an in-flight delivery is not made stale.
+            if !observation.isEnabled && transition == nil
+                && desiredPresentation == nil && deliveredPresentation == nil {
+                pendingRemind = false
+                return SecureInputEvaluation(observation: observation, transition: nil)
+            }
+            pendingRemind = pendingRemind || remind
             currentObservation = observation
             observationGeneration &+= 1
             enqueueEvaluationDelivery(
@@ -93,12 +109,33 @@ final class SecureInputMonitor: @unchecked Sendable {
         }
     }
 
+    /// Reminder for an app switch or focus move, sampled once the move has settled.
+    ///
+    /// didActivateApplication (and IMKit activation) lands before the previous app's
+    /// AppKit drops Secure Input: measured with an NSSecureTextField holder, the flag was
+    /// still on at every notification and off 50ms later. Sampling there re-shows the
+    /// warning for the field or app the user just left, and misses the one just entered.
+    /// A newer call replaces a pending one, so a burst of moves shows one toast.
+    /// ponytail: fixed delay, move to a settle-until-stable check if 250ms ever proves short.
+    func remindAfterSettle() {
+        let work = DispatchWorkItem { [weak self] in
+            self?.evaluate(remind: true)
+        }
+        withState {
+            settleWorkItem?.cancel()
+            settleWorkItem = work
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
     func invalidate() {
         withState {
             guard isValid else { return }
             isValid = false
             validityGeneration &+= 1
             observationGeneration &+= 1
+            settleWorkItem?.cancel()
+            settleWorkItem = nil
             desiredPresentation = nil
             presentationGeneration &+= 1
             enqueueInvalidationHide(generation: presentationGeneration)
@@ -205,13 +242,15 @@ final class SecureInputMonitor: @unchecked Sendable {
                   desiredPresentation == decision.desired
             else { return nil }
 
+            let remind = pendingRemind
+            pendingRemind = false
             guard let desired = decision.desired else {
                 guard deliveredPresentation != nil else { return nil }
                 deliveredPresentation = nil
                 return .hide
             }
 
-            guard deliveredPresentation != desired else { return nil }
+            guard remind || deliveredPresentation != desired else { return nil }
             deliveredPresentation = desired
             return .show(desired.holderAppName)
         }

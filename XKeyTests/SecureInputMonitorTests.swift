@@ -95,6 +95,80 @@ final class SecureInputMonitorTests: XCTestCase {
         XCTAssertEqual(presenter.hideCount, 1)
     }
 
+    func testRemindReshowsWhileActiveButNeverWhileInactive() {
+        let detector = Detector()
+        let presenter = Presenter()
+        let transitions = TransitionRecorder()
+        let monitor = makeMonitor(detector: detector,
+                                  presenter: presenter,
+                                  transitions: transitions)
+
+        monitor.evaluate(remind: true)
+        monitor.waitForPendingDeliveries()
+        detector.observation = observation(pid: 101, name: "1Password")
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        monitor.evaluate(remind: true)
+        monitor.waitForPendingDeliveries()
+
+        XCTAssertEqual(presenter.shownAppNames, ["1Password", "1Password"])
+        XCTAssertEqual(presenter.hideCount, 0)
+    }
+
+    func testRemindSurvivesASupersedingEvaluationWithoutRemind() {
+        let detector = Detector()
+        let presenter = Presenter()
+        let transitions = TransitionRecorder()
+        let delivery = DeliveryQueue()
+        let monitor = makeMonitor(detector: detector,
+                                  presenter: presenter,
+                                  transitions: transitions,
+                                  deliver: delivery.schedule)
+
+        detector.observation = observation(pid: 101, name: "1Password")
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        delivery.drain()
+
+        // A keystroke evaluation lands before the reminder reaches main.
+        monitor.evaluate(remind: true)
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        delivery.drain()
+
+        XCTAssertEqual(presenter.shownAppNames, ["1Password", "1Password"])
+    }
+
+    func testRepeatedInactiveEvaluationKeepsPendingHideDeliverable() {
+        let detector = Detector()
+        let presenter = Presenter()
+        let transitions = TransitionRecorder()
+        let delivery = DeliveryQueue()
+        let monitor = makeMonitor(detector: detector,
+                                  presenter: presenter,
+                                  transitions: transitions,
+                                  deliver: delivery.schedule)
+
+        detector.observation = observation(pid: 101, name: "1Password")
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        delivery.drain()
+
+        detector.observation = .inactive
+        monitor.evaluate()
+        monitor.evaluate()
+        monitor.evaluate()
+        monitor.waitForPendingDeliveries()
+        delivery.drain()
+
+        XCTAssertEqual(presenter.shownAppNames, ["1Password"])
+        XCTAssertEqual(presenter.hideCount, 1)
+        XCTAssertEqual(transitions.values,
+                       [.becameActive(observation(pid: 101, name: "1Password")), .becameInactive])
+    }
+
     func testSamePIDNameRefinementUpdatesTransitionStatusAndPresenter() {
         let detector = Detector()
         let presenter = Presenter()

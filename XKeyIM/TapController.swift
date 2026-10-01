@@ -150,6 +150,12 @@ final class TapController {
         }
         refreshAppContext(bundleIdentifier: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
         updateSecureInputMonitoring()
+        // Marked-text mode has no TapEventSource, so IMKit activation (app switch, focus
+        // into a new text client) is its only focus signal: re-show the warning for a
+        // holder that is still active. An armed tap reminds from TapEventSource instead.
+        if !isArmed {
+            secureInputRuntime.monitor.remindAfterSettle()
+        }
     }
 
     func imeDidDeactivate(stillSelected: Bool) {

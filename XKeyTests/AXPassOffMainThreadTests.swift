@@ -278,7 +278,7 @@ final class AXPassOffMainThreadTests: XCTestCase {
     /// stage. The pass then refines the policy with the window title, and Secure Input
     /// evaluation still happens before that refinement. Smart Switch's entry is published
     /// by the block itself, ahead of both — see SmartSwitchEntryTests.
-    func testAppSwitchChecksSecureInputAndPublishesContextFromTheAXPass() {
+    func testAppSwitchPublishesContextFromTheAXPassAndChecksSecureInputAfterSettle() {
         let detector = AXPassSecureInputDetector()
         let secureInputMonitor = SecureInputMonitor(
             detector: detector,
@@ -317,9 +317,14 @@ final class AXPassOffMainThreadTests: XCTestCase {
 
         wait(for: [blockReturned], timeout: 5)
 
-        XCTAssertEqual(checksWhenBlockReturned, 1,
-                       "Secure Input must be re-evaluated before policy context is published")
+        // Secure Input is sampled only after the switch settles: at the activation
+        // notification the previous app has not dropped it yet.
+        XCTAssertEqual(checksWhenBlockReturned, 0,
+                       "Secure Input must not be sampled at the activation notification")
         XCTAssertEqual(publishedBundleIdentifier, NSRunningApplication.current.bundleIdentifier)
+        let settledCheck = expectation(for: NSPredicate { _, _ in detector.readCount == 1 },
+                                       evaluatedWith: nil)
+        wait(for: [settledCheck], timeout: 2)
     }
 
     // MARK: - No AX on the tap thread
