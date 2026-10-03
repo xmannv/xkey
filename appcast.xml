@@ -6,51 +6,24 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20261002)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261002</link>
-      <sparkle:version>20261002</sparkle:version>
+      <title>Version 1.2.25 (Build 20261003)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261003</link>
+      <sparkle:version>20261003</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(secure-input): remind on app switch and focus change, sampled after settle</p>
-<p>The warning toast auto-hides after 5s but the monitor deduplicated on the</p>
-<p>last delivered presentation, so a holder that stays active in the</p>
-<p>background was announced once and then silently blocked typing.</p>
-<ul>
-<li>SecureInputMonitor.evaluate(remind:) re-shows the warning while Secure</li>
-</ul>
-<p>  Input is still active; it never shows while inactive.</p>
-<ul>
-<li>App switches and real focus changes (signatureChanged) remind through</li>
-</ul>
-<p>  remindAfterSettle(), 250ms later, coalesced so a burst shows one toast:</p>
-<p>  measured with an NSSecureTextField holder, Secure Input was still on at</p>
-<p>  every didActivateApplication notification and off 50ms later, so the</p>
-<p>  old synchronous sample was stale in both directions. A pending reminder</p>
-<p>  is sticky until a current delivery consumes it, so a keystroke</p>
-<p>  evaluation that supersedes it cannot swallow it.</p>
-<ul>
-<li>XKeyIM marked-text mode has no TapEventSource, so IMKit activation now</li>
-</ul>
-<p>  schedules the same reminder.</p>
-<ul>
-<li>Skip the delivery hop when Secure Input is off, was off, and nothing is</li>
-</ul>
-<p>  shown or pending to hide; generations stay untouched so an in-flight</p>
-<p>  hide is not made stale.</p>
-<ul>
-<li>XKeyIMController evaluates Secure Input once per keystroke, before the</li>
-</ul>
-<p>  armed return (IMKit is the armed mode's only per-keystroke signal while</p>
-<p>  Secure Input blinds the tap); drained pending events re-evaluate.</p>
-<ul>
-<li>Bump build number to 20261002.</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261002">Xem chi tiết trên GitHub</a></p>
+<p>fix(hotkey): ignore modifier-only hotkey on hold, extra modifier, or mouse/media input</p>
+<p>A modifier-only toggle (e.g. Fn) fired on release even when the key was held</p>
+<p>as a modifier for other actions. Fire only on a tap under 0.5s with no extra</p>
+<p>modifier added, and cancel the pending toggle on mouse or media-key events,</p>
+<p>which are outside the event tap mask. A spoiled gesture cannot re-arm until</p>
+<p>all modifiers are released.</p>
+<p>Fixes #328</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261003">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 01 Oct 2026 23:32:16 +0000</pubDate>
+      <pubDate>Sat, 03 Oct 2026 09:03:01 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20261002/XKey.dmg" sparkle:version="20261002" sparkle:shortVersionString="1.2.25" length="11451125" type="application/octet-stream" sparkle:edSignature="MO9S5AFn1DgC+qzb3d9Pd6WsvTwIomlh66bjBavDZcyKf3HfucEO5CkYEl/ndiRCdzecjJDLcjOkYLiuQE+oCQ==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20261003/XKey.dmg" sparkle:version="20261003" sparkle:shortVersionString="1.2.25" length="11457270" type="application/octet-stream" sparkle:edSignature="NUCrm67ykf7nJDrlBCYxilzfRQave/FGL9+6ywZJ+gohyHkFOQyVoQ8Myn5pNmDlDoMJJ5eIW1Imk3bOegLLCg==" />
     </item>
   </channel>
 </rss>
