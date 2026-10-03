@@ -930,6 +930,21 @@ final class TapOwnershipTests: XCTestCase {
                       "turning Vietnamese back on from XKey.app's own menu must survive a restart")
     }
 
+    /// Under an input source XKey is configured off for, the tap passes every keystroke
+    /// through. A toggle to V there would show a state that cannot type and record it as
+    /// the app's Smart Switch language, so the setting wins and the toggle is ignored.
+    func testTogglingVietnameseIsIgnoredUnderADisabledInputSource() {
+        SharedSettings.shared.vietnameseEnabled = false
+        let handler = KeyboardEventHandler()
+        handler.inputSourceEnabled = false
+        let viewModel = StatusBarViewModel(keyboardHandler: handler, eventTapManager: nil)
+
+        viewModel.toggleVietnamese()
+
+        XCTAssertFalse(viewModel.isVietnameseEnabled)
+        XCTAssertFalse(SharedSettings.shared.vietnameseEnabled)
+    }
+
     /// Tap ownership is per-machine state, like isRemoteDesktopTarget: machine A's PID
     /// means nothing on machine B, and importing it there makes machine B's XKey.app
     /// yield the keyboard to whatever local process happens to hold that PID.

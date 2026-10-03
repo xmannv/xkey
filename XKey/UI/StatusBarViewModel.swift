@@ -97,6 +97,19 @@ class StatusBarViewModel: ObservableObject {
     }
     
     func toggleVietnamese() {
+        // The user configured XKey off for this input source, and the tap passes every
+        // keystroke through under it. Flipping to V here would only show a state that
+        // cannot type, and record it as the app's Smart Switch language.
+        if keyboardHandler?.inputSourceEnabled == false {
+            let sourceName = InputSourceManager.getCurrentInputSource()?.displayName ?? ""
+            log("Vietnamese toggle ignored: XKey is off for input source '\(sourceName)'")
+            FloatingOverlay.shared.showWarning(
+                title: String(localized: "XKey đang tắt cho Input Source \"\(sourceName)\""),
+                subtitle: String(localized: "Bật lại trong Settings > Input Sources để gõ tiếng Việt.")
+            )
+            return
+        }
+
         isVietnameseEnabled.toggle()
         keyboardHandler?.setVietnamese(isVietnameseEnabled)
 
