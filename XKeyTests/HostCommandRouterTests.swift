@@ -81,4 +81,37 @@ final class HostCommandRouterTests: XCTestCase {
         XCTAssertEqual(resolver.update(modifiers: [.control], bindings: bindings), .toggleVietnamese)
         XCTAssertNil(resolver.update(modifiers: [], bindings: bindings))
     }
+
+    func testModifierOnlyResolverIgnoresLongHold() {
+        let hotkey = Hotkey(keyCode: 0, modifiers: [.function])
+        let bindings = [(hotkey: hotkey, command: HostCommand.toggleVietnamese)]
+        var resolver = ModifierOnlyHostCommandResolver()
+
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 0))
+        XCTAssertNil(resolver.update(modifiers: [], bindings: bindings, now: 1.0))
+
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 2.0))
+        XCTAssertEqual(resolver.update(modifiers: [], bindings: bindings, now: 2.2), .toggleVietnamese)
+    }
+
+    func testModifierOnlyResolverIgnoresExtraModifierAndCancel() {
+        let hotkey = Hotkey(keyCode: 0, modifiers: [.function])
+        let bindings = [(hotkey: hotkey, command: HostCommand.toggleVietnamese)]
+        var resolver = ModifierOnlyHostCommandResolver()
+
+        // Fn, then Shift joins: spoiled, no toggle, and Fn alone must not re-arm.
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 0))
+        XCTAssertNil(resolver.update(modifiers: [.function, .shift], bindings: bindings, now: 0.1))
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 0.2))
+        XCTAssertNil(resolver.update(modifiers: [], bindings: bindings, now: 0.3))
+
+        // Fully released: a clean tap works again.
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 1))
+        XCTAssertEqual(resolver.update(modifiers: [], bindings: bindings, now: 1.1), .toggleVietnamese)
+
+        // cancel() (key/click while held) spoils the tap.
+        XCTAssertNil(resolver.update(modifiers: [.function], bindings: bindings, now: 2))
+        resolver.cancel()
+        XCTAssertNil(resolver.update(modifiers: [], bindings: bindings, now: 2.1))
+    }
 }

@@ -33,6 +33,12 @@ class EventTapManager {
     /// `removeObserver(self)`).
     private var hotkeyRecordingObserver: NSObjectProtocol?
 
+    /// Cancels a pending modifier-only hotkey (e.g. Fn) when a mouse or media-key
+    /// event arrives while it is held; those events are outside the tap's mask. Runs on the
+    /// main thread, the same run loop the tap callback uses, so the resolver is not shared
+    /// across threads.
+    private var modifierOnlyCancelMonitor: Any?
+
     // Bundle IDs of remote desktop apps: see `RemoteDesktopBundleIds.all` in
     // Shared/AppBehaviorDetector.swift (single source of truth).
     
@@ -283,12 +289,23 @@ class EventTapManager {
             updateSessionTapForFrontmostApp()
         }
 
+        modifierOnlyCancelMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .systemDefined]
+        ) { [weak self] _ in
+            self?.modifierOnlyCommandResolver.cancel()
+        }
+
         isEnabled = true
         debugLogCallback?("Event tap fully started!")
     }
 
     func stop() {
         guard isEnabled else { return }
+
+        if let monitor = modifierOnlyCancelMonitor {
+            NSEvent.removeMonitor(monitor)
+            modifierOnlyCancelMonitor = nil
+        }
 
         // Stop primary tap
         if let tap = eventTap {

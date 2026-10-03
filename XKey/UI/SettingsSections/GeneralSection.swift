@@ -35,7 +35,9 @@ struct GeneralSection: View {
                                         .font(.caption)
                                         .fontWeight(.medium)
                                 }
-                                Text("Để tránh xung đột, vào System Settings → Keyboard → Keyboard Shortcuts → Input Sources và tắt các phím tắt chuyển đổi nguồn nhập.")
+                                Text(viewModel.preferences.toggleHotkey.modifiers.contains(.function)
+                                     ? "Để tránh xung đột, vào System Settings → Keyboard, đặt \"Nhấn phím 🌐 để\" (Press 🌐 key to) thành \"Không làm gì\" (Do Nothing)."
+                                     : "Để tránh xung đột, vào System Settings → Keyboard → Keyboard Shortcuts → Input Sources và tắt các phím tắt chuyển đổi nguồn nhập.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
