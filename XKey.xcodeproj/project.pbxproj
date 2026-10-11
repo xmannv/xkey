@@ -219,6 +219,9 @@
 		TRRESULT001 /* TranslationResultOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = TRRESULT002 /* TranslationResultOverlay.swift */; };
 		TYPBUF001 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
 		TYPBUF003 /* TypingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = TYPBUF002 /* TypingBuffer.swift */; };
+		SVCPROV001 /* ServicesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = SVCPROV002 /* ServicesProvider.swift */; };
+		USRDICT01 /* UserDictionaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = USRDICT02 /* UserDictionaryService.swift */; };
+		SVCTEST001 /* ServicesProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SVCTEST002 /* ServicesProviderTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -396,6 +399,9 @@
 		TRRESULT002 /* TranslationResultOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationResultOverlay.swift; sourceTree = "<group>"; };
 		TYPBUF002 /* TypingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingBuffer.swift; sourceTree = "<group>"; };
 		VERSION0001 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		SVCPROV002 /* ServicesProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicesProvider.swift; sourceTree = "<group>"; };
+		USRDICT02 /* UserDictionaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDictionaryService.swift; sourceTree = "<group>"; };
+		SVCTEST002 /* ServicesProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicesProviderTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -589,6 +595,8 @@
 				A2000001 /* XKeyApp.swift */,
 				A2000002 /* AppDelegate.swift */,
 				608CA8088C2F70FEC4ABA340 /* XKeyIMUpdateManager.swift */,
+				SVCPROV002 /* ServicesProvider.swift */,
+				USRDICT02 /* UserDictionaryService.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -732,6 +740,7 @@
 				CGEVTTRN002 /* CGEventTransportTests.swift */,
 				IMKITTRT002 /* IMKitTransportTests.swift */,
 				INPACTST002 /* InputActionTests.swift */,
+				SVCTEST002 /* ServicesProviderTests.swift */,
 			);
 			path = XKeyTests;
 			sourceTree = "<group>";
@@ -1056,6 +1065,8 @@
 				96B1917BFE8E2D474E931323 /* StatusBarPopoverView.swift in Sources */,
 				FC31E5BF03BAE76EB0EF5881 /* CustomConsonantChipEditor.swift in Sources */,
 				5057F4299DB8BF5B89E61876 /* ToggleHUDWindow.swift in Sources */,
+				SVCPROV001 /* ServicesProvider.swift in Sources */,
+				USRDICT01 /* UserDictionaryService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1105,6 +1116,7 @@
 				CGEVTTRN001 /* CGEventTransportTests.swift in Sources */,
 				IMKITTRT001 /* IMKitTransportTests.swift in Sources */,
 				INPACTST001 /* InputActionTests.swift in Sources */,
+				SVCTEST001 /* ServicesProviderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -514,7 +514,30 @@ struct AdvancedSection: View {
                 .buttonStyle(.borderless)
                 .disabled(newUserWord.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            
+
+            // Hotkey: add the frontmost app's selected text after a confirm
+            HStack {
+                Text("Phím tắt thêm từ đã chọn:")
+                    .font(.caption)
+                Spacer()
+                HotkeyRecorderView(hotkey: $viewModel.preferences.addToDictionaryHotkey, minimumModifiers: 2)
+                    .frame(width: 150)
+            }
+
+            Text("Bôi đen text ở app bất kỳ rồi bấm phím tắt để thêm từng từ vào từ điển")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
+            Text("Không thấy \"XKey: ...\" trong menu chuột phải? Bật tại System Settings → Keyboard → Keyboard Shortcuts → Services")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
+            Button("Mở Keyboard Settings") {
+                openKeyboardServicesSettings()
+            }
+            .buttonStyle(.link)
+            .font(.caption2)
+
             // Word count and toggle list
             HStack {
                 Text("\(userDictionaryWords.count) từ")
@@ -665,6 +688,17 @@ struct AdvancedSection: View {
     private func openDictionaryFolder() {
         let url = VNDictionaryManager.shared.getDictionaryDirectoryURL()
         NSWorkspace.shared.open(url)
+    }
+
+    private func openKeyboardServicesSettings() {
+        // macOS 13+ uses the Settings extension ID; macOS 12 (deployment
+        // target) still answers to the old preference-pane ID.
+        for raw in [
+            "x-apple.systempreferences:com.apple.Keyboard-Settings.extension",
+            "x-apple.systempreferences:com.apple.preference.keyboard",
+        ] {
+            if let url = URL(string: raw), NSWorkspace.shared.open(url) { return }
+        }
     }
     
     // MARK: - User Dictionary Actions

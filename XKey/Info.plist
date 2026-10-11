@@ -72,6 +72,30 @@
 	<integer>86400</integer>
 	<key>SUPublicEDKey</key>
 	<string>9/ryeUN9ZJfVWkorOqHJTK1l1jkQy6Gtp1x7dxNjmN8=</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>XKey: Thêm vào từ điển cá nhân</string>
+				<key>en</key>
+				<string>XKey: Add to Personal Dictionary</string>
+				<key>vi</key>
+				<string>XKey: Thêm vào từ điển cá nhân</string>
+				<key>zh-Hans</key>
+				<string>XKey: 添加到个人词典</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>addToUserDictionary</string>
+			<key>NSPortName</key>
+			<string>XKey</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSStringPboardType</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
 

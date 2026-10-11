@@ -173,13 +173,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Set shared instance for access from SwiftUI views
         AppDelegate.shared = self
-        
+
+        // Register macOS Services provider early so a service request that
+        // launched the app (context menu → Services → "XKey: Thêm vào từ điển
+        // cá nhân") is delivered once launch completes.
+        NSApp.servicesProvider = ServicesProvider.shared
+
         // Skip most setup when running under unit tests
         // Tests only need access to VNEngine and related classes
         if isRunningTests {
             // Minimal setup for tests - just create the handler without event tap
             keyboardHandler = KeyboardEventHandler()
             return
+        }
+
+        // macOS may ship the service unchecked in System Settings → Services;
+        // best-effort re-enable so the context-menu item shows up.
+        DispatchQueue.global(qos: .utility).async {
+            ServicesProvider.shared.ensureServiceMenuEnabled()
         }
 
         // Observe requests before publishing our PID, so a request cannot land in a
@@ -239,6 +250,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup convert tool hotkey
         setupConvertToolHotkey()
+
+        // Setup add-to-dictionary hotkey (shares the Services "add selection
+        // to user dictionary" pipeline via UserDictionaryService)
+        setupAddToDictionaryHotkey()
 
         // Setup translation hotkey
         setupTranslationHotkey()
@@ -866,6 +881,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.performTranslateToSource()
             case .showConvertTool:
                 self.openConvertTool()
+            case .addSelectionToUserDictionary:
+                self.performAddSelectionToDictionary()
             case .showSettings:
                 self.openPreferences()
             case .showDebugWindow:
@@ -2110,6 +2127,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initial setup
         updateConvertToolHotkey()
+    }
+
+    // MARK: - Add-to-Dictionary Hotkey
+
+    private func setupAddToDictionaryHotkey() {
+        // Setup notification observer for hotkey changes
+        NotificationCenter.default.addObserver(
+            forName: .addToDictionaryHotkeyDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateAddToDictionaryHotkey()
+        }
+
+        // Initial setup
+        updateAddToDictionaryHotkey()
+    }
+
+    private func updateAddToDictionaryHotkey() {
+        let preferences = SharedSettings.shared.loadPreferences()
+        let hotkey = preferences.addToDictionaryHotkey
+
+        // If no keycode, disable hotkey
+        guard hotkey.keyCode != 0 else {
+            eventTapManager?.addToDictionaryHotkey = nil
+            debugWindowController?.logEvent("Add-to-dictionary hotkey disabled (no key set)")
+            return
+        }
+
+        // Configure EventTapManager to handle the hotkey
+        eventTapManager?.addToDictionaryHotkey = hotkey
+
+        debugWindowController?.logEvent("Add-to-dictionary hotkey set: \(hotkey.displayString)")
+    }
+
+    /// Hotkey path: grab the frontmost selection (same AX→Cmd+C pipeline the
+    /// translator uses), confirm via alert, then write to the dictionary.
+    private func performAddSelectionToDictionary() {
+        debugWindowController?.logEvent("Add-to-dictionary triggered via hotkey")
+        let result = TranslationService.shared.getSelectedTextWithSource()
+        // .fullValue means nothing was selected — the capture grabbed the whole
+        // focused field. That's a translation convenience, not a selection, so
+        // don't offer to dump a field's worth of words into the dictionary.
+        let text = result?.source == .fullValue ? "" : (result?.text ?? "")
+        UserDictionaryService.shared.confirmThenAddFromText(text)
     }
 
     private func updateConvertToolHotkey() {

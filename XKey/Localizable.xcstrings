@@ -3373,6 +3373,22 @@
         }
       }
     },
+    "Không thấy \"XKey: ...\" trong menu chuột phải? Bật tại System Settings → Keyboard → Keyboard Shortcuts → Services": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't see \"XKey: ...\" in the context menu? Enable it in System Settings → Keyboard → Keyboard Shortcuts → Services"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右键菜单中看不到 \"XKey: ...\"？请在 系统设置 → 键盘 → 键盘快捷键 → 服务 中启用"
+          }
+        }
+      }
+    },
     "Không thể export thiết lập": {
       "localizations": {
         "en": {
@@ -4302,6 +4318,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开输入源"
+          }
+        }
+      }
+    },
+    "Mở Keyboard Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Keyboard Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开键盘设置"
           }
         }
       }

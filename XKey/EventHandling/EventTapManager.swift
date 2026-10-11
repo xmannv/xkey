@@ -64,6 +64,9 @@ class EventTapManager {
     // Convert tool hotkey configuration
     var convertToolHotkey: Hotkey?
 
+    // Add-selection-to-user-dictionary hotkey configuration
+    var addToDictionaryHotkey: Hotkey?
+
     // Undo typing hotkey configuration
     var undoTypingHotkey: Hotkey?
     
@@ -378,6 +381,7 @@ class EventTapManager {
         let bindings: [(Hotkey?, HostCommand, Bool)] = [
             (toolbarHotkey, .showToolbar, true),
             (convertToolHotkey, .showConvertTool, true),
+            (addToDictionaryHotkey, .addSelectionToUserDictionary, true),
             (translationHotkey, .showTranslation, false),
             (translateToSourceHotkey, .translateToSource, false),
             (debugHotkey, .showDebugWindow, false),
@@ -551,6 +555,17 @@ class EventTapManager {
             if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
                 debugLogCallback?("  → CONVERT TOOL HOTKEY DETECTED")
                 let result = routeHostCommand(.showConvertTool, event: event, proxy: proxy)
+                return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
+            }
+        }
+
+        // Check for add-to-dictionary hotkey
+        // Skip if user is recording a new hotkey (so they can re-record the same hotkey)
+        if let hotkey = addToDictionaryHotkey, type == .keyDown, !isHotkeyRecording {
+            let eventModifiers = ModifierFlags(from: event.flags)
+            if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
+                debugLogCallback?("  → ADD-TO-DICTIONARY HOTKEY DETECTED")
+                let result = routeHostCommand(.addSelectionToUserDictionary, event: event, proxy: proxy)
                 return result.shouldConsumeEvent ? nil : Unmanaged.passUnretained(event)
             }
         }

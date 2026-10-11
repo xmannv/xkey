@@ -10,6 +10,7 @@ enum HostCapability: Hashable {
     case undoTyping
     case translationUI
     case convertToolUI
+    case userDictionaryUI
     case settingsUI
     case debugWindowUI
     case toolbarUI
@@ -42,6 +43,7 @@ struct HostCapabilities: Equatable {
         .secureInputFeedback, .spellCheck, .macroExpansion, .smartSwitch,
         .appRules, .toggleVietnamese, .undoTyping, .translationUI,
         .convertToolUI, .settingsUI, .debugWindowUI, .toolbarUI,
+        .userDictionaryUI,
     ]))
 
     static let xkeyIM = HostCapabilities(
@@ -52,6 +54,7 @@ struct HostCapabilities: Equatable {
         unsupportedReasons: [
             .translationUI: "Translation UI is hosted by XKey.app",
             .convertToolUI: "Convert Tool UI is hosted by XKey.app",
+            .userDictionaryUI: "Dictionary UI is hosted by XKey.app",
             .settingsUI: "Settings UI is hosted by XKey.app",
             .debugWindowUI: "Debug window is hosted by XKey.app",
             .toolbarUI: "Toolbar UI is hosted by XKey.app",

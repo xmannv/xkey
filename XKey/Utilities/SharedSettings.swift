@@ -49,6 +49,8 @@ enum SharedSettingsKey: String {
     case tempOffToolbarHotkeyModifiers = "XKey.tempOffToolbarHotkeyModifiers"
     case convertToolHotkeyCode = "XKey.convertToolHotkeyCode"
     case convertToolHotkeyModifiers = "XKey.convertToolHotkeyModifiers"
+    case addToDictionaryHotkeyCode = "XKey.addToDictionaryHotkeyCode"
+    case addToDictionaryHotkeyModifiers = "XKey.addToDictionaryHotkeyModifiers"
 
     // Macro settings
     case macroEnabled = "XKey.macroEnabled"
@@ -803,6 +805,31 @@ class SharedSettings {
         guard !isBatchUpdating else { return }
         NotificationCenter.default.post(
             name: .convertToolHotkeyDidChange,
+            object: nil
+        )
+    }
+
+    var addToDictionaryHotkeyCode: UInt16 {
+        get { UInt16(readInt(forKey: SharedSettingsKey.addToDictionaryHotkeyCode.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.addToDictionaryHotkeyCode.rawValue)
+            notifyAddToDictionaryHotkeyChanged()
+        }
+    }
+
+    var addToDictionaryHotkeyModifiers: UInt {
+        get { UInt(readInt(forKey: SharedSettingsKey.addToDictionaryHotkeyModifiers.rawValue)) }
+        set {
+            writeInt(Int(newValue), forKey: SharedSettingsKey.addToDictionaryHotkeyModifiers.rawValue)
+            notifyAddToDictionaryHotkeyChanged()
+        }
+    }
+
+    /// Notify that the add-to-dictionary hotkey has changed
+    private func notifyAddToDictionaryHotkeyChanged() {
+        guard !isBatchUpdating else { return }
+        NotificationCenter.default.post(
+            name: .addToDictionaryHotkeyDidChange,
             object: nil
         )
     }
@@ -2041,6 +2068,16 @@ class SharedSettings {
             )
         }
 
+        // Add-to-dictionary hotkey
+        let dictHotkeyCode = addToDictionaryHotkeyCode
+        let dictHotkeyModifiers = addToDictionaryHotkeyModifiers
+        if dictHotkeyCode != 0 || dictHotkeyModifiers != 0 {
+            prefs.addToDictionaryHotkey = Hotkey(
+                keyCode: dictHotkeyCode,
+                modifiers: ModifierFlags(rawValue: dictHotkeyModifiers)
+            )
+        }
+
         // Macro settings
         prefs.macroEnabled = macroEnabled
         prefs.macroInEnglishMode = macroInEnglishMode
@@ -2204,6 +2241,8 @@ class SharedSettings {
         tempOffToolbarHotkeyModifiers = prefs.tempOffToolbarHotkey.modifiers.rawValue
         convertToolHotkeyCode = prefs.convertToolHotkey.keyCode
         convertToolHotkeyModifiers = prefs.convertToolHotkey.modifiers.rawValue
+        addToDictionaryHotkeyCode = prefs.addToDictionaryHotkey.keyCode
+        addToDictionaryHotkeyModifiers = prefs.addToDictionaryHotkey.modifiers.rawValue
 
         // Macro settings
         macroEnabled = prefs.macroEnabled
@@ -2291,6 +2330,9 @@ class SharedSettings {
 
         // Also notify convert tool hotkey changed
         notifyConvertToolHotkeyChanged()
+
+        // Also notify add-to-dictionary hotkey changed
+        notifyAddToDictionaryHotkeyChanged()
 
         // Also notify translation settings changed
         notifyTranslationSettingsChanged()
@@ -2381,6 +2423,9 @@ extension Notification.Name {
 
     /// Posted when convert tool hotkey changes
     static let convertToolHotkeyDidChange = Notification.Name("XKey.convertToolHotkeyDidChange")
+
+    /// Posted when the add-to-dictionary hotkey changes
+    static let addToDictionaryHotkeyDidChange = Notification.Name("XKey.addToDictionaryHotkeyDidChange")
 
     /// Posted when translation settings change
     static let translationSettingsDidChange = Notification.Name("XKey.translationSettingsDidChange")

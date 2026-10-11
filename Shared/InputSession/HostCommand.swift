@@ -8,6 +8,7 @@ enum HostCommand: String, CaseIterable, Hashable {
     case showTranslation
     case translateToSource
     case showConvertTool
+    case addSelectionToUserDictionary
     case showSettings
     case showDebugWindow
     case showToolbar
@@ -24,6 +25,8 @@ enum HostCommand: String, CaseIterable, Hashable {
             return .translationUI
         case .showConvertTool:
             return .convertToolUI
+        case .addSelectionToUserDictionary:
+            return .userDictionaryUI
         case .showSettings:
             return .settingsUI
         case .showDebugWindow:

@@ -108,6 +108,7 @@ struct Preferences: Codable {
     var tempOffToolbarEnabled: Bool = false      // Show floating toolbar for temp off controls
     var tempOffToolbarHotkey: Hotkey = Hotkey(keyCode: 0x11, modifiers: [.command, .option])  // Default: Cmd+Option+T
     var convertToolHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
+    var addToDictionaryHotkey: Hotkey = Hotkey(keyCode: 0, modifiers: [])  // Default: disabled (no hotkey)
 
     // Macro settings
     var macroEnabled: Bool = false               // Enable text shortcuts

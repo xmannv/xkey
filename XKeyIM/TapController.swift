@@ -390,6 +390,8 @@ final class TapController {
             ? nil : preferences.tempOffToolbarHotkey
         manager.convertToolHotkey = preferences.convertToolHotkey.keyCode == 0
             ? nil : preferences.convertToolHotkey
+        manager.addToDictionaryHotkey = preferences.addToDictionaryHotkey.keyCode == 0
+            ? nil : preferences.addToDictionaryHotkey
         manager.translationHotkey = preferences.translationEnabled
             && preferences.translationHotkey.keyCode != 0
             ? preferences.translationHotkey : nil
@@ -477,6 +479,7 @@ final class TapController {
             if SharedSettings.shared.beepOnToggle { NSSound.beep() }
             return .handled
         case .showTranslation, .translateToSource, .showConvertTool,
+             .addSelectionToUserDictionary,
              .showSettings, .showDebugWindow, .showToolbar:
             return .unsupported
         }

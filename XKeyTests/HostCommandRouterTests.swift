@@ -35,6 +35,7 @@ final class HostCommandRouterTests: XCTestCase {
             .showTranslation,
             .translateToSource,
             .showConvertTool,
+            .addSelectionToUserDictionary,
             .showSettings,
             .showDebugWindow,
             .showToolbar,

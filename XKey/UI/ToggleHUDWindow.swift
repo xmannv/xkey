@@ -34,13 +34,31 @@ class ToggleHUDWindow {
     ///   - isEnabled: Whether the feature is now enabled
     ///   - duration: How long to show the HUD (seconds)
     func show(title: String, isEnabled: Bool, duration: TimeInterval = 1.5) {
+        viewModel.mode = .toggle
+        viewModel.title = title
+        viewModel.detail = nil
+        viewModel.isEnabled = isEnabled
+        present(duration: duration)
+    }
+
+    /// Show a message HUD with icon, title and optional detail line
+    /// - Parameters:
+    ///   - title: Main message (e.g. "Đã thêm vào từ điển")
+    ///   - detail: Secondary line (e.g. the added words)
+    ///   - success: Green checkmark when true, orange X when false
+    ///   - duration: How long to show the HUD (seconds)
+    func showMessage(title: String, detail: String? = nil, success: Bool = true, duration: TimeInterval = 1.8) {
+        viewModel.mode = .message
+        viewModel.title = title
+        viewModel.detail = detail
+        viewModel.isEnabled = success
+        present(duration: duration)
+    }
+
+    private func present(duration: TimeInterval) {
         // Cancel any existing timer
         hideTimer?.invalidate()
-        
-        // Update content
-        viewModel.title = title
-        viewModel.isEnabled = isEnabled
-        
+
         // Create panel if needed
         if panel == nil {
             createPanel()
@@ -122,7 +140,10 @@ class ToggleHUDWindow {
 // MARK: - ViewModel
 
 private class ToggleHUDViewModel: ObservableObject {
+    enum Mode { case toggle, message }
+    @Published var mode: Mode = .toggle
     @Published var title: String = ""
+    @Published var detail: String? = nil
     @Published var isEnabled: Bool = true
 }
 
@@ -145,10 +166,18 @@ private struct ToggleHUDView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             
-            // State
-            Text(viewModel.isEnabled ? String(localized: "BẬT") : String(localized: "TẮT"))
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(viewModel.isEnabled ? .green : .orange)
+            // State (toggle mode) or detail line (message mode)
+            if viewModel.mode == .toggle {
+                Text(viewModel.isEnabled ? String(localized: "BẬT") : String(localized: "TẮT"))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(viewModel.isEnabled ? .green : .orange)
+            } else if let detail = viewModel.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
         }
         .fixedSize()
         .padding(.horizontal, 28)

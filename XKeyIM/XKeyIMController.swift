@@ -85,6 +85,7 @@ class XKeyIMController: IMKInputController {
             (preferences.toggleHotkey, .toggleVietnamese, true),
             (preferences.tempOffToolbarHotkey, .showToolbar, true),
             (preferences.convertToolHotkey, .showConvertTool, true),
+            (preferences.addToDictionaryHotkey, .addSelectionToUserDictionary, true),
             (preferences.translationEnabled ? preferences.translationHotkey : nil,
              .showTranslation, false),
             (preferences.translationEnabled ? preferences.translateToSourceHotkey : nil,
@@ -545,6 +546,7 @@ class XKeyIMController: IMKInputController {
             reloadSettings()
             return .handled
         case .showTranslation, .translateToSource, .showConvertTool,
+             .addSelectionToUserDictionary,
              .showSettings, .showDebugWindow, .showToolbar:
             return .unsupported
         }
