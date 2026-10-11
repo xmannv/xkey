@@ -6,24 +6,41 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20261003)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261003</link>
-      <sparkle:version>20261003</sparkle:version>
+      <title>Version 1.2.25 (Build 20261011)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261011</link>
+      <sparkle:version>20261011</sparkle:version>
       <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(hotkey): ignore modifier-only hotkey on hold, extra modifier, or mouse/media input</p>
-<p>A modifier-only toggle (e.g. Fn) fired on release even when the key was held</p>
-<p>as a modifier for other actions. Fire only on a tap under 0.5s with no extra</p>
-<p>modifier added, and cancel the pending toggle on mouse or media-key events,</p>
-<p>which are outside the event tap mask. A spoiled gesture cannot re-arm until</p>
-<p>all modifiers are released.</p>
-<p>Fixes #328</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261003">Xem chi tiết trên GitHub</a></p>
+<p>feat(dictionary): add selected text to personal dictionary via Services menu and global hotkey</p>
+<ul>
+<li>macOS Services item "XKey: Thêm vào từ điển cá nhân" (localized en/vi/zh-Hans)</li>
+</ul>
+<p>  splits the selection into normalized words and adds them all</p>
+<ul>
+<li>Configurable global hotkey (Settings → Advanced → Từ điển cá nhân) routes</li>
+</ul>
+<p>  through HostCommand.addSelectionToUserDictionary on both the local HID tap</p>
+<p>  and the remote/session callback; XKeyIM returns .unsupported so the event</p>
+<p>  reaches the main app</p>
+<ul>
+<li>Shared UserDictionaryService pipeline for both entry points: extract,</li>
+</ul>
+<p>  normalize, dedup, batch insert (single write + tombstone clearing), confirm</p>
+<p>  alert for the hotkey path, centered HUD feedback</p>
+<ul>
+<li>Best-effort re-enable of the Services entry in pbs NSServicesStatus at</li>
+</ul>
+<p>  launch (merges flags, preserves key_equivalent), plus a Settings hint and</p>
+<p>  "Open Keyboard Settings" shortcut</p>
+<ul>
+<li>Bump CURRENT<em>PROJECT</em>VERSION to 20261011</li>
+</ul>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261011">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sat, 03 Oct 2026 09:03:01 +0000</pubDate>
+      <pubDate>Sun, 11 Oct 2026 06:35:38 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20261003/XKey.dmg" sparkle:version="20261003" sparkle:shortVersionString="1.2.25" length="11457270" type="application/octet-stream" sparkle:edSignature="NUCrm67ykf7nJDrlBCYxilzfRQave/FGL9+6ywZJ+gohyHkFOQyVoQ8Myn5pNmDlDoMJJ5eIW1Imk3bOegLLCg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20261011/XKey.dmg" sparkle:version="20261011" sparkle:shortVersionString="1.2.25" length="11510005" type="application/octet-stream" sparkle:edSignature="Ci1dBoyJeL+NWnLF/c2i6YgVOSFosb1JE4rod1tip4YEhgSqrhqIEiJxjBgWbXhmdFlyvKNBfQNUBtcJzenEDw==" />
     </item>
   </channel>
 </rss>
