@@ -903,13 +903,29 @@ class CharacterInjector {
     /// Only the paste sequence uses this source — all other injection paths
     /// keep .privateState (avoids cross-app side effects).
     ///
-    /// NOTE: Clipboard is NOT restored after paste to avoid race conditions when typing fast.
+    /// NOTE: By default the clipboard is NOT restored after paste to avoid race
+    /// conditions when typing fast. PasteConfig.restoreClipboard opts in for apps
+    /// where only paste can deliver composed text (keycode-driven terminals): there
+    /// the previous clipboard is put back once changeCount proves no one else wrote.
     private func sendTextViaPaste(_ text: String, proxy: CGEventTapProxy?, config: PasteConfig = PasteConfig()) {
         let pasteboard = NSPasteboard.general
+        let restoreClipboard = config.restoreClipboard == true
+        var previousItems: [[NSPasteboard.PasteboardType: Data]] = []
+
+        if restoreClipboard {
+            previousItems = (pasteboard.pasteboardItems ?? []).compactMap { item in
+                var data: [NSPasteboard.PasteboardType: Data] = [:]
+                for type in item.types {
+                    if let value = item.data(forType: type) { data[type] = value }
+                }
+                return data.isEmpty ? nil : data
+            }
+        }
 
         // Set clipboard to replacement text
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        let ourChangeCount = pasteboard.changeCount
 
         debugCallback?("    → Paste: set clipboard = '\(text)'")
 
@@ -970,6 +986,18 @@ class CharacterInjector {
 
         // Wait for app to read clipboard and process paste
         usleep(config.postPasteDelay)
+
+        if restoreClipboard && pasteboard.changeCount == ourChangeCount {
+            pasteboard.clearContents()
+            if !previousItems.isEmpty {
+                let restored = previousItems.map { itemData -> NSPasteboardItem in
+                    let item = NSPasteboardItem()
+                    for (type, data) in itemData { item.setData(data, forType: type) }
+                    return item
+                }
+                pasteboard.writeObjects(restored)
+            }
+        }
 
         debugCallback?("    → Paste: done")
     }

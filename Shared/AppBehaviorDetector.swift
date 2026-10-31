@@ -243,6 +243,10 @@ struct PasteConfig: Codable {
     /// Modifier flags for paste shortcut (default: Cmd)
     /// Use CGEventFlags raw values for Codable compatibility
     var pasteModifierRawValue: UInt64 = CGEventFlags.maskCommand.rawValue
+
+    /// Restore the user's previous clipboard contents once the app has read the paste.
+    /// Optional so rules saved before this field existed still decode.
+    var restoreClipboard: Bool? = nil
     
     /// Computed property for CGEventFlags
     var pasteModifiers: CGEventFlags {
@@ -257,6 +261,18 @@ struct PasteConfig: Codable {
         skipSettleTime: true
     )
     
+    /// Preset for terminals whose key handling reads keycodes instead of the CGEvent
+    /// Unicode payload (Ghostty/GPUI-based apps such as Herdr and Rex). Composed text
+    /// can only reach them through the clipboard, so paste and put the user's clipboard
+    /// back once the terminal has had time to read it.
+    static let keycodeOnlyTerminal = PasteConfig(
+        prePasteDelay: 30000,    // 30ms — pasteboard server commit
+        postPasteDelay: 150000,  // 150ms — terminal reads clipboard before restore
+        useDirectPost: true,
+        skipSettleTime: true,
+        restoreClipboard: true
+    )
+
     /// Preset for remote desktop apps (high delays for network + clipboard sync).
     /// Remote desktop clients (Jump/RustDesk/etc) sync the local Mac clipboard to
     /// the remote machine async over network — typically 50–150ms. We need to
@@ -1337,12 +1353,23 @@ class AppBehaviorDetector {
         "co.zeit.hyper",
         "org.tabby",
         "com.termius-dmg.mac",
-        "com.cmuxterm.app"
+        "com.cmuxterm.app",
+        // Agent terminals / native multiplexers (Ghostty-based)
+        "dev.herdr.app",        // Herdr
+        "com.superlogical.rex"  // Rex (Superlogical)
     ]
     
     /// Unified terminal delays (backspace, wait, text) in microseconds
     /// All terminals use the same config
     static let terminalDelays: InjectionDelays = (8000, 25000, 8000)
+
+    /// Ghostty/GPUI-based terminals derive typed text from the keycode, not the
+    /// CGEvent Unicode payload, so keycode-0 chunk injection arrives as "a" for
+    /// every chunk. Composed text has to go through the clipboard paste path.
+    static let keycodeOnlyTerminalApps: Set<String> = [
+        "dev.herdr.app",        // Herdr (gpui-pre + libghostty)
+        "com.superlogical.rex"  // Rex (Ghostty terminal surface)
+    ]
     
     /// Browser apps
     static let browserApps: Set<String> = [
@@ -2737,7 +2764,9 @@ class AppBehaviorDetector {
 
         // Priority 0.2: Terminal panels in VSCode/Cursor/etc
         // Check directly via AX Description - doesn't go through overlay detection if it's a terminal panel (VSCode/Cursor)
-        if isInTerminalPanel(info: focusedInfo) {
+        // Keycode-only terminals (Herdr/Rex) also expose a "Terminal" AX description but need
+        // clipboard paste, so they fall through to the bundle-ID branch at Priority 2 instead.
+        if isInTerminalPanel(info: focusedInfo), !Self.keycodeOnlyTerminalApps.contains(bundleId) {
             return InjectionMethodInfo(
                 method: .slow,
                 delays: Self.terminalDelays,
@@ -3124,6 +3153,19 @@ class AppBehaviorDetector {
             )
         }
         
+        // Keycode-driven terminals: must be checked before the generic terminal
+        // branch so composed text goes out as a clipboard paste, not a keycode-0
+        // Unicode chunk the terminal would read as "a".
+        if Self.keycodeOnlyTerminalApps.contains(bundleId) {
+            return InjectionMethodInfo(
+                method: .slow,
+                delays: Self.terminalDelays,
+                textSendingMethod: .paste,
+                description: "Terminal (keycode-driven, paste injection)",
+                pasteConfig: .keycodeOnlyTerminal
+            )
+        }
+
         // All terminals - unified delays
         if Self.terminalApps.contains(bundleId) {
             return InjectionMethodInfo(
