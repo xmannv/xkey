@@ -47,6 +47,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var secureInputOwnershipObserver: NSObjectProtocol?
     private var permissionAlertShown = false
     private var permissionCheckTimer: Timer?
+    private var inputMonitoringTimer: Timer?
+    private var didRequestInputMonitoring = false
     private var inputSourceManager: InputSourceManager?
     private var switchXKeyHotkeyMonitor: Any?
     private var switchXKeyGlobalHotkeyMonitor: Any?
@@ -341,6 +343,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop permission check timer
         permissionCheckTimer?.invalidate()
         permissionCheckTimer = nil
+        inputMonitoringTimer?.invalidate()
+        inputMonitoringTimer = nil
     }
     
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -788,6 +792,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             showPermissionAlert()
             // Start monitoring for permission changes
             startPermissionMonitoring()
+        }
+
+        requestInputMonitoringIfNeeded()
+    }
+
+    /// Accessibility lets the tap be created, but macOS delivers no keyboard events to it
+    /// until Input Monitoring is granted — the tap looks healthy (`enabled`) and simply
+    /// receives nothing. Ask once, then recreate the tap as soon as the grant appears.
+    private func requestInputMonitoringIfNeeded() {
+        guard !CGPreflightListenEventAccess() else { return }
+        if !didRequestInputMonitoring {
+            didRequestInputMonitoring = true
+            _ = CGRequestListenEventAccess()
+        }
+        debugWindowController?.logEvent("Input Monitoring permission missing — typing will not work until XKey is enabled in System Settings > Privacy & Security > Input Monitoring")
+        inputMonitoringTimer?.invalidate()
+        inputMonitoringTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self, CGPreflightListenEventAccess() else { return }
+            self.inputMonitoringTimer?.invalidate()
+            self.inputMonitoringTimer = nil
+            self.debugWindowController?.logEvent("Input Monitoring granted — recreating event tap")
+            if self.eventTapManager?.isRunning == true {
+                self.eventTapManager?.suspendAndDrainPendingInjection()
+                self.eventTapManager?.stop()
+            }
+            self.reconcileMainEventTapOwnership()
         }
     }
     
