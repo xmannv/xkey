@@ -6,41 +6,35 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.25 (Build 20261011)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261011</link>
-      <sparkle:version>20261011</sparkle:version>
-      <sparkle:shortVersionString>1.2.25</sparkle:shortVersionString>
+      <title>Version 1.2.26 (Build 20261111)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.26-20261111</link>
+      <sparkle:version>20261111</sparkle:version>
+      <sparkle:shortVersionString>1.2.26</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(dictionary): add selected text to personal dictionary via Services menu and global hotkey</p>
+<p>feat(undo): add option to undo words whose mark was cancelled by a repeated key</p>
+<p>In Telex a repeated mark key ("ff", "rr") cancels the mark and swallows</p>
+<p>one key, so "traffic" shows as "trafic" and "current" as "curent". Undo</p>
+<p>typing refused these words because canUndoTyping only accepted words</p>
+<p>that still carry a diacritic, so the undo hotkey passed through.</p>
+<p>Add an opt-in sub-option under "Hoàn tác gõ tiếng Việt" (default off).</p>
+<p>When on, canUndoTyping also accepts a word whose raw keystroke count</p>
+<p>differs from the characters on screen. The keystroke sequence already</p>
+<p>keeps both repeated keys, so undoTyping restores "traffic" unchanged.</p>
 <ul>
-<li>macOS Services item "XKey: Thêm vào từ điển cá nhân" (localized en/vi/zh-Hans)</li>
+<li>Thread undoTypingAfterMarkCancel through Preferences, SharedSettings,</li>
 </ul>
-<p>  splits the selection into normalized words and adds them all</p>
+<p>  EngineSettings, RuntimePreferences and KeyboardEventHandler</p>
 <ul>
-<li>Configurable global hotkey (Settings → Advanced → Từ điển cá nhân) routes</li>
+<li>Show the setting in the General section and the debug summary</li>
+<li>Bump MARKETING<em>VERSION to 1.2.26 and CURRENT</em>PROJECT_VERSION to 20261111</li>
 </ul>
-<p>  through HostCommand.addSelectionToUserDictionary on both the local HID tap</p>
-<p>  and the remote/session callback; XKeyIM returns .unsupported so the event</p>
-<p>  reaches the main app</p>
-<ul>
-<li>Shared UserDictionaryService pipeline for both entry points: extract,</li>
-</ul>
-<p>  normalize, dedup, batch insert (single write + tombstone clearing), confirm</p>
-<p>  alert for the hotkey path, centered HUD feedback</p>
-<ul>
-<li>Best-effort re-enable of the Services entry in pbs NSServicesStatus at</li>
-</ul>
-<p>  launch (merges flags, preserves key_equivalent), plus a Settings hint and</p>
-<p>  "Open Keyboard Settings" shortcut</p>
-<ul>
-<li>Bump CURRENT<em>PROJECT</em>VERSION to 20261011</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.25-20261011">Xem chi tiết trên GitHub</a></p>
+<p>Fixes #334</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.26-20261111">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Sun, 11 Oct 2026 06:35:38 +0000</pubDate>
+      <pubDate>Wed, 11 Nov 2026 06:37:55 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.25-20261011/XKey.dmg" sparkle:version="20261011" sparkle:shortVersionString="1.2.25" length="11510005" type="application/octet-stream" sparkle:edSignature="Ci1dBoyJeL+NWnLF/c2i6YgVOSFosb1JE4rod1tip4YEhgSqrhqIEiJxjBgWbXhmdFlyvKNBfQNUBtcJzenEDw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.26-20261111/XKey.dmg" sparkle:version="20261111" sparkle:shortVersionString="1.2.26" length="11519733" type="application/octet-stream" sparkle:edSignature="KyNL1DLjzeZibNkT9hegEo/r86laDyTR4WZGMrZtCKplFI4Jml2p8LY2mFO6V7MeslvBQKEF+jPvwyjKKpOzAw==" />
     </item>
   </channel>
 </rss>
