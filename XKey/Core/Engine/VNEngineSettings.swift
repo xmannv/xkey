@@ -25,6 +25,7 @@ extension VNEngine {
         var capitalizeOnlyAfterSpace: Bool = true   // Only capitalize after . ? ! when followed by a space (newline still always caps)
         var restoreIfWrongSpelling: Bool = true
         var skipRestoreForUppercaseVietnameseAbbreviations: Bool = false
+        var undoTypingAfterMarkCancel: Bool = false
 
         var customConsonants: Set<UInt16> = []
         
@@ -77,6 +78,7 @@ extension VNEngine {
         vUpperCaseRequireSpace = settings.capitalizeOnlyAfterSpace ? 1 : 0
         vRestoreIfWrongSpelling = settings.restoreIfWrongSpelling ? 1 : 0
         vSkipRestoreForUppercaseVietnameseAbbreviations = settings.skipRestoreForUppercaseVietnameseAbbreviations ? 1 : 0
+        vUndoAfterMarkCancel = settings.undoTypingAfterMarkCancel ? 1 : 0
 
         vCustomConsonants = settings.customConsonants
         
@@ -127,6 +129,7 @@ extension VNEngine {
         settings.capitalizeOnlyAfterSpace = vUpperCaseRequireSpace == 1
         settings.restoreIfWrongSpelling = vRestoreIfWrongSpelling == 1
         settings.skipRestoreForUppercaseVietnameseAbbreviations = vSkipRestoreForUppercaseVietnameseAbbreviations == 1
+        settings.undoTypingAfterMarkCancel = vUndoAfterMarkCancel == 1
         settings.customConsonants = vCustomConsonants
         
         // Macro settings

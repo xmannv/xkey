@@ -395,6 +395,7 @@ class DebugViewModel: ObservableObject {
         lines.append("  Upper Case First Char: \(stateLabel(settings.upperCaseFirstChar))")
         lines.append("  Capitalize Only After Space: \(stateLabel(settings.capitalizeOnlyAfterSpace))")
         lines.append("  Undo Typing: \(stateLabel(settings.undoTypingEnabled))")
+        lines.append("  Undo After Mark Cancel: \(stateLabel(settings.undoTypingAfterMarkCancel))")
         lines.append("  Beep on Toggle: \(stateLabel(settings.beepOnToggle))")
         lines.append("  Status Bar Click To Toggle: \(stateLabel(settings.statusBarClickToToggle))")
         lines.append("")

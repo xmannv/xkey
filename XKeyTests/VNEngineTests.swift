@@ -2605,6 +2605,46 @@ class VNEngineTests: XCTestCase {
         XCTAssertEqual(restoredString(result), "ddi")
     }
 
+    private func typeWord(_ word: String) {
+        let keys: [Character: UInt16] = [
+            "t": VietnameseData.KEY_T, "r": VietnameseData.KEY_R, "a": VietnameseData.KEY_A,
+            "f": VietnameseData.KEY_F, "i": VietnameseData.KEY_I, "c": VietnameseData.KEY_C,
+            "u": VietnameseData.KEY_U, "e": VietnameseData.KEY_E, "n": VietnameseData.KEY_N,
+            "h": VietnameseData.KEY_H,
+        ]
+        for ch in word {
+            _ = engine.processKey(character: ch, keyCode: CGKeyCode(keys[ch]!), isUppercase: false)
+        }
+    }
+
+    // Issue #334: "ff"/"rr" cancel the mark and swallow one key; undo must restore all keys.
+    func testUndoTyping_afterMarkCancel_optionOff_passesThrough() {
+        engine.reset()
+        typeWord("traffic")
+        XCTAssertEqual(engine.getCurrentWord(), "trafic")
+        XCTAssertFalse(engine.canUndoTyping())
+    }
+
+    func testUndoTyping_afterMarkCancel_optionOn_restoresRawKeys() {
+        engine.vUndoAfterMarkCancel = 1
+        for (typed, shown) in [("traffic", "trafic"), ("current", "curent")] {
+            engine.reset()
+            typeWord(typed)
+            XCTAssertEqual(engine.getCurrentWord(), shown)
+            XCTAssertTrue(engine.canUndoTyping())
+            let result = engine.undoTyping()
+            XCTAssertEqual(result.backspaceCount, shown.count)
+            XCTAssertEqual(restoredString(result), typed)
+        }
+    }
+
+    func testUndoTyping_afterMarkCancel_optionOn_plainWordPassesThrough() {
+        engine.vUndoAfterMarkCancel = 1
+        engine.reset()
+        typeWord("thu")
+        XCTAssertFalse(engine.canUndoTyping())
+    }
+
     func testUndoTyping_banana_nonAdjacentDoubleA() {
         engine.reset()
         engine.vCheckSpelling = 0

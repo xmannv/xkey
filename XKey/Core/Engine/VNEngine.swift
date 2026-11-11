@@ -60,6 +60,7 @@ class VNEngine {
     var vUseSmartSwitchKey = 0     // 0: No, 1: Yes
     var vUpperCaseFirstChar = 0    // 0: No, 1: Yes
     var vUpperCaseRequireSpace = 1 // 0: cap right after . ? ! even with no space; 1: require a space after . ? ! (newline always caps)
+    var vUndoAfterMarkCancel = 0   // 0: No, 1: Yes (undo also when screen differs from raw keys without diacritics, e.g. "trafic")
     var vTempOffSpelling = 0       // 0: No, 1: Yes (temp off spell check via toolbar)
     var vTempOffEngine = 0         // 0: No, 1: Yes (temp off engine via toolbar)
     /// Optional instance-level final spelling provider. Nil preserves the shared
@@ -3309,7 +3310,13 @@ extension VNEngine {
                 return true
             }
         }
-        
+
+        // A repeated mark key ("ff", "rr") cancels the mark and swallows one key, so the
+        // screen ("trafic") is shorter than the raw keys ("traffic") with no diacritic left.
+        if vUndoAfterMarkCancel == 1 && buffer.keystrokeSequenceCount != Int(index) {
+            return true
+        }
+
         // No Vietnamese modification found - nothing to undo
         return false
     }

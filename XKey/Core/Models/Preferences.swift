@@ -76,6 +76,7 @@ struct Preferences: Codable {
     var toggleHotkey: Hotkey = Hotkey(keyCode: 9, modifiers: [.command, .shift]) // Default: Cmd+Shift+V
     var undoTypingEnabled: Bool = false          // Enable undo typing with Esc key
     var undoTypingHotkey: Hotkey?                 // Custom hotkey for undo typing (nil = use Esc)
+    var undoTypingAfterMarkCancel: Bool = false  // Also undo words whose mark was cancelled by a repeated key (traffic → trafic → traffic)
     var beepOnToggle: Bool = false               // Play beep sound when toggle Vietnamese
     
     // Input settings

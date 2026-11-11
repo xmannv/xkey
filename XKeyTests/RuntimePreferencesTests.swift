@@ -15,6 +15,7 @@ final class RuntimePreferencesTests: XCTestCase {
         preferences.capitalizeOnlyAfterSpace = false
         preferences.restoreIfWrongSpelling = false
         preferences.skipRestoreForUppercaseVietnameseAbbreviations = true
+        preferences.undoTypingAfterMarkCancel = true
         preferences.customConsonantEnabled = true
         preferences.customConsonants = "Z,F"
         preferences.macroEnabled = true
@@ -47,6 +48,7 @@ final class RuntimePreferencesTests: XCTestCase {
         XCTAssertFalse(snapshot.engineSettings.capitalizeOnlyAfterSpace)
         XCTAssertFalse(snapshot.engineSettings.restoreIfWrongSpelling)
         XCTAssertTrue(snapshot.engineSettings.skipRestoreForUppercaseVietnameseAbbreviations)
+        XCTAssertTrue(snapshot.engineSettings.undoTypingAfterMarkCancel)
         XCTAssertEqual(snapshot.engineSettings.customConsonants,
                        VietnameseData.parseCustomConsonants("Z,F"))
         XCTAssertTrue(snapshot.engineSettings.macroEnabled)

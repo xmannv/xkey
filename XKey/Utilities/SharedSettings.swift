@@ -24,6 +24,7 @@ enum SharedSettingsKey: String {
     case undoTypingHotkeyCode = "XKey.undoTypingHotkeyCode"
     case undoTypingHotkeyModifiers = "XKey.undoTypingHotkeyModifiers"
     case undoTypingHotkeyIsModifierOnly = "XKey.undoTypingHotkeyIsModifierOnly"
+    case undoTypingAfterMarkCancel = "XKey.undoTypingAfterMarkCancel"
     case beepOnToggle = "XKey.beepOnToggle"
 
     // Input settings
@@ -627,6 +628,11 @@ class SharedSettings {
     var undoTypingEnabled: Bool {
         get { readBool(forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
         set { writeBool(newValue, forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
+    }
+
+    var undoTypingAfterMarkCancel: Bool {
+        get { readBool(forKey: SharedSettingsKey.undoTypingAfterMarkCancel.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.undoTypingAfterMarkCancel.rawValue) }
     }
 
     var undoTypingHotkeyCode: UInt16 {
@@ -2010,7 +2016,8 @@ class SharedSettings {
             )
         }
         prefs.undoTypingEnabled = undoTypingEnabled
-        
+        prefs.undoTypingAfterMarkCancel = undoTypingAfterMarkCancel
+
         // Undo typing hotkey
         let undoHotkeyCode = undoTypingHotkeyCode
         let undoHotkeyModifiers = undoTypingHotkeyModifiers
@@ -2204,7 +2211,8 @@ class SharedSettings {
         toggleHotkeyModifiers = prefs.toggleHotkey.modifiers.rawValue
         toggleHotkeyIsModifierOnly = prefs.toggleHotkey.isModifierOnly
         undoTypingEnabled = prefs.undoTypingEnabled
-        
+        undoTypingAfterMarkCancel = prefs.undoTypingAfterMarkCancel
+
         // Undo typing hotkey (optional)
         if let undoHotkey = prefs.undoTypingHotkey {
             undoTypingHotkeyCode = undoHotkey.keyCode

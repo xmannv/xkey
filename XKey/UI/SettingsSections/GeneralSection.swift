@@ -86,6 +86,12 @@ struct GeneralSection: View {
                                 Text("Mặc định: Esc. Hỗ trợ tổ hợp phím modifier như Ctrl+Shift (không áp dụng cho XKeyIM)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+
+                                Toggle("Hoàn tác cả từ đã huỷ dấu bằng phím lặp", isOn: $viewModel.preferences.undoTypingAfterMarkCancel)
+
+                                Text("Ví dụ: gõ \"traffic\" ra \"trafic\" (ff huỷ dấu) → hoàn tác thành \"traffic\"")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             
                             Text("Nhấn phím tắt ngay sau khi gõ để hoàn tác việc bỏ dấu (ví dụ: \"tiếng\" → \"tieesng\")")
