@@ -6,35 +6,34 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.26 (Build 20261111)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.26-20261111</link>
-      <sparkle:version>20261111</sparkle:version>
-      <sparkle:shortVersionString>1.2.26</sparkle:shortVersionString>
+      <title>Version 1.2.27 (Build 20261113)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.27-20261113</link>
+      <sparkle:version>20261113</sparkle:version>
+      <sparkle:shortVersionString>1.2.27</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(undo): add option to undo words whose mark was cancelled by a repeated key</p>
-<p>In Telex a repeated mark key ("ff", "rr") cancels the mark and swallows</p>
-<p>one key, so "traffic" shows as "trafic" and "current" as "curent". Undo</p>
-<p>typing refused these words because canUndoTyping only accepted words</p>
-<p>that still carry a diacritic, so the undo hotkey passed through.</p>
-<p>Add an opt-in sub-option under "Hoàn tác gõ tiếng Việt" (default off).</p>
-<p>When on, canUndoTyping also accepts a word whose raw keystroke count</p>
-<p>differs from the characters on screen. The keystroke sequence already</p>
-<p>keeps both repeated keys, so undoTyping restores "traffic" unchanged.</p>
+<p>feat(startup): keep the last language across relaunch</p>
+<p>XKey.app forced Vietnamese on at every cold start whenever the input</p>
+<p>source was enabled for it, discarding the E the user left it in. Only</p>
+<p>XKeyIM read the persisted flag, so the two hosts disagreed after a</p>
+<p>restart.</p>
+<p>The first input-source sync after launch now keeps the persisted</p>
+<p>language for apps without a Smart Switch entry. A saved per-app entry</p>
+<p>still wins, a source configured off still forces E, and later</p>
+<p>input-source switches keep re-enabling Vietnamese.</p>
 <ul>
-<li>Thread undoTypingAfterMarkCancel through Preferences, SharedSettings,</li>
+<li>Add isInitialSync to handleInputSourceChange and a testable</li>
 </ul>
-<p>  EngineSettings, RuntimePreferences and KeyboardEventHandler</p>
+<p>  inputSourceSyncLanguage decision helper</p>
 <ul>
-<li>Show the setting in the General section and the debug summary</li>
-<li>Bump MARKETING<em>VERSION to 1.2.26 and CURRENT</em>PROJECT_VERSION to 20261111</li>
+<li>Cover the launch precedence with LaunchLanguageTests</li>
+<li>Bump MARKETING<em>VERSION to 1.2.27 and CURRENT</em>PROJECT_VERSION to 20261113</li>
 </ul>
-<p>Fixes #334</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.26-20261111">Xem chi tiết trên GitHub</a></p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.27-20261113">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Wed, 11 Nov 2026 06:37:55 +0000</pubDate>
+      <pubDate>Fri, 13 Nov 2026 10:25:49 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.26-20261111/XKey.dmg" sparkle:version="20261111" sparkle:shortVersionString="1.2.26" length="11519733" type="application/octet-stream" sparkle:edSignature="KyNL1DLjzeZibNkT9hegEo/r86laDyTR4WZGMrZtCKplFI4Jml2p8LY2mFO6V7MeslvBQKEF+jPvwyjKKpOzAw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.27-20261113/XKey.dmg" sparkle:version="20261113" sparkle:shortVersionString="1.2.27" length="11521781" type="application/octet-stream" sparkle:edSignature="Wp8FuM+Nm8FtJ5OvY5KItbc5K2Gmks/7FCFfkKOUYQw/CHf+SyeGUTsj7D/F1zm7douu1pvQ3kDgYCDQ7GFUBw==" />
     </item>
   </channel>
 </rss>
