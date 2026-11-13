@@ -1094,3 +1094,74 @@ final class TapOwnershipTests: XCTestCase {
         SharedSettings.shared.invalidateCache()
     }
 }
+
+/// XKey.app used to force Vietnamese on at launch whenever the input source was
+/// enabled for it, discarding the E the user left it in. The last language now
+/// survives a relaunch, while Smart Switch's per-app entry still wins.
+final class LaunchLanguageTests: XCTestCase {
+    func testInitialSyncKeepsTheLastLanguageWhenSmartSwitchIsOff() {
+        XCTAssertFalse(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: true,
+            smartSwitchEnabled: false,
+            savedSmartSwitchLanguage: nil,
+            lastPersistedVietnamese: false
+        ))
+
+        XCTAssertTrue(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: true,
+            smartSwitchEnabled: false,
+            savedSmartSwitchLanguage: nil,
+            lastPersistedVietnamese: true
+        ))
+    }
+
+    func testInitialSyncKeepsTheLastLanguageForAnAppWithoutAnEntry() {
+        XCTAssertFalse(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: true,
+            smartSwitchEnabled: true,
+            savedSmartSwitchLanguage: nil,
+            lastPersistedVietnamese: false
+        ), "an app with no saved language must inherit the last one, not be forced to Vietnamese")
+    }
+
+    func testSmartSwitchEntryWinsOverTheLastLanguageAtLaunch() {
+        XCTAssertFalse(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: true,
+            smartSwitchEnabled: true,
+            savedSmartSwitchLanguage: 0,
+            lastPersistedVietnamese: true
+        ), "an app saved as English must stay English")
+
+        XCTAssertTrue(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: true,
+            smartSwitchEnabled: true,
+            savedSmartSwitchLanguage: 1,
+            lastPersistedVietnamese: false
+        ), "an app saved as Vietnamese must stay Vietnamese")
+    }
+
+    func testLaterInputSourceSwitchesStillReenableVietnamese() {
+        XCTAssertTrue(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: true,
+            isInitialSync: false,
+            smartSwitchEnabled: false,
+            savedSmartSwitchLanguage: nil,
+            lastPersistedVietnamese: false
+        ), "only the launch sync keeps the last state; switching input sources keeps re-enabling Vietnamese")
+    }
+
+    func testConfiguredOffSourceAlwaysDisables() {
+        XCTAssertFalse(AppDelegate.inputSourceSyncLanguage(
+            shouldEnable: false,
+            isInitialSync: true,
+            smartSwitchEnabled: true,
+            savedSmartSwitchLanguage: 1,
+            lastPersistedVietnamese: true
+        ))
+    }
+}

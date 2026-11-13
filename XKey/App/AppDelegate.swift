@@ -1497,12 +1497,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let shouldEnable = inputSourceManager?.isEnabled(for: currentSource.id) ?? true
             debugWindowController?.logEvent("Initial Input Source: \(currentSource.displayName)")
             debugWindowController?.logEvent("   Should enable XKey: \(shouldEnable)")
-            handleInputSourceChange(source: currentSource, shouldEnable: shouldEnable)
+            handleInputSourceChange(source: currentSource, shouldEnable: shouldEnable, isInitialSync: true)
         }
     }
 
     /// Handle input source changes - apply enable/disable logic
-    private func handleInputSourceChange(source: InputSourceInfo, shouldEnable: Bool) {
+    private func handleInputSourceChange(source: InputSourceInfo,
+                                         shouldEnable: Bool,
+                                         isInitialSync: Bool = false) {
         // Check if this is XKeyIM input source
         let isXKeyIM = InputSourceManager.isXKeyInputSource(source)
 
@@ -1539,8 +1541,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Determine effective engine state, considering Smart Switch per-app data.
             // `shouldEnable` comes from global IS config (InputSourceConfig.isXKeyEnabled).
-            // When shouldEnable=true, we also check if the current app has a saved language
-            // preference that overrides the global config.
+            // A saved per-app language overrides it; the first sync after launch otherwise
+            // keeps the language the user last had.
             var effectiveEnable = shouldEnable
             
             if shouldEnable {
@@ -1560,7 +1562,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Smart Switch handled on entry (e.g., user manually switched IS, or
                 // entry was blocked by a disabled input source).
                 // Consult Smart Switch per-app data directly.
-                if let handler = self.keyboardHandler, handler.smartSwitchEnabled,
+                let smartSwitchEnabled = self.keyboardHandler?.smartSwitchEnabled ?? false
+                var savedSmartSwitchLanguage: Int?
+                if let handler = self.keyboardHandler, smartSwitchEnabled,
                    let bundleId = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
                     // Fresh, not cached: returning from XKeyIM there was no entry to
                     // reload the map, and XKeyIM may have saved this app since.
@@ -1568,12 +1572,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let savedLanguage = handler.engine.smartSwitchManager.getAppLanguage(
                         bundleId: bundleId, currentLanguage: 0  // currentLanguage unused in getAppLanguage
                     )
+                    if savedLanguage >= 0 {
+                        savedSmartSwitchLanguage = savedLanguage
+                    }
                     if savedLanguage == 0 {
                         // App has saved English preference — override shouldEnable
-                        effectiveEnable = false
                         debugWindowController?.logEvent("'\(source.displayName)' → Smart Switch override: '\(bundleId)' saved English")
                     }
-                    // savedLanguage == 1 or -1 (new app): keep effectiveEnable = true
+                }
+
+                effectiveEnable = Self.inputSourceSyncLanguage(
+                    shouldEnable: shouldEnable,
+                    isInitialSync: isInitialSync,
+                    smartSwitchEnabled: smartSwitchEnabled,
+                    savedSmartSwitchLanguage: savedSmartSwitchLanguage,
+                    lastPersistedVietnamese: SharedSettings.shared.vietnameseEnabled
+                )
+                if isInitialSync {
+                    debugWindowController?.logEvent("'\(source.displayName)' → Launch restore: \(effectiveEnable ? "Vietnamese" : "English")")
                 }
             }
             
@@ -1600,6 +1616,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    /// The language an input-source sync should apply.
+    ///
+    /// A configured-off source always wins. A Smart Switch entry saved for the
+    /// frontmost app beats everything else. On the first sync after launch, an app
+    /// without an entry resumes the language the user last had instead of being
+    /// forced to Vietnamese; later input-source switches still re-enable it.
+    static func inputSourceSyncLanguage(shouldEnable: Bool,
+                                        isInitialSync: Bool,
+                                        smartSwitchEnabled: Bool,
+                                        savedSmartSwitchLanguage: Int?,
+                                        lastPersistedVietnamese: Bool) -> Bool {
+        guard shouldEnable else { return false }
+        if smartSwitchEnabled, let savedSmartSwitchLanguage {
+            return savedSmartSwitchLanguage != 0
+        }
+        return isInitialSync ? lastPersistedVietnamese : true
     }
 
     private func reconcileMainEventTapOwnership(knownSource: InputSourceInfo? = nil) {
