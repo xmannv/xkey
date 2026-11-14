@@ -1670,6 +1670,33 @@ class VNEngine {
         findAndCalculateVowel()
         logCallback?("insertW: vowelCount=\(vowelCount), vowelStartIndex=\(vowelStartIndex), vowelEndIndex=\(vowelEndIndex)")
         
+        // Do not strip horn/breve from an already completed syllable (closed coda or
+        // triphthong) on a trailing Telex 'w'. Appending literal 'w' keeps "được" + 'w'
+        // as "đượcw" (so Backspace leaves "được" intact instead of corrupting it into
+        // "đuọc"), while leaving late free-mark 'w' ("dduocjw" -> "được") and open
+        // contiguous 'w'-undo ("oww" -> "ow", "tuoww" -> "tuow") untouched.
+        if vInputType != 1 && keyCode == VietnameseData.KEY_W && vowelCount > 0 {
+            let isCompletedSyllable = (vowelEndIndex + 1 < Int(index)) || (vowelCount >= 3)
+            if isCompletedSyllable {
+                var clusterHasToneW = false
+                for i in vowelStartIndex...vowelEndIndex {
+                    if (typingWord[i] & VNEngine.TONEW_MASK) != 0 {
+                        clusterHasToneW = true
+                        break
+                    }
+                }
+                if clusterHasToneW {
+                    insertKey(keyCode: keyCode, isCaps: isCaps)
+                    tempDisableKey = true
+                    isChanged = false
+                    hookState.code = UInt8(vDoNothing)
+                    hookState.backspaceCount = 0
+                    hookState.newCharCount = 0
+                    return
+                }
+            }
+        }
+        
         // Remove ^ tone from all vowels
         for i in vowelStartIndex...vowelEndIndex {
             typingWord[i] &= ~VNEngine.TONE_MASK

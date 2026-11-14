@@ -3105,6 +3105,55 @@ class VNEngineTests: XCTestCase {
                        "-p must behave like -t for invalid tones")
     }
 
+    // MARK: - Completed Horn/Breve Syllable Preservation on Trailing Telex 'w'
+
+    func testTelex_CompletedHornBreveSyllables_KeepSyllableIntactOnTrailingW() {
+        XCTAssertEqual(typeTelex("dduowcjw"), "đượcw")
+        XCTAssertEqual(typeTelex("dduowcw"), "đươcw")
+        XCTAssertEqual(typeTelex("truowngrw"), "trưởngw")
+        XCTAssertEqual(typeTelex("nguowifw"), "ngườiw")
+        XCTAssertEqual(typeTelex("hoawcjw"), "hoặcw")
+        XCTAssertEqual(typeTelex("mawtsw"), "mắtw")
+
+        // Backspace after accidental trailing 'w' must leave the completed syllable intact
+        engine.reset()
+        for ch in "dduowcj" {
+            let kc = VietnameseData.keyCode(for: ch) ?? 0
+            _ = engine.processKey(character: ch, keyCode: kc, isUppercase: false)
+        }
+        let trailingWResult = engine.processKey(
+            character: "w",
+            keyCode: VietnameseData.KEY_W,
+            isUppercase: false
+        )
+        XCTAssertFalse(trailingWResult.shouldConsume, "Trailing 'w' on completed syllable should pass through literally")
+        XCTAssertEqual(engine.getCurrentWord(), "đượcw")
+
+        _ = engine.processKey(
+            character: "\u{8}",
+            keyCode: VietnameseData.KEY_DELETE,
+            isUppercase: false
+        )
+        XCTAssertEqual(engine.getCurrentWord(), "được", "Backspace must recover intact 'được'")
+    }
+
+    func testTelex_LateFreeMarkWAndOpenWUndo_StillWork() {
+        // Late free-mark 'w' on unhorned/unbreved syllables must continue to apply
+        XCTAssertEqual(typeTelex("dduocjw"), "được")
+        XCTAssertEqual(typeTelex("hoacjw"), "hoặc")
+        XCTAssertEqual(typeTelex("matjw"), "mặt")
+        XCTAssertEqual(typeTelex("nguoiwf"), "người")
+
+        // Open / contiguous 'w'-undo must continue to undo horn/breve
+        XCTAssertEqual(typeTelex("oww"), "ow")
+        XCTAssertEqual(typeTelex("aww"), "aw")
+        XCTAssertEqual(typeTelex("uww"), "uw")
+        XCTAssertEqual(typeTelex("uoww"), "uow")
+        XCTAssertEqual(typeTelex("tuoww"), "tuow")
+        XCTAssertEqual(typeTelex("muaww"), "muaw")
+        XCTAssertEqual(typeTelex("hoaww"), "hoaw")
+    }
+
 }
 
 
