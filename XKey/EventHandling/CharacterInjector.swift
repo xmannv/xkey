@@ -230,9 +230,9 @@ class CharacterInjector {
         injectionSemaphore.wait()
         defer { injectionSemaphore.signal() }
 
-        // Create NEW event source for each injection
-        // This ensures each injection has independent state, avoiding potential race conditions
-        eventSource = CGEventSource(stateID: .privateState)
+        // Reuse the source from init: every new .privateState source maps a 16K
+        // shared-memory page that macOS never unmaps (~70MB per day of typing).
+        if eventSource == nil { eventSource = CGEventSource(stateID: .privateState) }
 
         let methodInfo = precomputedMethod ?? detectInjectionMethod()
         let method = methodInfo.method
@@ -419,7 +419,7 @@ class CharacterInjector {
         textSendingMethod: TextSendingMethod,
         needsEmptyCharPrefix: Bool = false
     ) {
-        eventSource = CGEventSource(stateID: .privateState)
+        if eventSource == nil { eventSource = CGEventSource(stateID: .privateState) }
 
         let text = characters.map { $0.unicode(codeTable: codeTable) }.joined()
         debugCallback?("Inject async direct: bs=\(backspaceCount), chars=\(characters.count), text=\"\(text)\", textMode=\(textSendingMethod), emptyCharPrefix=\(needsEmptyCharPrefix)")
