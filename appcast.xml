@@ -6,34 +6,23 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.27 (Build 20261113)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.27-20261113</link>
-      <sparkle:version>20261113</sparkle:version>
-      <sparkle:shortVersionString>1.2.27</sparkle:shortVersionString>
+      <title>Version 1.2.28 (Build 20261116)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.28-20261116</link>
+      <sparkle:version>20261116</sparkle:version>
+      <sparkle:shortVersionString>1.2.28</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>feat(startup): keep the last language across relaunch</p>
-<p>XKey.app forced Vietnamese on at every cold start whenever the input</p>
-<p>source was enabled for it, discarding the E the user left it in. Only</p>
-<p>XKeyIM read the persisted flag, so the two hosts disagreed after a</p>
-<p>restart.</p>
-<p>The first input-source sync after launch now keeps the persisted</p>
-<p>language for apps without a Smart Switch entry. A saved per-app entry</p>
-<p>still wins, a source configured off still forces E, and later</p>
-<p>input-source switches keep re-enabling Vietnamese.</p>
-<ul>
-<li>Add isInitialSync to handleInputSourceChange and a testable</li>
-</ul>
-<p>  inputSourceSyncLanguage decision helper</p>
-<ul>
-<li>Cover the launch precedence with LaunchLanguageTests</li>
-<li>Bump MARKETING<em>VERSION to 1.2.27 and CURRENT</em>PROJECT_VERSION to 20261113</li>
-</ul>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.27-20261113">Xem chi tiết trên GitHub</a></p>
+<p>fix(injection): reuse the private event source to stop a shared-memory leak</p>
+<p>Every CGEventSource(stateID: .privateState) maps a 16K shared-memory page</p>
+<p>that macOS never unmaps. Creating one per injection leaked about 70MB per</p>
+<p>day of typing (72MB of a 107MB footprint after 24.6h). Reuse the source</p>
+<p>from init and recreate it only when nil.</p>
+<p>Bump version to 1.2.28 (20261116).</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.28-20261116">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Fri, 13 Nov 2026 10:25:49 +0000</pubDate>
+      <pubDate>Mon, 16 Nov 2026 07:13:38 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.27-20261113/XKey.dmg" sparkle:version="20261113" sparkle:shortVersionString="1.2.27" length="11521781" type="application/octet-stream" sparkle:edSignature="Wp8FuM+Nm8FtJ5OvY5KItbc5K2Gmks/7FCFfkKOUYQw/CHf+SyeGUTsj7D/F1zm7douu1pvQ3kDgYCDQ7GFUBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.28-20261116/XKey.dmg" sparkle:version="20261116" sparkle:shortVersionString="1.2.28" length="11522805" type="application/octet-stream" sparkle:edSignature="CBT1lfshnPTmnNJhHDQVnyVsqYblTx5yuZTGmfmIijKuNysll+gXaw27zrlVYJGvdm0mhkquxVTkux5d55t3Dg==" />
     </item>
   </channel>
 </rss>
