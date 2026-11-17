@@ -627,7 +627,13 @@ class VNEngine {
         // Note: extCode == 5 means instant restore - key is already included in restored keystrokes
         // so we should NOT insert it again. Only insert key for normal restore (undo mark).
         if hookState.code == UInt8(vRestore) && hookState.extCode != 5 {
+            let undoDisabledKey = tempDisableKey
             insertKey(keyCode: keyCode, isCaps: isCaps)
+            // insertKey's phonetic recheck ignores vowel clusters, so it would re-enable marks
+            // after a circumflex undo ("queuee" + "s" → "queúe"). Keep the word literal.
+            if undoDisabledKey && [VietnameseData.KEY_A, VietnameseData.KEY_E, VietnameseData.KEY_O].contains(keyCode) {
+                tempDisableKey = true
+            }
             // NOTE: We do NOT remove modifier here because raw keystrokes should reflect
             // what user actually typed. E.g., "ass" should have raw keystrokes ["a", "s", "s"]
             // The modifier "s" on entry "á" represents the first "s", and the new entry "s"

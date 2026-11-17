@@ -3105,6 +3105,25 @@ class VNEngineTests: XCTestCase {
                        "-p must behave like -t for invalid tones")
     }
 
+    // MARK: - Issue #339: circumflex undo must keep the word literal
+
+    /// "queue" + "e" undoes the free-mark ê ("quêu" → "queue"). The next tone key
+    /// must stay literal, not land on the invalid cluster ("queuees" → "queúe").
+    func testTelex_NonAdjacentCircumflexUndo_KeepsToneKeyLiteral() {
+        XCTAssertEqual(typeTelex("queuee"), "queue")
+        XCTAssertEqual(typeTelex("queuees"), "queues")
+        XCTAssertEqual(typeTelex("queueef"), "queuef")
+        XCTAssertEqual(typeTelex("keuees"), "keues")
+        // Adjacent undo already behaved this way — baseline.
+        XCTAssertEqual(typeTelex("teees"), "tees")
+        // Simple Telex 1/2 share the same undo path.
+        for inputType in [2, 3] {
+            engine.vInputType = inputType
+            XCTAssertEqual(typeTelex("queuees"), "queues", "inputType=\(inputType)")
+            XCTAssertEqual(typeTelex("keuees"), "keues", "inputType=\(inputType)")
+        }
+    }
+
 }
 
 
