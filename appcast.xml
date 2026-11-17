@@ -6,23 +6,30 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.28 (Build 20261116)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.28-20261116</link>
-      <sparkle:version>20261116</sparkle:version>
-      <sparkle:shortVersionString>1.2.28</sparkle:shortVersionString>
+      <title>Version 1.2.29 (Build 20261117)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.29-20261117</link>
+      <sparkle:version>20261117</sparkle:version>
+      <sparkle:shortVersionString>1.2.29</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(injection): reuse the private event source to stop a shared-memory leak</p>
-<p>Every CGEventSource(stateID: .privateState) maps a 16K shared-memory page</p>
-<p>that macOS never unmaps. Creating one per injection leaked about 70MB per</p>
-<p>day of typing (72MB of a 107MB footprint after 24.6h). Reuse the source</p>
-<p>from init and recreate it only when nil.</p>
-<p>Bump version to 1.2.28 (20261116).</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.28-20261116">Xem chi tiết trên GitHub</a></p>
+<p>fix(telex): keep the word literal after undoing a non-adjacent circumflex</p>
+<p>Typing "queuee" undoes the free-mark ê ("quêu" -> "queue") and sets</p>
+<p>tempDisableKey, but the vRestore branch then calls insertKey, whose</p>
+<p>phonetic checkSpelling() ignores vowel clusters and re-enables marks.</p>
+<p>The next tone key landed on an invalid cluster: "queuees" -> "queúe",</p>
+<p>"keuees" -> "keúe". Adjacent undo ("teees") was only safe because of</p>
+<p>the three-identical-vowels rule.</p>
+<p>Keep tempDisableKey set after a circumflex undo (a/e/o) so the rest of</p>
+<p>the word stays literal. dd, mark and w undo are unchanged. Affects</p>
+<p>Telex and Simple Telex 1/2; VNI was never affected (its undo key is a</p>
+<p>digit).</p>
+<p>Bump version to 1.2.29 (20261117).</p>
+<p>Refs #339</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.29-20261117">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Mon, 16 Nov 2026 07:13:38 +0000</pubDate>
+      <pubDate>Tue, 17 Nov 2026 05:45:08 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.28-20261116/XKey.dmg" sparkle:version="20261116" sparkle:shortVersionString="1.2.28" length="11522805" type="application/octet-stream" sparkle:edSignature="CBT1lfshnPTmnNJhHDQVnyVsqYblTx5yuZTGmfmIijKuNysll+gXaw27zrlVYJGvdm0mhkquxVTkux5d55t3Dg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.29-20261117/XKey.dmg" sparkle:version="20261117" sparkle:shortVersionString="1.2.29" length="11524853" type="application/octet-stream" sparkle:edSignature="HXM2Mz1zoKkpFF9S64da4V/zjigyb2WjNPFR9V5N3fQN4drfiDiDHJPo5jZoTuBdt0LkJ6rN+nCV7Ib1D5HFBg==" />
     </item>
   </channel>
 </rss>
