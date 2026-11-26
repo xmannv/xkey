@@ -6,43 +6,38 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.30 (Build 20261126)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.30-20261126</link>
-      <sparkle:version>20261126</sparkle:version>
-      <sparkle:shortVersionString>1.2.30</sparkle:shortVersionString>
+      <title>Version 1.2.31 (Build 20261126.1)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.31-20261126.1</link>
+      <sparkle:version>20261126.1</sparkle:version>
+      <sparkle:shortVersionString>1.2.31</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(telex): keep non-Vietnamese words literal while typing</p>
-<p>Stop applying Vietnamese marks to words whose structure proves they can</p>
-<p>never be Vietnamese: restore the raw keystrokes on the keystroke where the</p>
-<p>vowel group or final consonant run becomes impossible, and pin the rest of</p>
-<p>the word literal.</p>
+<p>perf(telex): keep the literal guard off the keystroke hot path</p>
+<p>The early literal guard added in 6e85962 ran the word string build, the</p>
+<p>user/dictionary lookups and a file-attribute stat (isDictionaryLoaded -></p>
+<p>FileManager.attributesOfItem) on every keystroke before the structural</p>
+<p>check — 18.01 us/keystroke vs the 6.6 us perf gate (baseline 2.19).</p>
 <ul>
-<li>VowelSequenceValidator.isExtendableOrValid: prefix-extendable check.</li>
-<li>Loanword vowel groups (cooc, khoao, palang) exempt; 'l' treated as an</li>
+<li>Run deadStateReason() first; only a structurally dead word pays for the</li>
 </ul>
-<p>  extendable medial; all-caps no longer exempt so "SEAR" stays literal.</p>
+<p>  word string and dictionary lookups. Decisions are unchanged: guard still</p>
+<p>  fires on dead ∧ letters>=2 ∧ not a dictionary/user-dictionary word.</p>
 <ul>
-<li>Never re-judge a buffer restored by backspace (handleDelete), skip</li>
+<li>Drop the isDictionaryLoaded stat: isValidWord already checks the user</li>
 </ul>
-<p>  vRestore undo states, and obey the cursor/focus/desync flags.</p>
+<p>  dictionary and returns false when no dictionary is loaded.</p>
 <ul>
-<li>Replace exactly the displayed characters (buffer.count before the</li>
+<li>Precompute valid prefixes of endConsonantTable and validSequences into</li>
 </ul>
-<p>  event), rebuild keystrokes with fresh entryIds, rebuild macroKey, respect</p>
-<p>  MAX_BUFF/overflow, and clear hookState.code so saveWord still runs.</p>
-<ul>
-<li>12 regression tests: ProcessResult shape, backspace-after-restore,</li>
-</ul>
-<p>  uppercase/mixed case, loanword groups, desync flags, custom consonants,</p>
-<p>  VNI.</p>
-<p>Corpus restore_raw 3776 -> 5861/7217; English transient flash</p>
-<p>66786 -> 64674/235976 under the guard's reach.</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.30-20261126">Xem chi tiết trên GitHub</a></p>
+<p>  static sets instead of rebuilding arrays per table row per keystroke.</p>
+<p>Measured after: ~2.3 us/keystroke (0.23 s per 100k keys), Release gate</p>
+<p>green; Debug suite and XKeyIM build pass.</p>
+<p>Ships as 1.2.31 (20261126.1): v1.2.30 already went out with the regression.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.31-20261126.1">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Thu, 26 Nov 2026 16:00:50 +0000</pubDate>
+      <pubDate>Thu, 26 Nov 2026 16:19:25 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.30-20261126/XKey.dmg" sparkle:version="20261126" sparkle:shortVersionString="1.2.30" length="11558134" type="application/octet-stream" sparkle:edSignature="7r3eNKkWrJkNDc+mlilwowzveC0Tjk2UygGDb58PFJCNDpS5Ksr/X4+TY39c5SqKwBFq3Xl7Xw0NQgoqIxopBw==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.31-20261126.1/XKey.dmg" sparkle:version="20261126.1" sparkle:shortVersionString="1.2.31" length="11560182" type="application/octet-stream" sparkle:edSignature="RCahqHjNgqPLhsFEcbIV58MH2bIGJt9W0dNGUPOCfaD88vHSDWRDT7Ellqm9YryaKEghoblJ4oWBL4edwXwzCA==" />
     </item>
   </channel>
 </rss>
