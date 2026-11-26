@@ -68,3 +68,6 @@ appcast.xml
 .graphifyignore
 graphify-out/
 .codegraph/
+
+# Local planning notes (superpowers)
+docs/
