@@ -3347,20 +3347,22 @@ extension VNEngine {
         // or the consonant, in the same event that would otherwise render the tone.
         if Self.vowelProducingKeys.contains(UInt16(keyCode)) { return false }
 
-        // Cheap exemptions first: every keystroke of an all-caps word would otherwise
-        // pay for the structural analysis.
+        // Structure first: this runs after every keystroke, so a live Vietnamese word
+        // must not pay for the word string or any dictionary lookup. The exemptions
+        // below only decide whether a structurally dead word is known after all.
+        let savedVC = vowelCount, savedVS = vowelStartIndex, savedVE = vowelEndIndex
+        defer { vowelCount = savedVC; vowelStartIndex = savedVS; vowelEndIndex = savedVE }
+        guard let reason = deadStateReason() else { return false }
+
         let word = getCurrentWord()
         let letters = word.filter { $0.isLetter }
         guard letters.count >= 2 else { return false }
+        // Dictionary words and user-dictionary words keep their say. isValidWord
+        // checks the user dictionary first and returns false when no dictionary is
+        // loaded, so it subsumes the old isLoaded+isValid+isUserWord trio — and the
+        // old isDictionaryLoaded call was a file-attribute stat on every keystroke.
         let style: VNDictionaryManager.DictionaryStyle = SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
-        if VNDictionaryManager.shared.isDictionaryLoaded(style: style),
-           VNDictionaryManager.shared.isValidWord(word, style: style) { return false }
-        if SharedSettings.shared.isWordInUserDictionary(word) { return false }
-
-        let savedVC = vowelCount, savedVS = vowelStartIndex, savedVE = vowelEndIndex
-        defer { vowelCount = savedVC; vowelStartIndex = savedVS; vowelEndIndex = savedVE }
-
-        guard let reason = deadStateReason() else { return false }
+        if VNDictionaryManager.shared.isValidWord(word, style: style) { return false }
 
         var raw = buffer.getKeystrokeSequence()
         guard !raw.isEmpty, !buffer.hasOverflow, raw.count <= VNEngine.MAX_BUFF else { return false }
@@ -3430,26 +3432,36 @@ extension VNEngine {
             return "vowels"
         }
 
-        var finalRun = ""
+        var finalChars: [Character] = []
         var i = Int(index) - 1
         while i > Int(vowelEndIndex) {
-            finalRun = String(Self.keyCodeToChar(chr(i)) ?? "?") + finalRun
+            finalChars.append(Self.keyCodeToChar(chr(i)) ?? "?")
             i -= 1
         }
-        guard !finalRun.isEmpty else { return nil }
+        guard !finalChars.isEmpty else { return nil }
         // 'l' never ends a Vietnamese word, but it is a medial in loanwords
         // (palăng, balô, lô). A lone 'l' is still extendable, so defer; once a
         // consonant follows it the run can never be Vietnamese ("world" -> "wỏld").
-        if finalRun == "l" { return nil }
-        let validPrefix = vietnameseData.endConsonantTable.contains { pattern in
-            guard pattern.count >= finalRun.count else { return false }
-            let prefix = pattern.prefix(finalRun.count).compactMap {
-                Self.keyCodeToChar($0 & ~VietnameseData.END_CONSONANT_MASK)
-            }
-            return String(prefix) == finalRun
-        }
-        return validPrefix ? nil : "final"
+        if finalChars == ["l"] { return nil }
+        let finalRun = String(finalChars.reversed())
+        return Self.validFinalPrefixes.contains(finalRun) ? nil : "final"
     }
+
+    /// String prefixes of `VietnameseData.endConsonantTable` with the quick-end mask
+    /// stripped, precomputed so the per-keystroke guard does one set lookup instead of
+    /// rebuilding a prefix string for every table row.
+    private static let validFinalPrefixes: Set<String> = {
+        var prefixes = Set<String>()
+        for pattern in VietnameseData().endConsonantTable {
+            for length in 1...pattern.count {
+                let chars = pattern.prefix(length).compactMap {
+                    VNEngine.keyCodeToChar($0 & ~VietnameseData.END_CONSONANT_MASK)
+                }
+                prefixes.insert(String(chars))
+            }
+        }
+        return prefixes
+    }()
 
     /// A custom consonant is a valid initial only by itself. Early English detection
     /// exempts anything starting with one of them, so without this the rest of such a
@@ -3699,8 +3711,9 @@ extension VNEngine {
                    wordToCheck.lowercased().contains(where: { customConsonantChars.contains($0) }) {
                     let style: VNDictionaryManager.DictionaryStyle =
                         SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
-                    let inDictionary = VNDictionaryManager.shared.isDictionaryLoaded(style: style)
-                        && VNDictionaryManager.shared.isValidWord(wordToCheck, style: style)
+                    // The outer condition already excludes user-dictionary words, so
+                    // isValidWord here is exactly "loaded and found in word set".
+                    let inDictionary = VNDictionaryManager.shared.isValidWord(wordToCheck, style: style)
                     if !inDictionary {
                         let savedVC = vowelCount, savedVS = vowelStartIndex, savedVE = vowelEndIndex
                         let deadReason = deadStateReason()

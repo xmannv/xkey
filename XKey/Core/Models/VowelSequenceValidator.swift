@@ -188,15 +188,25 @@ struct VowelSequenceValidator {
         return validSequences.contains(vowels)
     }
 
+    /// Every proper prefix of `validSequences`, precomputed so the per-keystroke
+    /// literal guard does one set lookup instead of walking (and allocating inside)
+    /// the sequence table for each candidate.
+    private static let extendablePrefixes: Set<[VNVowel]> = {
+        var prefixes = Set<[VNVowel]>()
+        for sequence in validSequences {
+            for length in 1..<sequence.count {
+                prefixes.insert(Array(sequence.prefix(length)))
+            }
+        }
+        return prefixes
+    }()
+
     /// True when `vowels` is a valid sequence, or can still grow into one by appending
     /// more vowels (used by VNEngine's early literal guard to detect dead vowel groups
     /// such as "ea", which no Vietnamese word can ever contain).
     static func isExtendableOrValid(_ vowels: [VNVowel]) -> Bool {
         if isValid(vowels) { return true }
-        for sequence in validSequences where sequence.count > vowels.count {
-            if Array(sequence.prefix(vowels.count)) == vowels { return true }
-        }
-        return false
+        return extendablePrefixes.contains(vowels)
     }
     
     // MARK: - Tone Position Calculation
