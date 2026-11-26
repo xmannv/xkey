@@ -6,30 +6,43 @@
     <description>XKey - Vietnamese Input Method for macOS</description>
     <language>vi</language>
     <item>
-      <title>Version 1.2.29 (Build 20261117)</title>
-      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.29-20261117</link>
-      <sparkle:version>20261117</sparkle:version>
-      <sparkle:shortVersionString>1.2.29</sparkle:shortVersionString>
+      <title>Version 1.2.30 (Build 20261126)</title>
+      <link>https://github.com/xmannv/xkey/releases/tag/v1.2.30-20261126</link>
+      <sparkle:version>20261126</sparkle:version>
+      <sparkle:shortVersionString>1.2.30</sparkle:shortVersionString>
       <description><![CDATA[
         <p><h2>What's New</h2></p>
-<p>fix(telex): keep the word literal after undoing a non-adjacent circumflex</p>
-<p>Typing "queuee" undoes the free-mark ê ("quêu" -> "queue") and sets</p>
-<p>tempDisableKey, but the vRestore branch then calls insertKey, whose</p>
-<p>phonetic checkSpelling() ignores vowel clusters and re-enables marks.</p>
-<p>The next tone key landed on an invalid cluster: "queuees" -> "queúe",</p>
-<p>"keuees" -> "keúe". Adjacent undo ("teees") was only safe because of</p>
-<p>the three-identical-vowels rule.</p>
-<p>Keep tempDisableKey set after a circumflex undo (a/e/o) so the rest of</p>
-<p>the word stays literal. dd, mark and w undo are unchanged. Affects</p>
-<p>Telex and Simple Telex 1/2; VNI was never affected (its undo key is a</p>
-<p>digit).</p>
-<p>Bump version to 1.2.29 (20261117).</p>
-<p>Refs #339</p>
-<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.29-20261117">Xem chi tiết trên GitHub</a></p>
+<p>fix(telex): keep non-Vietnamese words literal while typing</p>
+<p>Stop applying Vietnamese marks to words whose structure proves they can</p>
+<p>never be Vietnamese: restore the raw keystrokes on the keystroke where the</p>
+<p>vowel group or final consonant run becomes impossible, and pin the rest of</p>
+<p>the word literal.</p>
+<ul>
+<li>VowelSequenceValidator.isExtendableOrValid: prefix-extendable check.</li>
+<li>Loanword vowel groups (cooc, khoao, palang) exempt; 'l' treated as an</li>
+</ul>
+<p>  extendable medial; all-caps no longer exempt so "SEAR" stays literal.</p>
+<ul>
+<li>Never re-judge a buffer restored by backspace (handleDelete), skip</li>
+</ul>
+<p>  vRestore undo states, and obey the cursor/focus/desync flags.</p>
+<ul>
+<li>Replace exactly the displayed characters (buffer.count before the</li>
+</ul>
+<p>  event), rebuild keystrokes with fresh entryIds, rebuild macroKey, respect</p>
+<p>  MAX_BUFF/overflow, and clear hookState.code so saveWord still runs.</p>
+<ul>
+<li>12 regression tests: ProcessResult shape, backspace-after-restore,</li>
+</ul>
+<p>  uppercase/mixed case, loanword groups, desync flags, custom consonants,</p>
+<p>  VNI.</p>
+<p>Corpus restore_raw 3776 -> 5861/7217; English transient flash</p>
+<p>66786 -> 64674/235976 under the guard's reach.</p>
+<p><a href="https://github.com/xmannv/xkey/releases/tag/v1.2.30-20261126">Xem chi tiết trên GitHub</a></p>
       ]]></description>
-      <pubDate>Tue, 17 Nov 2026 05:45:08 +0000</pubDate>
+      <pubDate>Thu, 26 Nov 2026 16:00:50 +0000</pubDate>
       <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.29-20261117/XKey.dmg" sparkle:version="20261117" sparkle:shortVersionString="1.2.29" length="11524853" type="application/octet-stream" sparkle:edSignature="HXM2Mz1zoKkpFF9S64da4V/zjigyb2WjNPFR9V5N3fQN4drfiDiDHJPo5jZoTuBdt0LkJ6rN+nCV7Ib1D5HFBg==" />
+      <enclosure url="https://github.com/xmannv/xkey/releases/download/v1.2.30-20261126/XKey.dmg" sparkle:version="20261126" sparkle:shortVersionString="1.2.30" length="11558134" type="application/octet-stream" sparkle:edSignature="7r3eNKkWrJkNDc+mlilwowzveC0Tjk2UygGDb58PFJCNDpS5Ksr/X4+TY39c5SqKwBFq3Xl7Xw0NQgoqIxopBw==" />
     </item>
   </channel>
 </rss>
