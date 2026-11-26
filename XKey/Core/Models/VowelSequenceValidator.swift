@@ -187,6 +187,17 @@ struct VowelSequenceValidator {
     static func isValid(_ vowels: [VNVowel]) -> Bool {
         return validSequences.contains(vowels)
     }
+
+    /// True when `vowels` is a valid sequence, or can still grow into one by appending
+    /// more vowels (used by VNEngine's early literal guard to detect dead vowel groups
+    /// such as "ea", which no Vietnamese word can ever contain).
+    static func isExtendableOrValid(_ vowels: [VNVowel]) -> Bool {
+        if isValid(vowels) { return true }
+        for sequence in validSequences where sequence.count > vowels.count {
+            if Array(sequence.prefix(vowels.count)) == vowels { return true }
+        }
+        return false
+    }
     
     // MARK: - Tone Position Calculation
     

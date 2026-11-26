@@ -160,6 +160,10 @@ class VNEngine {
     // MARK: - Engine State
 
     var tempDisableKey = false
+    /// Sticky per-word "keep this word literal" flag. Set when the typed state proves the
+    /// word can never be Vietnamese (see applyEarlyLiteralGuard); the rest of the word is
+    /// inserted literally and no mark/tone key can change it. Cleared when the word ends.
+    var forceLiteralWord = false
     var spaceCount = 0
     var hasHandledMacro = false
     var upperCaseStatus: UInt8 = 0
@@ -439,6 +443,7 @@ class VNEngine {
                 //    → Without this fix, tempDisableKey is still true
                 //    → Vietnamese processing is skipped, resulting in "nhâmf" instead of "nhầm"
                 tempDisableKey = false
+                forceLiteralWord = false
                 logCallback?("  → Reset tempDisableKey=false (allow Vietnamese processing after backspace)")
 
                 if vCheckSpelling == 1 {
@@ -551,7 +556,7 @@ class VNEngine {
         // 3. checkForStandaloneChar already validates the context
         let isBracketStandaloneKey = (keyCode == VietnameseData.KEY_LEFT_BRACKET || keyCode == VietnameseData.KEY_RIGHT_BRACKET)
         
-        if !isSpecial || (tempDisableKey && !isBracketStandaloneKey) {
+        if !isSpecial || ((tempDisableKey || forceLiteralWord) && !isBracketStandaloneKey) {
             if vQuickTelex == 1 && isQuickTelexKey(keyCode: keyCode) {
                 handleQuickTelex(keyCode: keyCode, isCaps: isCaps)
                 return
@@ -1379,12 +1384,12 @@ class VNEngine {
 
         logCallback?("  → After insert: count=\(buffer.count)")
 
-        if vCheckSpelling == 1 && isCheckSpelling {
+        if vCheckSpelling == 1 && isCheckSpelling && !forceLiteralWord {
             checkSpelling()
         }
 
         // Allow d after consonant
-        if keyCode == VietnameseData.KEY_D && buffer.count >= 2 {
+        if !forceLiteralWord && keyCode == VietnameseData.KEY_D && buffer.count >= 2 {
             let prevKey = buffer.keyCode(at: buffer.count - 2)
             if vietnameseData.isConsonant(prevKey) {
                 tempDisableKey = false
@@ -3014,6 +3019,7 @@ class VNEngine {
         hookState.macroKey.removeAll()
 
         tempDisableKey = false
+        forceLiteralWord = false
         hasHandledMacro = false
         hasHandleQuickConsonant = false
         // Reset desync flag on new session - fresh start
@@ -3274,8 +3280,206 @@ extension VNEngine {
     
     /// Process a key press
     func processKey(character: Character, keyCode: CGKeyCode, isUppercase: Bool) -> ProcessResult {
-        let result = handleKeyEvent(keyCode: keyCode, character: character, isUppercase: isUppercase, hasOtherModifier: false)
-        return convertHookStateToResult(result, currentKeyCode: keyCode, currentCharacter: character, isUppercase: isUppercase)
+        if buffer.isEmpty { forceLiteralWord = false }
+        // Characters already on screen before this event. The buffer mirrors the screen,
+        // and the key being processed is not on screen yet, so this is the exact number
+        // of characters a replacement may delete.
+        let displayedBefore = buffer.count
+        _ = handleKeyEvent(keyCode: keyCode, character: character, isUppercase: isUppercase, hasOtherModifier: false)
+        let restored = applyEarlyLiteralGuard(keyCode: keyCode, character: character,
+                                              isCaps: isUppercase, displayedBefore: displayedBefore)
+        // The guard can rewrite hookState into a restore, so convert the live state.
+        let result = convertHookStateToResult(hookState, currentKeyCode: keyCode, currentCharacter: character, isUppercase: isUppercase)
+        if restored {
+            // Leave no vRestore behind: processWordBreak is called directly by the event
+            // handlers (not through handleKeyEvent), and saveWord() skips saving when it
+            // still sees vRestore — the restored word would vanish from history and
+            // backspace after the space would desync. macroKey is kept (handleKeyEvent
+            // carries it across events).
+            hookState.code = UInt8(vDoNothing)
+            hookState.backspaceCount = 0
+            hookState.newCharCount = 0
+            hookState.extCode = 0
+        }
+        return result
+    }
+
+    // MARK: - Early literal guard
+
+    /// Keep a word literal as soon as its state proves it can never be Vietnamese.
+    ///
+    /// Why: Telex mark keys are ordinary letters (s/f/r/x/j). When such a letter lands on a
+    /// vowel group that is not a Vietnamese sequence, the engine still applies the tone and
+    /// shows nonsense ("sear" -> "sẻa") until the word break. This runs after every
+    /// keystroke, and when the word is provably dead it rewrites the screen back to the raw
+    /// keystrokes and pins the rest of the word literal.
+    ///
+    /// A word is dead when:
+    /// 1. the vowel group is neither a valid sequence nor a prefix of one
+    ///    (VowelSequenceValidator), or
+    /// 2. the consonant run after the vowel group is not a prefix of any valid final.
+    ///
+    /// Exemptions (measured against the Vietnamese dictionary: only acronyms and loanwords
+    /// would otherwise be caught): all-caps abbreviations, dictionary words, user-dictionary
+    /// words, and words the engine already forced literal without any Vietnamese marks
+    /// (the double-key escapes "karr" -> "kar").
+    @discardableResult
+    private func applyEarlyLiteralGuard(keyCode: CGKeyCode, character: Character,
+                                        isCaps: Bool, displayedBefore: Int) -> Bool {
+        guard !forceLiteralWord, !buffer.isEmpty else { return false }
+        // Backspace must never re-judge: handleDelete has already restored a word
+        // into the buffer from history, and rewriting it here re-types that word as
+        // raw plus the Delete key itself (measured: "abc" backspace -> 4 entries,
+        // history order desynced by one). The key code, not hookState.code, is the
+        // discriminator — a plain literal insert legitimately ends in vDoNothing
+        // pass-through ("womb" at 'b').
+        guard keyCode != CGKeyCode(VietnameseData.KEY_DELETE) else { return false }
+        // Undo (double mark key, "nhâm" + f -> "nhâmf") appends a literal letter on
+        // purpose; never rewrite that state.
+        if hookState.code == UInt8(vRestore) { return false }
+        // Never rewrite the screen while the buffer/screen relation is uncertain —
+        // the same flags every other restore path checks.
+        guard !cursorMovedSinceReset, !focusChangedDuringTyping, !bufferDesyncDetected else { return false }
+        if tempDisableKey && !hasVietnameseProcessing() { return false }
+        // Extending the vowel group with another vowel is how Vietnamese words grow
+        // ("ừa" + a + a), and the pre-existing behaviour keeps such words composed.
+        // The guard still catches the same words one keystroke later, on the tone key
+        // or the consonant, in the same event that would otherwise render the tone.
+        if Self.vowelProducingKeys.contains(UInt16(keyCode)) { return false }
+
+        // Cheap exemptions first: every keystroke of an all-caps word would otherwise
+        // pay for the structural analysis.
+        let word = getCurrentWord()
+        let letters = word.filter { $0.isLetter }
+        guard letters.count >= 2 else { return false }
+        let style: VNDictionaryManager.DictionaryStyle = SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
+        if VNDictionaryManager.shared.isDictionaryLoaded(style: style),
+           VNDictionaryManager.shared.isValidWord(word, style: style) { return false }
+        if SharedSettings.shared.isWordInUserDictionary(word) { return false }
+
+        let savedVC = vowelCount, savedVS = vowelStartIndex, savedVE = vowelEndIndex
+        defer { vowelCount = savedVC; vowelStartIndex = savedVS; vowelEndIndex = savedVE }
+
+        guard let reason = deadStateReason() else { return false }
+
+        var raw = buffer.getKeystrokeSequence()
+        guard !raw.isEmpty, !buffer.hasOverflow, raw.count <= VNEngine.MAX_BUFF else { return false }
+        // A modifier key (Telex tone/modifier letters, z) is not stored as an entry, and
+        // some of them are not recorded in the keystroke sequence either ("bejazz" + z).
+        // The key the user just pressed is part of the literal text, so keep it.
+        let pressed = RawKeystroke(keyCode: UInt16(keyCode), isCaps: isCaps)
+        if raw.last?.keyCode != pressed.keyCode { raw.append(pressed) }
+        let displayed = displayedBefore
+        hookState.code = UInt8(vRestore)
+        hookState.backspaceCount = displayed
+        hookState.newCharCount = raw.count
+        for (i, keystroke) in raw.enumerated() {
+            var charCode = UInt32(keystroke.keyCode)
+            if keystroke.isCaps { charCode |= VNEngine.CAPS_MASK }
+            hookState.charData[raw.count - 1 - i] = charCode
+        }
+        hookState.extCode = 5
+        hookState.macroKey = raw.map { $0.asUInt32 }
+
+        // The buffer must mirror the restored screen text. Leaving it empty (or composed)
+        // lets the next literal insert re-enable Vietnamese processing through
+        // checkSpelling on a one-character buffer.
+        buffer.clear()
+        for keystroke in raw {
+            buffer.append(keyCode: keystroke.keyCode, isCaps: keystroke.isCaps)
+            // Record WITHOUT the old entryId: recordKeystroke stamps the id of the entry
+            // just appended. Reusing the old id breaks removeLast/remove(at:), which
+            // correlate keystrokes with entries by id — a backspace would leave a phantom
+            // keystroke behind and the next restore would replay the deleted character.
+            buffer.recordKeystroke(RawKeystroke(keyCode: keystroke.keyCode, isCaps: keystroke.isCaps))
+        }
+        forceLiteralWord = true
+        logCallback?("earlyLiteralGuard: '\(word)' dead (\(reason)), restored \(displayed) -> \(raw.count) raw chars")
+        return true
+    }
+
+    /// Keys that append or transform a vowel: the guard defers on these (see above).
+    private static let vowelProducingKeys: Set<UInt16> = [
+        VietnameseData.KEY_A, VietnameseData.KEY_E, VietnameseData.KEY_I,
+        VietnameseData.KEY_O, VietnameseData.KEY_U, VietnameseData.KEY_Y,
+        VietnameseData.KEY_W,
+        VietnameseData.KEY_LEFT_BRACKET, VietnameseData.KEY_RIGHT_BRACKET,
+    ]
+
+    /// Vowel groups that only occur in Vietnamese loanwords shipped in vi-DauCu.dic
+    /// ("coóc", "boóng", "khoào", "ngoáo", "palăng", …). They are not in
+    /// `VowelSequenceValidator.validSequences` — adding them there would change tone
+    /// placement and insertAOE everywhere — so the guard exempts them here. Without this
+    /// the guard would rewrite those words to raw keystrokes on a machine that has not
+    /// downloaded the dictionary (the dictionary exemption is the only other cover).
+    private static let loanwordVowelGroups: [[VNVowel]] = [
+        [.o, .o],        // coóc, soóc, boóng, toòng, goòng, choòng, xoong
+        [.o, .a, .o],    // khoào, ngoáo
+        [.a, .aBreve],   // palăng
+    ]
+
+    /// Does the current state prove the word can never become Vietnamese?
+    private func deadStateReason() -> String? {
+        if let initialReason = deadInitialClusterReason() { return initialReason }
+        findAndCalculateVowel()
+        guard vowelCount > 0 else { return nil }
+        let sequence = getCurrentVowelSequence()
+        if !sequence.isEmpty,
+           !VowelSequenceValidator.isExtendableOrValid(sequence),
+           !Self.loanwordVowelGroups.contains(sequence) {
+            return "vowels"
+        }
+
+        var finalRun = ""
+        var i = Int(index) - 1
+        while i > Int(vowelEndIndex) {
+            finalRun = String(Self.keyCodeToChar(chr(i)) ?? "?") + finalRun
+            i -= 1
+        }
+        guard !finalRun.isEmpty else { return nil }
+        // 'l' never ends a Vietnamese word, but it is a medial in loanwords
+        // (palăng, balô, lô). A lone 'l' is still extendable, so defer; once a
+        // consonant follows it the run can never be Vietnamese ("world" -> "wỏld").
+        if finalRun == "l" { return nil }
+        let validPrefix = vietnameseData.endConsonantTable.contains { pattern in
+            guard pattern.count >= finalRun.count else { return false }
+            let prefix = pattern.prefix(finalRun.count).compactMap {
+                Self.keyCodeToChar($0 & ~VietnameseData.END_CONSONANT_MASK)
+            }
+            return String(prefix) == finalRun
+        }
+        return validPrefix ? nil : "final"
+    }
+
+    /// A custom consonant is a valid initial only by itself. Early English detection
+    /// exempts anything starting with one of them, so without this the rest of such a
+    /// word is still treated as Vietnamese: "whisker" -> "whíkẻ" with W enabled.
+    /// Only runs when a non-empty consonant run starts with a custom consonant —
+    /// every other impossible initial is already caught by early English detection.
+    private func deadInitialClusterReason() -> String? {
+        guard !vCustomConsonants.isEmpty, index >= 2 else { return nil }
+        var run: [UInt16] = []
+        for i in 0..<Int(index) {
+            let key = chr(i)
+            guard vietnameseData.isConsonant(key),
+                  let char = Self.keyCodeToChar(key), char.isLetter else { break }
+            run.append(key)
+        }
+        guard run.count >= 2,
+              let first = Self.keyCodeToChar(run[0]),
+              customConsonantChars.contains(Character(first.lowercased())) else { return nil }
+        let validPrefix = vietnameseData.consonantTable.contains { pattern in
+            guard pattern.count >= run.count else { return false }
+            return pattern.prefix(run.count).enumerated().allSatisfy { i, patternKey in
+                let base = patternKey & ~(VietnameseData.CONSONANT_ALLOW_MASK | VietnameseData.END_CONSONANT_MASK)
+                let unmaskAllow = (patternKey & VietnameseData.CONSONANT_ALLOW_MASK) != 0
+                    && vCustomConsonants.contains(base)
+                let masked = patternKey & ~((unmaskAllow ? VietnameseData.CONSONANT_ALLOW_MASK : 0)
+                    | (vQuickStartConsonant == 1 ? VietnameseData.END_CONSONANT_MASK : 0))
+                return masked == run[i]
+            }
+        }
+        return validPrefix ? nil : "initial"
     }
     
     /// Process backspace key
@@ -3483,8 +3687,30 @@ extension VNEngine {
                 let wordToCheck = getCurrentWord()
 
                 // Check if the word is valid Vietnamese
-                let isValidWord = checkWordSpelling(word: wordToCheck)
+                var isValidWord = checkWordSpelling(word: wordToCheck)
                 logCallback?("processWordBreak: wordToCheck='\(wordToCheck)', isValid=\(isValidWord)")
+
+                // Custom consonants exempt the word from the dictionary check, which also
+                // hides structurally dead words ("wifi" -> "wìi", vowel group "ii").
+                // Structure is authoritative: a word that can never be Vietnamese still
+                // restores. Dictionary/user-dictionary words keep their say.
+                if isValidWord, !vCustomConsonants.isEmpty, hasVietnameseProcessing(),
+                   !SharedSettings.shared.isWordInUserDictionary(wordToCheck),
+                   wordToCheck.lowercased().contains(where: { customConsonantChars.contains($0) }) {
+                    let style: VNDictionaryManager.DictionaryStyle =
+                        SharedSettings.shared.modernStyle ? .dauMoi : .dauCu
+                    let inDictionary = VNDictionaryManager.shared.isDictionaryLoaded(style: style)
+                        && VNDictionaryManager.shared.isValidWord(wordToCheck, style: style)
+                    if !inDictionary {
+                        let savedVC = vowelCount, savedVS = vowelStartIndex, savedVE = vowelEndIndex
+                        let deadReason = deadStateReason()
+                        vowelCount = savedVC; vowelStartIndex = savedVS; vowelEndIndex = savedVE
+                        if let deadReason {
+                            isValidWord = false
+                            logCallback?("processWordBreak: '\(wordToCheck)' dead (\(deadReason)) despite custom-consonant exemption, forcing restore")
+                        }
+                    }
+                }
 
                 if !isValidWord {
                     // Not using AX - check if word has Vietnamese processing

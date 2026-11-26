@@ -2924,6 +2924,272 @@ class VNEngineTests: XCTestCase {
                                  ("k",K,false),("s",S,false)]), "Lắk", "Caps Lawks → Lắk")
     }
 
+    // MARK: - Early literal guard (dead vowel group / final consonant while typing)
+
+    /// A Telex tone letter must never sit on a vowel group that can never be Vietnamese.
+    /// Before the guard: "sear" rendered "sẻa" until the word break restored it.
+    func testEarlyLiteralGuard_EnglishStaysLiteral() {
+        XCTAssertEqual(typeTelex("sear"), "sear", "'ea' can never be Vietnamese")
+        XCTAssertEqual(typeTelex("search"), "search")
+        XCTAssertEqual(typeTelex("aerial"), "aerial", "'ae' can never be Vietnamese")
+        XCTAssertEqual(typeTelex("street"), "street")
+        XCTAssertEqual(typeTelex("bladed"), "bladed", "final 'd' can never be Vietnamese")
+        XCTAssertEqual(typeTelex("bejazz"), "bejazz")
+        XCTAssertEqual(typeTelex("womb"), "womb", "final 'mb' can never be Vietnamese")
+        XCTAssertEqual(typeTelex("whisker"), "whisker", "'w' vowel must not block the guard")
+        XCTAssertEqual(typeTelex("caress"), "caress", "mark applied first, guard restores raw")
+    }
+
+    /// The guard must never fire on real Vietnamese, including free-mark and qu/gi words.
+    func testEarlyLiteralGuard_VietnameseUnaffected() {
+        XCTAssertEqual(typeTelex("vieejt"), "việt")
+        XCTAssertEqual(typeTelex("khoong"), "không")
+        XCTAssertEqual(typeTelex("nguowif"), "người")
+        XCTAssertEqual(typeTelex("quyeenj"), "quyện")
+        XCTAssertEqual(typeTelex("giawcj"), "giặc")
+        XCTAssertEqual(typeTelex("bawts"), "bắt")
+        XCTAssertEqual(typeTelex("toans"), "toán")
+        XCTAssertEqual(typeTelex("nghieeng"), "nghiêng")
+    }
+
+    /// Double-key escapes intentionally produce "impossible" Vietnamese and must survive.
+    func testEarlyLiteralGuard_EscapesPreserved() {
+        XCTAssertEqual(typeTelex("karr"), "kar", "double r escapes to a literal final r")
+        XCTAssertEqual(typeTelex("toff"), "tof", "double f escapes to a literal final f")
+        XCTAssertEqual(typeTelex("maxx"), "max", "double x escapes to a literal final x")
+        XCTAssertEqual(typeTelex("carr"), "car")
+    }
+
+    /// 'w' -> ư exists in Telex and both Simple Telex modes; the guard is
+    /// input-type agnostic (vowel-sequence validity), so all three must behave alike.
+    /// VNI must keep composing normally.
+    func testEarlyLiteralGuard_AllInputMethods() {
+        func typeWith(_ input: String, type: Int) -> String {
+            engine.reset()
+            engine.vInputType = type
+            for ch in input {
+                _ = engine.processKey(character: ch,
+                                      keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                      isUppercase: false)
+            }
+            return engine.getCurrentWord()
+        }
+        for type in [0, 2, 3] {
+            XCTAssertEqual(typeWith("sear", type: type), "sear", "telex-family type \(type)")
+            XCTAssertEqual(typeWith("vieejt", type: type), "việt", "Vietnamese type \(type)")
+        }
+        // w -> ư exists in Telex and Simple Telex 2, not in Simple Telex 1.
+        for type in [0, 3] {
+            XCTAssertEqual(typeWith("w", type: type), "ư", "standalone ư type \(type)")
+            XCTAssertEqual(typeWith("womb", type: type), "womb", "w-word type \(type)")
+        }
+        XCTAssertEqual(typeWith("vie6t5", type: 1), "việt", "VNI still composes")
+    }
+
+    /// Custom consonants must not exempt a word from the guard. With W,J,Z,K,F enabled
+    /// (the reported setup) and Simple Telex 1 ('w' stays literal), "whisker" used to
+    /// skip the structural checks entirely and take the s/r tones: "whíkẻ".
+    func testEarlyLiteralGuard_CustomConsonantsStillAnalyzed() {
+        var settings = VNEngine.EngineSettings()
+        settings.inputMethod = .simpleTelex1
+        settings.spellCheckEnabled = true
+        settings.restoreIfWrongSpelling = true
+        settings.customConsonants = [VietnameseData.KEY_W, VietnameseData.KEY_J,
+                                     VietnameseData.KEY_Z, VietnameseData.KEY_K,
+                                     VietnameseData.KEY_F]
+        engine.updateSettings(settings)
+        func type(_ input: String) -> String {
+            engine.reset()
+            for ch in input {
+                _ = engine.processKey(character: ch,
+                                      keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                      isUppercase: false)
+            }
+            return engine.getCurrentWord()
+        }
+        XCTAssertEqual(type("whisker"), "whisker", "custom 'w' must not disable the guard")
+        XCTAssertEqual(type("womb"), "womb", "final 'mb' can never be Vietnamese")
+        XCTAssertEqual(type("with"), "with", "final 'th' can never be Vietnamese")
+        XCTAssertEqual(type("flask"), "flask", "custom 'f' does not make 'fl' a valid initial")
+        XCTAssertEqual(type("zebra"), "zebra", "final 'b' can never be Vietnamese")
+        XCTAssertEqual(type("world"), "world", "final 'ld' can never be Vietnamese")
+        // Deliberately Vietnamese-style custom-consonant words must still compose.
+        XCTAssertEqual(type("was"), "wá", "custom 'w' + valid vowel still takes the tone")
+        XCTAssertEqual(type("zaayj"), "zậy", "custom 'z' word still composes")
+        XCTAssertEqual(type("khoong"), "không", "valid 'kh' initial must not be flagged")
+
+        // The sticky literal flag must not leak past the word boundary.
+        func typeInto(_ input: String) {
+            for ch in input {
+                _ = engine.processKey(character: ch,
+                                      keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                      isUppercase: false)
+            }
+        }
+        engine.reset()
+        typeInto("whisker")
+        _ = engine.processWordBreak(character: " ")
+        typeInto("khoong")
+        XCTAssertEqual(engine.getCurrentWord(), "không", "flag must clear after the space")
+
+        // Backspacing the pinned word back to empty must release it as well.
+        engine.reset()
+        typeInto("whisker")
+        for _ in 0..<7 { _ = engine.processBackspace() }
+        typeInto("khoong")
+        XCTAssertEqual(engine.getCurrentWord(), "không", "clearing the pinned word must clear the flag")
+        engine.updateSettings(VNEngine.EngineSettings())
+    }
+
+    /// All-caps abbreviations are typed literally and must not be restored.
+    func testEarlyLiteralGuard_AllCapsAbbreviation() {
+        engine.reset()
+        for ch in "HCM" {
+            _ = engine.processKey(character: ch,
+                                  keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                  isUppercase: true)
+        }
+        XCTAssertEqual(engine.getCurrentWord(), "HCM")
+    }
+
+    /// The restore must replace exactly the characters on screen. The key being
+    /// processed is not on screen yet, so the count is the buffer size BEFORE the
+    /// event (3: "ươm"), never 4 — an off-by-one would eat the character or space
+    /// typed before the word ("hello " + "womb" -> "hellowomb").
+    func testEarlyLiteralGuard_ReplacesExactlyDisplayedChars() throws {
+        engine.reset()
+        var last: VNEngine.ProcessResult?
+        for ch in "womb" {
+            last = engine.processKey(character: ch,
+                                     keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                     isUppercase: false)
+        }
+        let result = try XCTUnwrap(last)
+        XCTAssertTrue(result.shouldConsume)
+        XCTAssertEqual(result.backspaceCount, 3, "screen showed 3 chars before the 'b' event")
+        XCTAssertEqual(result.newCharacters.map { $0.unicode(codeTable: .unicode) }.joined(), "womb")
+    }
+
+    /// After a restore the buffer must mirror the screen with no phantom keystrokes:
+    /// a backspace deletes exactly one character and leaves the rest intact.
+    func testEarlyLiteralGuard_BackspaceAfterRestore() {
+        engine.reset()
+        for ch in "womb" {
+            _ = engine.processKey(character: ch,
+                                  keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                  isUppercase: false)
+        }
+        // Delete is pass-through (the OS deletes), so nothing is consumed.
+        let bs = engine.processBackspace()
+        XCTAssertFalse(bs.shouldConsume)
+        XCTAssertEqual(engine.getCurrentWord(), "wom", "buffer must drop exactly the 'b'")
+        XCTAssertEqual(engine.buffer.count, 3, "no phantom keystroke left behind")
+    }
+
+    /// All-caps abbreviations are exempt, mixed case is not — "Womb" still restores.
+    func testEarlyLiteralGuard_UppercaseAndMixedCase() {
+        func type(_ chars: [(Character, Bool)]) -> String {
+            engine.reset()
+            for (ch, caps) in chars {
+                let lower = Character(ch.lowercased())
+                _ = engine.processKey(character: ch,
+                                      keyCode: VietnameseData.keyCode(for: lower) ?? 0,
+                                      isUppercase: caps)
+            }
+            return engine.getCurrentWord()
+        }
+        XCTAssertEqual(type([("S", true), ("E", true), ("A", true), ("R", true)]), "SEAR")
+        XCTAssertEqual(type([("W", true), ("o", false), ("m", false), ("b", false)]), "Womb")
+    }
+
+    /// Loanword vowel groups that exist only in the shipped dictionary ("coóc",
+    /// "khoào", "palăng") are exempt, so they keep composing into Vietnamese instead
+    /// of being restored to raw keystrokes on installs without the dictionary.
+    func testEarlyLiteralGuard_LoanwordGroupsStayComposed() {
+        XCTAssertNotEqual(typeTelex("coocs"), "coocs")
+        XCTAssertNotEqual(typeTelex("khoaof"), "khoaof")
+    }
+
+    /// The guard obeys the same desync flags as every other restore path.
+    func testEarlyLiteralGuard_RespectsDesyncFlags() {
+        engine.reset()
+        engine.bufferDesyncDetected = true
+        for ch in "sear" {
+            _ = engine.processKey(character: ch,
+                                  keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                  isUppercase: false)
+        }
+        // Guard dormant: the legacy composed output shows up (diacritic kept).
+        XCTAssertNotEqual(engine.getCurrentWord(), "sear",
+                          "guard must stay dormant while desynced")
+    }
+
+    /// A custom consonant is a valid initial by itself; the rest of the word is still
+    /// analyzed, so an English-looking word stays literal.
+    func testEarlyLiteralGuard_CustomConsonantNotExempt() {
+        engine.reset()
+        engine.vCustomConsonants = [VietnameseData.KEY_Z]
+        for ch in "zear" {
+            _ = engine.processKey(character: ch,
+                                  keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                  isUppercase: false)
+        }
+        XCTAssertEqual(engine.getCurrentWord(), "zear", "custom-consonant word must still be analyzed")
+    }
+
+    /// The custom-consonant exemption in checkWordSpelling hides structurally dead
+    /// words from the word-break restore ("wifi" -> "wìi", vowel group "ii").
+    /// Structure wins at the boundary, but only for words with a custom letter;
+    /// genuine Vietnamese custom-initial words must survive untouched.
+    func testWordBreak_CustomConsonantDeadStructureRestores() {
+        var settings = VNEngine.EngineSettings()
+        settings.inputMethod = .simpleTelex1
+        settings.spellCheckEnabled = true
+        settings.restoreIfWrongSpelling = true
+        settings.customConsonants = [VietnameseData.KEY_W, VietnameseData.KEY_J,
+                                     VietnameseData.KEY_Z, VietnameseData.KEY_K,
+                                     VietnameseData.KEY_F]
+        engine.updateSettings(settings)
+        func type(_ input: String) -> (mid: String, breakResult: VNEngine.ProcessResult) {
+            engine.reset()
+            for ch in input {
+                _ = engine.processKey(character: ch,
+                                      keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                      isUppercase: false)
+            }
+            return (engine.getCurrentWord(), engine.processWordBreak(character: " "))
+        }
+
+        let wifi = type("wifi")
+        XCTAssertEqual(wifi.mid, "wìi", "intermediate composition stays as before")
+        XCTAssertTrue(wifi.breakResult.shouldConsume, "dead 'ii' group must restore at the boundary")
+        XCTAssertEqual(wifi.breakResult.backspaceCount, 3, "screen showed 3 chars for 'wìi'")
+        XCTAssertEqual(wifi.breakResult.newCharacters.map { $0.unicode(codeTable: .unicode) }.joined(),
+                       "wifi ", "restore rebuilds the raw keystrokes plus the space")
+
+        let was = type("was")
+        XCTAssertEqual(was.mid, "wá")
+        XCTAssertFalse(was.breakResult.shouldConsume, "structurally valid custom-initial word must survive")
+
+        let khoong = type("khoong")
+        XCTAssertEqual(khoong.mid, "không")
+        XCTAssertFalse(khoong.breakResult.shouldConsume, "valid 'kh' initial must not be flagged")
+
+        engine.updateSettings(VNEngine.EngineSettings())
+    }
+
+    /// VNI digits are tone keys too: a dead vowel group must stay literal there as well.
+    func testEarlyLiteralGuard_VNIStaysLiteral() {
+        engine.reset()
+        engine.vInputType = 1
+        for ch in "ae1" {
+            _ = engine.processKey(character: ch,
+                                  keyCode: VietnameseData.keyCode(for: ch) ?? 0,
+                                  isUppercase: false)
+        }
+        XCTAssertEqual(engine.getCurrentWord(), "ae1", "'ae' can never be Vietnamese in VNI")
+    }
+
     /// REGRESSION: normal typing proper-name abbreviations must allow uppercase Đ
     /// followed by an uppercase consonant (ĐL/ĐN) without restoring to raw DDL/DDN.
     /// Lowercase đl/đn still follow normal spell-check path (no uppercase bypass).
